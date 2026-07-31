@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /access_codes/{codeId} {
+      // La app (sin iniciar sesión) puede CONSULTAR un código puntual si ya sabe cuál es
+      // (para validarlo al ingresar), pero NO puede listar todos los códigos existentes.
+      allow get: if true;
+
+      // Solo un administrador con sesión iniciada (panel web) puede listar, crear,
+      // editar o borrar códigos.
+      allow list, create, update, delete: if request.auth != null;
+    }
+  }
+}

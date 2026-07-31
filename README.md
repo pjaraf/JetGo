@@ -160,6 +160,55 @@ Incluye TODOS los formatos que Android necesita para que se vea nítido en cualq
 Si más adelante quieres tu propio logo/marca en vez de este, solo reemplaza esos mismos archivos
 manteniendo nombre y carpeta — no hace falta tocar código.
 
+## Código de acceso + panel de administración (Firebase)
+
+La app ahora pide un código de acceso antes de dejar usarla. Los códigos se generan y
+administran desde un panel web (`docs/index.html`, hosteado gratis con GitHub Pages),
+y se guardan en **Firestore** (base de datos de Google Firebase, plan gratuito).
+
+### 1) Crear el proyecto de Firebase (una sola vez)
+1. Ve a [console.firebase.google.com](https://console.firebase.google.com) e inicia sesión con Google.
+2. **Agregar proyecto** → ponle un nombre (ej. "JetGo") → puedes desactivar Google Analytics → **Crear proyecto**.
+3. En el menú izquierdo: **Compilación → Firestore Database → Crear base de datos**.
+   - Elige una ubicación (cualquiera cercana a tus clientes está bien) → modo **producción**.
+4. Ve a **Firestore Database → Reglas** y reemplaza todo el contenido por el que está en
+   `firestore.rules` (incluido en este repo) → **Publicar**.
+5. Ve a **Compilación → Authentication → Comenzar** → pestaña **Sign-in method** →
+   habilita **Correo electrónico/contraseña**.
+6. Pestaña **Users** → **Add user** → crea tu propio usuario administrador
+   (el correo/contraseña con los que vas a entrar al panel).
+
+### 2) Conectar la app Android a tu proyecto
+1. En Firebase: **⚙️ (Configuración del proyecto)** → copia el **ID del proyecto**
+   (algo como `jetgo-a1b2c`).
+2. Pégalo en `app/src/main/res/values/strings.xml`, en la línea:
+   ```xml
+   <string name="firebase_project_id">TU_PROJECT_ID_AQUI</string>
+   ```
+
+### 3) Conectar el panel web a tu proyecto
+1. En Firebase: **⚙️ (Configuración del proyecto)** → baja hasta "Tus apps" → ícono `</>` (Web)
+   → dale un nombre → **Registrar app** (no hace falta hosting de Firebase).
+2. Te va a mostrar un bloque `firebaseConfig = { apiKey: ..., authDomain: ..., ... }`. Copia
+   ese objeto completo y pégalo en `docs/index.html`, reemplazando el que dice
+   `TU_API_KEY`, `TU_PROJECT_ID`, etc.
+
+### 4) Publicar el panel con GitHub Pages
+1. En tu repositorio de GitHub: **Settings → Pages**.
+2. En "Source" elige **Deploy from a branch**, branch **main**, carpeta **/docs** → **Save**.
+3. Espera 1-2 minutos. Tu panel quedará disponible en algo como:
+   `https://pjaraf.github.io/JetGo/`
+4. Entra ahí, inicia sesión con el usuario administrador que creaste en el paso 1.6,
+   y ya puedes generar códigos con el botón "Generar nuevo código".
+
+### Cómo funciona para tus clientes
+- Le compartes el código generado (ej. `X7K9-QRT2`).
+- Al abrir la app por primera vez, se lo piden antes de cualquier otra cosa.
+- Una vez validado, el teléfono lo recuerda (no lo vuelve a pedir), pero **cada vez que abre
+  la app se revalida contra Firestore** — así que si revocas ("Revocar") o eliminas
+  ("Eliminar") un código desde el panel, en la próxima apertura de la app ese cliente pierde
+  el acceso automáticamente y le vuelve a pedir un código.
+
 ## Notas técnicas importantes
 - `minSdk = 21` para máxima compatibilidad con TV Box antiguos.
 - El foco naranja de las tarjetas (igual al de tu captura de referencia) funciona tanto

@@ -25,6 +25,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.data.model.ContentType
+import com.jetgo.tv.ui.screens.AccessCodeScreen
 import com.jetgo.tv.ui.screens.CategoryPickerScreen
 import com.jetgo.tv.ui.components.FullscreenPlayerEffect
 import com.jetgo.tv.ui.components.FullscreenPlayerOverlay
@@ -71,6 +72,7 @@ private fun categoryFromRoute(route: String?): ContentType = when (route) {
 @Composable
 private fun AppRoot(viewModel: HomeViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+    val accessState by viewModel.accessState.collectAsState()
     val isFullscreen by viewModel.isFullscreenPlayer.collectAsState()
     val updateInfo by viewModel.updateInfo.collectAsState()
     val context = LocalContext.current
@@ -84,12 +86,23 @@ private fun AppRoot(viewModel: HomeViewModel) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (updateInfo != null && uiState.isConfigured && !isFullscreen) {
+            if (updateInfo != null && uiState.isConfigured && accessState.isGranted && !isFullscreen) {
                 UpdateBanner(updateInfo = updateInfo!!)
             }
 
             Box(modifier = Modifier.weight(1f)) {
                 when {
+                    accessState.isChecking -> {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    }
+                    !accessState.isGranted -> {
+                        // ---- Filtro de código de acceso: se muestra ANTES que todo lo demás ----
+                        AccessCodeScreen(
+                            isChecking = false,
+                            errorMessage = accessState.errorMessage,
+                            onSubmitCode = { viewModel.submitAccessCode(it) }
+                        )
+                    }
                     uiState.isLoading && !uiState.isConfigured -> {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                     }

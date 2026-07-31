@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.jetgo.tv.BuildConfig
+import com.jetgo.tv.data.local.AccessStore
 import com.jetgo.tv.data.local.ConfigStore
 import com.jetgo.tv.data.local.FavoritesStore
 import com.jetgo.tv.data.model.Category
@@ -15,12 +16,14 @@ import com.jetgo.tv.data.model.SeriesDetail
 import com.jetgo.tv.data.model.SeriesEpisode
 import com.jetgo.tv.data.repository.StreamRepository
 import com.jetgo.tv.player.PlayerManager
+import com.jetgo.tv.util.AccessCodeChecker
 import com.jetgo.tv.util.UpdateChecker
 import com.jetgo.tv.util.UpdateInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -28,6 +31,12 @@ data class HomeUiState(
     val isLoading: Boolean = false,
     val isConfigured: Boolean = false,
     val liveChannels: List<Channel> = emptyList(),
+    val errorMessage: String? = null
+)
+
+data class AccessUiState(
+    val isChecking: Boolean = true, // empieza en true: revisando si ya hay un código guardado
+    val isGranted: Boolean = false,
     val errorMessage: String? = null
 )
 
@@ -69,7 +78,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = StreamRepository()
     private val configStore = ConfigStore(application)
     private val favoritesStore = FavoritesStore(application)
+    private val accessStore = AccessStore(application)
     val playerManager = PlayerManager(application)
+
+    private val _accessState = MutableStateFlow(AccessUiState())
+    val accessState: StateFlow<AccessUiState> = _accessState.asStateFlow()
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -118,6 +131,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private var searchCatalog: List<ContentItem>? = null
 
     init {
+        checkStoredAccess()
+
         viewModelScope.launch {
             configStore.mode.collect { currentMode = it }
         }
@@ -131,6 +146,51 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             favoritesStore.favorites.collect { _favorites.value = it }
         }
         checkForUpdate()
+    }
+
+    /** Al abrir la app: si ya había un código guardado, lo re-valida contra Firestore
+     *  (así una revocación hecha desde el panel de administración sí toma efecto). */
+    private fun checkStoredAccess() {
+        viewModelScope.launch {
+            val projectId = getApplication<Application>().getString(com.jetgo.tv.R.string.firebase_project_id)
+            val savedCode = accessStore.savedCode.first()
+
+            if (savedCode.isNullOrBlank()) {
+                _accessState.value = AccessUiState(isChecking = false, isGranted = false)
+                return@launch
+            }
+
+            val valid = withContext(Dispatchers.IO) {
+                AccessCodeChecker.isCodeValid(projectId, savedCode)
+            }
+
+            if (valid) {
+                _accessState.value = AccessUiState(isChecking = false, isGranted = true)
+            } else {
+                accessStore.clear()
+                _accessState.value = AccessUiState(isChecking = false, isGranted = false, errorMessage = null)
+            }
+        }
+    }
+
+    fun submitAccessCode(code: String) {
+        _accessState.value = _accessState.value.copy(isChecking = true, errorMessage = null)
+        viewModelScope.launch {
+            val projectId = getApplication<Application>().getString(com.jetgo.tv.R.string.firebase_project_id)
+            val valid = withContext(Dispatchers.IO) {
+                AccessCodeChecker.isCodeValid(projectId, code)
+            }
+            if (valid) {
+                accessStore.saveCode(code.trim().uppercase())
+                _accessState.value = AccessUiState(isChecking = false, isGranted = true)
+            } else {
+                _accessState.value = AccessUiState(
+                    isChecking = false,
+                    isGranted = false,
+                    errorMessage = "Código inválido o inactivo"
+                )
+            }
+        }
     }
 
     /** Consulta en segundo plano si hay una versión más nueva publicada en GitHub Releases */

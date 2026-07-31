@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>JetGo · Panel de códigos de acceso</title>
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #1a1d24;
+    --surface2: #22262f;
+    --orange: #ff7a2e;
+    --green: #3ddc84;
+    --red: #e5493b;
+    --text: #ffffff;
+    --muted: #9aa0ab;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  }
+  .container { max-width: 720px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  p.subtitle { color: var(--muted); margin-top: 0; font-size: 14px; }
+
+  .card {
+    background: var(--surface);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid #333842;
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 15px;
+    margin-bottom: 12px;
+  }
+  input:focus { outline: 2px solid var(--orange); }
+
+  button {
+    width: 100%;
+    padding: 13px 14px;
+    border-radius: 10px;
+    border: none;
+    background: var(--orange);
+    color: #1a1200;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.secondary { background: var(--surface2); color: var(--text); }
+  button.danger { background: var(--red); color: white; }
+
+  #error { color: var(--red); font-size: 14px; margin-top: 8px; }
+  #logout { display: none; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th, td { text-align: left; padding: 10px 8px; font-size: 13px; border-bottom: 1px solid #262a33; }
+  th { color: var(--muted); font-weight: 600; }
+  .code-cell { font-family: monospace; font-size: 15px; letter-spacing: 1px; }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700;
+  }
+  .badge.active { background: rgba(61,220,132,0.15); color: var(--green); }
+  .badge.revoked { background: rgba(229,73,59,0.15); color: var(--red); }
+  .actions-cell button { width: auto; padding: 6px 10px; font-size: 12px; margin-right: 6px; }
+  #copyToast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--green); color: #06210f; padding: 10px 18px; border-radius: 30px;
+    font-size: 14px; font-weight: 700; display: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>JetGo · Códigos de acceso</h1>
+  <p class="subtitle">Panel para generar y administrar los códigos de acceso de tus clientes.</p>
+
+  <!-- ---------- LOGIN ---------- -->
+  <div class="card" id="loginCard">
+    <input id="email" type="email" placeholder="Correo de administrador" autocomplete="username" />
+    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" />
+    <button id="loginBtn">Iniciar sesión</button>
+    <div id="error"></div>
+  </div>
+
+  <!-- ---------- PANEL (visible tras iniciar sesión) ---------- -->
+  <div id="panel" style="display:none;">
+
+    <div class="card">
+      <input id="clientName" type="text" placeholder="Nombre del cliente (opcional)" />
+      <button id="generateBtn">Generar nuevo código</button>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Código</th><th>Cliente</th><th>Estado</th><th>Acciones</th></tr>
+        </thead>
+        <tbody id="codesTableBody">
+          <tr><td colspan="4" style="color:var(--muted)">Cargando códigos...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <button class="secondary" id="logout">Cerrar sesión</button>
+  </div>
+</div>
+
+<div id="copyToast">Código copiado</div>
+
+<!-- Firebase (SDK compat, sin necesidad de bundler) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script>
+  // =========================================================================
+  // 1) PEGA AQUI la configuracion de tu proyecto de Firebase
+  //    (Consola de Firebase -> Configuracion del proyecto -> tus apps -> SDK setup)
+  // =========================================================================
+  const firebaseConfig = {
+    apiKey: "AIzaSyCUVh9xAH_9Fc7V3ng21OvInhzwjO1NmRg",
+    authDomain: "jetgo-f0127.firebaseapp.com",
+    projectId: "jetgo-f0127",
+    storageBucket: "jetgo-f0127.firebasestorage.app",
+    messagingSenderId: "880287180978",
+    appId: "1:880287180978:web:019ab79dd76a24d96e81ab"
+  };
+  // =========================================================================
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  const loginCard = document.getElementById('loginCard');
+  const panel = document.getElementById('panel');
+  const errorEl = document.getElementById('error');
+
+  document.getElementById('loginBtn').addEventListener('click', () => {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    errorEl.textContent = '';
+    auth.signInWithEmailAndPassword(email, password)
+      .catch(err => { errorEl.textContent = 'No se pudo iniciar sesion: ' + err.message; });
+  });
+
+  document.getElementById('logout').addEventListener('click', () => auth.signOut());
+
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      loginCard.style.display = 'none';
+      panel.style.display = 'block';
+      document.getElementById('logout').style.display = 'block';
+      listenToCodes();
+    } else {
+      loginCard.style.display = 'block';
+      panel.style.display = 'none';
+      document.getElementById('logout').style.display = 'none';
+    }
+  });
+
+  // ---------- Generar un codigo nuevo ----------
+  function generateRandomCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin 0/O/1/I para evitar confusiones
+    let code = '';
+    for (let i = 0; i < 8; i++) {
+      if (i === 4) code += '-';
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return code;
+  }
+
+  document.getElementById('generateBtn').addEventListener('click', async () => {
+    const clientName = document.getElementById('clientName').value.trim();
+    const code = generateRandomCode();
+    await db.collection('access_codes').doc(code).set({
+      active: true,
+      clientName: clientName || null,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById('clientName').value = '';
+    showToast('Codigo generado: ' + code);
+  });
+
+  // ---------- Listar codigos en tiempo real ----------
+  function listenToCodes() {
+    db.collection('access_codes').orderBy('createdAt', 'desc')
+      .onSnapshot(snapshot => {
+        const tbody = document.getElementById('codesTableBody');
+        if (snapshot.empty) {
+          tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Todavia no hay codigos generados.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = '';
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const code = doc.id;
+          const active = data.active !== false;
+          const tr = document.createElement('tr');
+          tr.innerHTML =
+            '<td class="code-cell">' + code + '</td>' +
+            '<td>' + (data.clientName || '<span style="color:var(--muted)">-</span>') + '</td>' +
+            '<td><span class="badge ' + (active ? 'active' : 'revoked') + '">' + (active ? 'Activo' : 'Revocado') + '</span></td>' +
+            '<td class="actions-cell">' +
+              '<button class="secondary" onclick="copyCode(\'' + code + '\')">Copiar</button>' +
+              '<button class="' + (active ? 'danger' : 'secondary') + '" onclick="toggleActive(\'' + code + '\', ' + active + ')">' + (active ? 'Revocar' : 'Reactivar') + '</button>' +
+              '<button class="danger" onclick="deleteCode(\'' + code + '\')">Eliminar</button>' +
+            '</td>';
+          tbody.appendChild(tr);
+        });
+      });
+  }
+
+  window.toggleActive = async (code, currentlyActive) => {
+    await db.collection('access_codes').doc(code).update({ active: !currentlyActive });
+  };
+
+  window.deleteCode = async (code) => {
+    if (!confirm('Eliminar el codigo ' + code + '? Esta accion no se puede deshacer.')) return;
+    await db.collection('access_codes').doc(code).delete();
+  };
+
+  window.copyCode = (code) => {
+    navigator.clipboard.writeText(code);
+    showToast('Codigo copiado');
+  };
+
+  function showToast(msg) {
+    const toast = document.getElementById('copyToast');
+    toast.textContent = msg;
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 2000);
+  }
+</script>
+</body>
+</html>
