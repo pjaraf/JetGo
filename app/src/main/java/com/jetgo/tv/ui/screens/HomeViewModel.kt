@@ -3,6 +3,7 @@ package com.jetgo.tv.ui.screens
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.jetgo.tv.BuildConfig
 import com.jetgo.tv.data.local.ConfigStore
 import com.jetgo.tv.data.local.FavoritesStore
 import com.jetgo.tv.data.model.Category
@@ -14,10 +15,14 @@ import com.jetgo.tv.data.model.SeriesDetail
 import com.jetgo.tv.data.model.SeriesEpisode
 import com.jetgo.tv.data.repository.StreamRepository
 import com.jetgo.tv.player.PlayerManager
+import com.jetgo.tv.util.UpdateChecker
+import com.jetgo.tv.util.UpdateInfo
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class HomeUiState(
     val isLoading: Boolean = false,
@@ -103,6 +108,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _seriesDetailState = MutableStateFlow(SeriesDetailUiState())
     val seriesDetailState: StateFlow<SeriesDetailUiState> = _seriesDetailState.asStateFlow()
 
+    private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
+    val updateInfo: StateFlow<UpdateInfo?> = _updateInfo.asStateFlow()
+
     private var currentConfig: ServerConfig? = null
     private var currentMode: String = "xtream" // "xtream" o "m3u"
 
@@ -122,7 +130,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             favoritesStore.favorites.collect { _favorites.value = it }
         }
+        checkForUpdate()
     }
+
+    /** Consulta en segundo plano si hay una versión más nueva publicada en GitHub Releases */
+    private fun checkForUpdate() {
+        viewModelScope.launch {
+            val info = withContext(Dispatchers.IO) {
+                UpdateChecker.checkForUpdate(BuildConfig.GITHUB_REPO, BuildConfig.VERSION_CODE)
+            }
+            _updateInfo.value = info
+        }
+    }
+
 
     fun connectXtream(config: ServerConfig) {
         viewModelScope.launch {

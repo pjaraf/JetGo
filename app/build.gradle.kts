@@ -24,8 +24,12 @@ android {
         applicationId = "com.jetgo.tv"
         minSdk = 21          // cubre teléfonos, tablets, TV box y Android TV/Google TV
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        // El número de build de GitHub Actions se usa como versionCode, así la app
+        // puede compararlo con el que trae la última Release y saber si hay que actualizar.
+        versionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
+        versionName = "1.0.${versionCode}"
+
+        buildConfigField("String", "GITHUB_REPO", "\"pjaraf/JetGo\"")
     }
 
     signingConfigs {
@@ -59,6 +63,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"

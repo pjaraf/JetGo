@@ -30,6 +30,7 @@ import com.jetgo.tv.ui.components.FullscreenPlayerEffect
 import com.jetgo.tv.ui.components.FullscreenPlayerOverlay
 import com.jetgo.tv.ui.components.PhoneBottomNav
 import com.jetgo.tv.ui.components.PhoneMainTab
+import com.jetgo.tv.ui.components.UpdateBanner
 import com.jetgo.tv.ui.screens.ChannelListScreen
 import com.jetgo.tv.ui.screens.FavoritesScreen
 import com.jetgo.tv.ui.screens.HomeScreen
@@ -71,6 +72,7 @@ private fun categoryFromRoute(route: String?): ContentType = when (route) {
 private fun AppRoot(viewModel: HomeViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val isFullscreen by viewModel.isFullscreenPlayer.collectAsState()
+    val updateInfo by viewModel.updateInfo.collectAsState()
     val context = LocalContext.current
     val isTv = remember { isTelevision(context) }
 
@@ -81,26 +83,34 @@ private fun AppRoot(viewModel: HomeViewModel) {
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
-        when {
-            uiState.isLoading && !uiState.isConfigured -> {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (updateInfo != null && uiState.isConfigured && !isFullscreen) {
+                UpdateBanner(updateInfo = updateInfo!!)
             }
-            !uiState.isConfigured -> {
-                SetupScreen(
-                    isLoading = uiState.isLoading,
-                    errorMessage = uiState.errorMessage,
-                    onConnectXtream = { viewModel.connectXtream(it) },
-                    onConnectM3u = { viewModel.connectM3u(it) }
-                )
-            }
-            isTv -> {
-                // ---- Interfaz original para Android TV / Google TV / TV Box (sin cambios) ----
-                val navController = rememberNavController()
-                DashboardNavHost(navController, viewModel)
-            }
-            else -> {
-                // ---- Interfaz para teléfonos: barra inferior Inicio / TV / Perfil ----
-                PhoneApp(viewModel)
+
+            Box(modifier = Modifier.weight(1f)) {
+                when {
+                    uiState.isLoading && !uiState.isConfigured -> {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    }
+                    !uiState.isConfigured -> {
+                        SetupScreen(
+                            isLoading = uiState.isLoading,
+                            errorMessage = uiState.errorMessage,
+                            onConnectXtream = { viewModel.connectXtream(it) },
+                            onConnectM3u = { viewModel.connectM3u(it) }
+                        )
+                    }
+                    isTv -> {
+                        // ---- Interfaz original para Android TV / Google TV / TV Box (sin cambios) ----
+                        val navController = rememberNavController()
+                        DashboardNavHost(navController, viewModel)
+                    }
+                    else -> {
+                        // ---- Interfaz para teléfonos: barra inferior Inicio / TV / Perfil ----
+                        PhoneApp(viewModel)
+                    }
+                }
             }
         }
 

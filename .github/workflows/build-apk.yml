@@ -12,6 +12,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Descargar el código del repositorio
@@ -32,7 +34,7 @@ jobs:
           gradle-version: 8.7
 
       - name: Compilar APK debug
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: gradle assembleDebug --no-daemon --stacktrace -PversionCode=${{ github.run_number }}
 
       - name: Subir el APK como artefacto descargable
         uses: actions/upload-artifact@v4
@@ -40,3 +42,27 @@ jobs:
           name: JetGo-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      # ---- Publica/actualiza el Release "latest", que la app instalada consulta
+      #      para detectar automáticamente que hay una versión nueva ----
+      - name: Preparar archivo de versión
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: echo "${{ github.run_number }}" > version.txt
+
+      - name: Eliminar el Release 'latest' anterior (si existe)
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: gh release delete latest --yes --cleanup-tag || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publicar el nuevo Release 'latest'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          gh release create latest \
+            app/build/outputs/apk/debug/app-debug.apk \
+            version.txt \
+            --title "JetGo (build ${{ github.run_number }})" \
+            --notes "Compilación automática desde GitHub Actions (commit ${{ github.sha }})" \
+            --prerelease
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
