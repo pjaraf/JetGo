@@ -35,6 +35,7 @@ import com.jetgo.tv.ui.screens.HomeScreen
 import com.jetgo.tv.ui.screens.HomeViewModel
 import com.jetgo.tv.ui.screens.SearchScreen
 import com.jetgo.tv.ui.screens.SetupScreen
+import com.jetgo.tv.ui.screens.phone.PhoneInicioScreen
 import com.jetgo.tv.ui.screens.phone.PhoneProfileScreen
 import com.jetgo.tv.ui.screens.phone.PhoneTvScreen
 import com.jetgo.tv.ui.theme.JetGoTheme
@@ -216,6 +217,7 @@ private fun PhoneApp(viewModel: HomeViewModel) {
     val categoryContentState by viewModel.categoryContentState.collectAsState()
     val favorites by viewModel.favorites.collectAsState()
     val searchState by viewModel.searchState.collectAsState()
+    val homeCatalog by viewModel.homeCatalog.collectAsState()
 
     BackHandler(enabled = showSearch) { showSearch = false }
 
@@ -239,8 +241,14 @@ private fun PhoneApp(viewModel: HomeViewModel) {
         Box(modifier = Modifier.weight(1f)) {
             when (selectedTab) {
                 PhoneMainTab.INICIO -> {
-                    val navController = rememberNavController()
-                    DashboardNavHost(navController, viewModel)
+                    PhoneInicioScreen(
+                        catalog = homeCatalog,
+                        onEnterScreen = { viewModel.ensureHomeCatalogLoaded() },
+                        onItemClick = { item ->
+                            viewModel.selectContentItem(item) { viewModel.enterFullscreenPlayer() }
+                        },
+                        onSearchClick = { showSearch = true }
+                    )
                 }
                 PhoneMainTab.TV -> {
                     PhoneTvScreen(

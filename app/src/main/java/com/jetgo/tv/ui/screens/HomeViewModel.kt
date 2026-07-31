@@ -42,6 +42,13 @@ data class SearchUiState(
     val results: List<ContentItem> = emptyList()
 )
 
+data class HomeCatalogState(
+    val isLoading: Boolean = false,
+    val movies: List<ContentItem> = emptyList(),
+    val series: List<ContentItem> = emptyList(),
+    val anime: List<ContentItem> = emptyList()
+)
+
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = StreamRepository()
@@ -78,6 +85,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _searchState = MutableStateFlow(SearchUiState())
     val searchState: StateFlow<SearchUiState> = _searchState.asStateFlow()
+
+    private val _homeCatalog = MutableStateFlow(HomeCatalogState())
+    val homeCatalog: StateFlow<HomeCatalogState> = _homeCatalog.asStateFlow()
+    private var homeCatalogLoaded = false
 
     private var currentConfig: ServerConfig? = null
     private var currentMode: String = "xtream" // "xtream" o "m3u"
@@ -309,6 +320,41 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             it.name.contains(query, ignoreCase = true)
         }
         _searchState.value = _searchState.value.copy(results = results)
+    }
+
+    /** Carga (una sola vez) películas/series/anime destacados para la pantalla de Inicio */
+    fun ensureHomeCatalogLoaded() {
+        if (homeCatalogLoaded || _homeCatalog.value.isLoading) return
+
+        if (currentMode == "m3u") {
+            homeCatalogLoaded = true
+            return
+        }
+        val config = currentConfig ?: return
+
+        _homeCatalog.value = _homeCatalog.value.copy(isLoading = true)
+        viewModelScope.launch {
+            val movies = try {
+                repository.getMovies(config, categoryId = null).map {
+                    ContentItem(it.streamId, it.name, it.coverUrl, ContentType.MOVIE, it.streamUrl)
+                }
+            } catch (e: Exception) { emptyList() }
+
+            val series = try {
+                repository.getSeries(config, categoryId = null).map {
+                    ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null)
+                }
+            } catch (e: Exception) { emptyList() }
+
+            val anime = try {
+                repository.getMoviesByCategoryKeyword(config, "anime").map {
+                    ContentItem(it.streamId, it.name, it.coverUrl, ContentType.ANIME, it.streamUrl)
+                }
+            } catch (e: Exception) { emptyList() }
+
+            _homeCatalog.value = HomeCatalogState(isLoading = false, movies = movies, series = series, anime = anime)
+            homeCatalogLoaded = true
+        }
     }
 
     override fun onCleared() {
