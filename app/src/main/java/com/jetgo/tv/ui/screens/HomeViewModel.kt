@@ -226,18 +226,25 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             configStore.saveXtream(config.host, config.username, config.password)
             currentConfig = config
             currentMode = "xtream"
-            val ok = repository.login(config)
-            if (!ok) {
-                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "No se pudo autenticar con el servidor")
-                return@launch
+            try {
+                val ok = repository.login(config)
+                if (!ok) {
+                    _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "No se pudo autenticar con el servidor")
+                    return@launch
+                }
+                val channels = repository.getLiveChannels(config, categoryId = null)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    isConfigured = true,
+                    liveChannels = channels
+                )
+                channels.firstOrNull()?.let { playChannel(it) }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "No se pudo conectar al servidor. Verifica el host, usuario y contraseña."
+                )
             }
-            val channels = repository.getLiveChannels(config, categoryId = null)
-            _uiState.value = _uiState.value.copy(
-                isLoading = false,
-                isConfigured = true,
-                liveChannels = channels
-            )
-            channels.firstOrNull()?.let { playChannel(it) }
         }
     }
 
@@ -246,13 +253,27 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             configStore.saveM3u(url)
             currentMode = "m3u"
-            val result = repository.loadFromM3u(url)
-            _uiState.value = _uiState.value.copy(
-                isLoading = false,
-                isConfigured = true,
-                liveChannels = result.channels
-            )
-            result.channels.firstOrNull()?.let { playChannel(it) }
+            try {
+                val result = repository.loadFromM3u(url)
+                if (result.channels.isEmpty()) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = "La lista M3U está vacía o no se pudo leer. Verifica la URL."
+                    )
+                    return@launch
+                }
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    isConfigured = true,
+                    liveChannels = result.channels
+                )
+                result.channels.firstOrNull()?.let { playChannel(it) }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "No se pudo cargar la lista M3U. Verifica la URL o tu conexión a internet."
+                )
+            }
         }
     }
 
