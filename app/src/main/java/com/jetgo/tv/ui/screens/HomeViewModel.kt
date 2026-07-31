@@ -423,7 +423,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val sameSeasonEpisodes = detail.episodesBySeason[current.season].orEmpty()
         val currentIndex = sameSeasonEpisodes.indexOfFirst { it.id == current.id }
 
-        val next = if (currentIndex in sameSeasonEpisodes.indices.dropLast(1)) {
+        val next = if (currentIndex in sameSeasonEpisodes.indices && currentIndex < sameSeasonEpisodes.size - 1) {
             sameSeasonEpisodes[currentIndex + 1]
         } else {
             // Fin de temporada: pasa al primer capítulo de la siguiente temporada, si existe
