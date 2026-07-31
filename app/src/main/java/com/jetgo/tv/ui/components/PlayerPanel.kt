@@ -2,6 +2,8 @@ package com.jetgo.tv.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -11,12 +13,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,7 +41,9 @@ import com.jetgo.tv.ui.theme.LiveGreen
 fun PlayerPanel(
     playerManager: PlayerManager,
     modifier: Modifier = Modifier,
-    isFocused: Boolean = true
+    isFocused: Boolean = true,
+    showFullscreenHint: Boolean = false,
+    onTap: () -> Unit = {}
 ) {
     val stats = playerManager.stats.value
 
@@ -50,6 +57,11 @@ fun PlayerPanel(
                 color = if (isFocused) FocusOrange else Color.Transparent,
                 shape = RoundedCornerShape(6.dp)
             )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onTap
+            )
     ) {
         AndroidView(
             factory = { context ->
@@ -60,6 +72,24 @@ fun PlayerPanel(
             },
             modifier = Modifier.fillMaxSize()
         )
+
+        if (showFullscreenHint) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.5f))
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Fullscreen,
+                    contentDescription = "Pantalla completa",
+                    tint = Color.White,
+                    modifier = Modifier.padding(4.dp)
+                )
+            }
+        }
 
         // Barra inferior con estado del canal, igual a "Discovery World HD ... 4Kb/s"
         Row(

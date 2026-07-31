@@ -45,4 +45,8 @@ class ConfigStore(private val context: Context) {
             prefs[KEY_MODE] = "m3u"
         }
     }
+
+    suspend fun clear() {
+        context.dataStore.edit { prefs -> prefs.clear() }
+    }
 }

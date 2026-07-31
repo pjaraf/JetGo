@@ -2,31 +2,43 @@ package com.jetgo.tv
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.jetgo.tv.data.model.ContentType
 import com.jetgo.tv.ui.screens.CategoryPickerScreen
+import com.jetgo.tv.ui.components.FullscreenPlayerEffect
+import com.jetgo.tv.ui.components.FullscreenPlayerOverlay
+import com.jetgo.tv.ui.components.PhoneBottomNav
+import com.jetgo.tv.ui.components.PhoneMainTab
 import com.jetgo.tv.ui.screens.ChannelListScreen
 import com.jetgo.tv.ui.screens.FavoritesScreen
 import com.jetgo.tv.ui.screens.HomeScreen
 import com.jetgo.tv.ui.screens.HomeViewModel
 import com.jetgo.tv.ui.screens.SearchScreen
 import com.jetgo.tv.ui.screens.SetupScreen
+import com.jetgo.tv.ui.screens.phone.PhoneProfileScreen
+import com.jetgo.tv.ui.screens.phone.PhoneTvScreen
 import com.jetgo.tv.ui.theme.JetGoTheme
-import java.net.URLDecoder
-import java.net.URLEncoder
+import com.jetgo.tv.util.isTelevision
 
 class MainActivity : ComponentActivity() {
 
@@ -55,11 +67,15 @@ private fun categoryFromRoute(route: String?): ContentType = when (route) {
 @Composable
 private fun AppRoot(viewModel: HomeViewModel) {
     val uiState by viewModel.uiState.collectAsState()
-    val categoryPickerState by viewModel.categoryPickerState.collectAsState()
-    val categoryContentState by viewModel.categoryContentState.collectAsState()
-    val favorites by viewModel.favorites.collectAsState()
-    val searchState by viewModel.searchState.collectAsState()
-    val navController = rememberNavController()
+    val isFullscreen by viewModel.isFullscreenPlayer.collectAsState()
+    val context = LocalContext.current
+    val isTv = remember { isTelevision(context) }
+
+    // Mantiene la orientación/inmersión sincronizadas con el estado de pantalla completa
+    FullscreenPlayerEffect(
+        isFullscreen = isFullscreen,
+        onBackFromFullscreen = { viewModel.exitFullscreenPlayer() }
+    )
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
@@ -74,100 +90,182 @@ private fun AppRoot(viewModel: HomeViewModel) {
                     onConnectM3u = { viewModel.connectM3u(it) }
                 )
             }
+            isTv -> {
+                // ---- Interfaz original para Android TV / Google TV / TV Box (sin cambios) ----
+                val navController = rememberNavController()
+                DashboardNavHost(navController, viewModel)
+            }
             else -> {
-                NavHost(navController = navController, startDestination = "home") {
+                // ---- Interfaz para teléfonos: barra inferior Inicio / TV / Perfil ----
+                PhoneApp(viewModel)
+            }
+        }
 
-                    // ---- Pantalla principal ----
-                    composable("home") {
-                        HomeScreen(
-                            playerManager = viewModel.playerManager,
-                            liveChannels = uiState.liveChannels,
-                            onChannelSelected = { viewModel.playChannel(it) },
-                            onCategoryClick = { category ->
-                                navController.navigate("categoryPicker/$category")
-                            },
-                            onSearchClick = { navController.navigate("search") },
-                            onFavoritesClick = { navController.navigate("favorites") }
-                        )
+        // El reproductor a pantalla completa se dibuja por ENCIMA de todo lo demás
+        if (isFullscreen) {
+            FullscreenPlayerOverlay(
+                playerManager = viewModel.playerManager,
+                onExitFullscreen = { viewModel.exitFullscreenPlayer() }
+            )
+        }
+    }
+}
+
+/**
+ * Contenido de la pestaña "Inicio" en teléfonos, e interfaz completa en TV:
+ * el dashboard con las 5 categorías + reproductor, y sus pantallas de detalle.
+ */
+@Composable
+private fun DashboardNavHost(navController: NavHostController, viewModel: HomeViewModel) {
+    val categoryPickerState by viewModel.categoryPickerState.collectAsState()
+    val categoryContentState by viewModel.categoryContentState.collectAsState()
+    val favorites by viewModel.favorites.collectAsState()
+    val searchState by viewModel.searchState.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
+
+    NavHost(navController = navController, startDestination = "home") {
+
+        composable("home") {
+            HomeScreen(
+                playerManager = viewModel.playerManager,
+                liveChannels = uiState.liveChannels,
+                onChannelSelected = { viewModel.playChannel(it) },
+                onCategoryClick = { category -> navController.navigate("categoryPicker/$category") },
+                onSearchClick = { navController.navigate("search") },
+                onFavoritesClick = { navController.navigate("favorites") }
+            )
+        }
+
+        composable("categoryPicker/{category}") { backStackEntry ->
+            val category = backStackEntry.arguments?.getString("category")
+            val type = categoryFromRoute(category)
+
+            LaunchedEffect(category) { viewModel.loadCategoriesForType(type) }
+
+            CategoryPickerScreen(
+                isLoading = categoryPickerState.isLoading,
+                categories = categoryPickerState.categories,
+                errorMessage = categoryPickerState.errorMessage,
+                onCategorySelected = { selectedCategory ->
+                    val encodedId = java.net.URLEncoder.encode(selectedCategory.id, "UTF-8")
+                    navController.navigate("categoryContent/$category/$encodedId")
+                }
+            )
+        }
+
+        composable("categoryContent/{category}/{categoryId}") { backStackEntry ->
+            val category = backStackEntry.arguments?.getString("category")
+            val categoryId = backStackEntry.arguments?.getString("categoryId")
+                ?.let { java.net.URLDecoder.decode(it, "UTF-8") } ?: ""
+            val type = categoryFromRoute(category)
+
+            LaunchedEffect(category, categoryId) { viewModel.loadCategoryContent(type, categoryId) }
+
+            ChannelListScreen(
+                isLoading = categoryContentState.isLoading,
+                items = categoryContentState.items,
+                errorMessage = categoryContentState.errorMessage,
+                isFavorite = { viewModel.isFavorite(it) },
+                onToggleFavorite = { viewModel.toggleFavorite(it) },
+                onItemSelected = { item ->
+                    viewModel.selectContentItem(item) {
+                        navController.popBackStack("home", inclusive = false)
                     }
+                }
+            )
+        }
 
-                    // ---- Paso 1: elegir subcategoría dentro de Vivo/Serie/Película/Anime/Especial ----
-                    composable("categoryPicker/{category}") { backStackEntry ->
-                        val category = backStackEntry.arguments?.getString("category")
-                        val type = categoryFromRoute(category)
-
-                        LaunchedEffect(category) {
-                            viewModel.loadCategoriesForType(type)
-                        }
-
-                        CategoryPickerScreen(
-                            isLoading = categoryPickerState.isLoading,
-                            categories = categoryPickerState.categories,
-                            errorMessage = categoryPickerState.errorMessage,
-                            onCategorySelected = { selectedCategory ->
-                                val encodedId = URLEncoder.encode(selectedCategory.id, "UTF-8")
-                                navController.navigate("categoryContent/$category/$encodedId")
-                            }
-                        )
+        composable("search") {
+            SearchScreen(
+                isLoadingCatalog = searchState.isLoadingCatalog,
+                query = searchState.query,
+                results = searchState.results,
+                isFavorite = { viewModel.isFavorite(it) },
+                onToggleFavorite = { viewModel.toggleFavorite(it) },
+                onQueryChanged = { viewModel.onSearchQueryChanged(it) },
+                onEnterScreen = { viewModel.ensureSearchCatalogLoaded() },
+                onItemSelected = { item ->
+                    viewModel.selectContentItem(item) {
+                        navController.popBackStack("home", inclusive = false)
                     }
+                }
+            )
+        }
 
-                    // ---- Paso 2: contenido real de la subcategoría elegida ----
-                    composable("categoryContent/{category}/{categoryId}") { backStackEntry ->
-                        val category = backStackEntry.arguments?.getString("category")
-                        val categoryId = backStackEntry.arguments?.getString("categoryId")
-                            ?.let { URLDecoder.decode(it, "UTF-8") } ?: ""
-                        val type = categoryFromRoute(category)
-
-                        LaunchedEffect(category, categoryId) {
-                            viewModel.loadCategoryContent(type, categoryId)
-                        }
-
-                        ChannelListScreen(
-                            isLoading = categoryContentState.isLoading,
-                            items = categoryContentState.items,
-                            errorMessage = categoryContentState.errorMessage,
-                            isFavorite = { viewModel.isFavorite(it) },
-                            onToggleFavorite = { viewModel.toggleFavorite(it) },
-                            onItemSelected = { item ->
-                                viewModel.selectContentItem(item) {
-                                    navController.popBackStack("home", inclusive = false)
-                                }
-                            }
-                        )
+        composable("favorites") {
+            FavoritesScreen(
+                favorites = favorites,
+                onToggleFavorite = { viewModel.toggleFavorite(it) },
+                onItemSelected = { item ->
+                    viewModel.playFavorite(item) {
+                        navController.popBackStack("home", inclusive = false)
                     }
+                }
+            )
+        }
+    }
+}
 
-                    // ---- Búsqueda global ----
-                    composable("search") {
-                        SearchScreen(
-                            isLoadingCatalog = searchState.isLoadingCatalog,
-                            query = searchState.query,
-                            results = searchState.results,
-                            isFavorite = { viewModel.isFavorite(it) },
-                            onToggleFavorite = { viewModel.toggleFavorite(it) },
-                            onQueryChanged = { viewModel.onSearchQueryChanged(it) },
-                            onEnterScreen = { viewModel.ensureSearchCatalogLoaded() },
-                            onItemSelected = { item ->
-                                viewModel.selectContentItem(item) {
-                                    navController.popBackStack("home", inclusive = false)
-                                }
-                            }
-                        )
-                    }
+/** Shell para teléfonos: barra inferior Inicio / TV / Perfil */
+@Composable
+private fun PhoneApp(viewModel: HomeViewModel) {
+    var selectedTab by remember { mutableStateOf(PhoneMainTab.TV) }
+    var showSearch by remember { mutableStateOf(false) }
 
-                    // ---- Favoritos ----
-                    composable("favorites") {
-                        FavoritesScreen(
-                            favorites = favorites,
-                            onToggleFavorite = { viewModel.toggleFavorite(it) },
-                            onItemSelected = { item ->
-                                viewModel.playFavorite(item) {
-                                    navController.popBackStack("home", inclusive = false)
-                                }
-                            }
-                        )
-                    }
+    val categoryPickerState by viewModel.categoryPickerState.collectAsState()
+    val categoryContentState by viewModel.categoryContentState.collectAsState()
+    val favorites by viewModel.favorites.collectAsState()
+    val searchState by viewModel.searchState.collectAsState()
+
+    BackHandler(enabled = showSearch) { showSearch = false }
+
+    if (showSearch) {
+        SearchScreen(
+            isLoadingCatalog = searchState.isLoadingCatalog,
+            query = searchState.query,
+            results = searchState.results,
+            isFavorite = { viewModel.isFavorite(it) },
+            onToggleFavorite = { viewModel.toggleFavorite(it) },
+            onQueryChanged = { viewModel.onSearchQueryChanged(it) },
+            onEnterScreen = { viewModel.ensureSearchCatalogLoaded() },
+            onItemSelected = { item ->
+                viewModel.selectContentItem(item) { showSearch = false }
+            }
+        )
+        return
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.weight(1f)) {
+            when (selectedTab) {
+                PhoneMainTab.INICIO -> {
+                    val navController = rememberNavController()
+                    DashboardNavHost(navController, viewModel)
+                }
+                PhoneMainTab.TV -> {
+                    PhoneTvScreen(
+                        playerManager = viewModel.playerManager,
+                        categories = categoryPickerState.categories,
+                        categoriesLoading = categoryPickerState.isLoading,
+                        channelsInCategory = categoryContentState.items,
+                        channelsLoading = categoryContentState.isLoading,
+                        favorites = favorites,
+                        onLoadCategories = { viewModel.loadCategoriesForType(ContentType.LIVE) },
+                        onLoadChannelsForCategory = { categoryId ->
+                            viewModel.loadCategoryContent(ContentType.LIVE, categoryId)
+                        },
+                        onChannelTap = { item -> viewModel.selectContentItem(item) {} },
+                        onFavoriteTap = { item -> viewModel.playFavorite(item) {} },
+                        onSearchClick = { showSearch = true },
+                        onEnterFullscreen = { viewModel.enterFullscreenPlayer() }
+                    )
+                }
+                PhoneMainTab.PERFIL -> {
+                    PhoneProfileScreen(onDisconnect = { viewModel.disconnect() })
                 }
             }
         }
+
+        PhoneBottomNav(selected = selectedTab, onSelect = { selectedTab = it })
     }
 }

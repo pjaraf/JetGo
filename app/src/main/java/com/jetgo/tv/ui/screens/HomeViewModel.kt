@@ -61,6 +61,21 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _favorites = MutableStateFlow<List<ContentItem>>(emptyList())
     val favorites: StateFlow<List<ContentItem>> = _favorites.asStateFlow()
 
+    private val _isFullscreenPlayer = MutableStateFlow(false)
+    val isFullscreenPlayer: StateFlow<Boolean> = _isFullscreenPlayer.asStateFlow()
+
+    fun enterFullscreenPlayer() { _isFullscreenPlayer.value = true }
+    fun exitFullscreenPlayer() { _isFullscreenPlayer.value = false }
+
+    fun disconnect() {
+        viewModelScope.launch {
+            configStore.clear()
+            playerManager.exoPlayer.stop()
+            currentConfig = null
+            _uiState.value = HomeUiState()
+        }
+    }
+
     private val _searchState = MutableStateFlow(SearchUiState())
     val searchState: StateFlow<SearchUiState> = _searchState.asStateFlow()
 
