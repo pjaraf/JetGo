@@ -1,0 +1,303 @@
+package com.jetgo.tv.ui.screens
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.jetgo.tv.data.local.ConfigStore
+import com.jetgo.tv.data.local.FavoritesStore
+import com.jetgo.tv.data.model.Category
+import com.jetgo.tv.data.model.Channel
+import com.jetgo.tv.data.model.ContentItem
+import com.jetgo.tv.data.model.ContentType
+import com.jetgo.tv.data.model.ServerConfig
+import com.jetgo.tv.data.repository.StreamRepository
+import com.jetgo.tv.player.PlayerManager
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+data class HomeUiState(
+    val isLoading: Boolean = false,
+    val isConfigured: Boolean = false,
+    val liveChannels: List<Channel> = emptyList(),
+    val errorMessage: String? = null
+)
+
+data class CategoryPickerUiState(
+    val isLoading: Boolean = false,
+    val categories: List<Category> = emptyList(),
+    val errorMessage: String? = null
+)
+
+data class CategoryContentUiState(
+    val isLoading: Boolean = false,
+    val items: List<ContentItem> = emptyList(),
+    val errorMessage: String? = null
+)
+
+data class SearchUiState(
+    val isLoadingCatalog: Boolean = false,
+    val query: String = "",
+    val results: List<ContentItem> = emptyList()
+)
+
+class HomeViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val repository = StreamRepository()
+    private val configStore = ConfigStore(application)
+    private val favoritesStore = FavoritesStore(application)
+    val playerManager = PlayerManager(application)
+
+    private val _uiState = MutableStateFlow(HomeUiState())
+    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    private val _categoryPickerState = MutableStateFlow(CategoryPickerUiState())
+    val categoryPickerState: StateFlow<CategoryPickerUiState> = _categoryPickerState.asStateFlow()
+
+    private val _categoryContentState = MutableStateFlow(CategoryContentUiState())
+    val categoryContentState: StateFlow<CategoryContentUiState> = _categoryContentState.asStateFlow()
+
+    private val _favorites = MutableStateFlow<List<ContentItem>>(emptyList())
+    val favorites: StateFlow<List<ContentItem>> = _favorites.asStateFlow()
+
+    private val _searchState = MutableStateFlow(SearchUiState())
+    val searchState: StateFlow<SearchUiState> = _searchState.asStateFlow()
+
+    private var currentConfig: ServerConfig? = null
+    private var currentMode: String = "xtream" // "xtream" o "m3u"
+
+    // Caché en memoria del catálogo completo para búsqueda instantánea tras la primera carga
+    private var searchCatalog: List<ContentItem>? = null
+
+    init {
+        viewModelScope.launch {
+            configStore.mode.collect { currentMode = it }
+        }
+        viewModelScope.launch {
+            configStore.config.collect { config ->
+                currentConfig = config
+                if (config != null && currentMode == "xtream") connectXtream(config)
+            }
+        }
+        viewModelScope.launch {
+            favoritesStore.favorites.collect { _favorites.value = it }
+        }
+    }
+
+    fun connectXtream(config: ServerConfig) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            configStore.saveXtream(config.host, config.username, config.password)
+            currentConfig = config
+            currentMode = "xtream"
+            val ok = repository.login(config)
+            if (!ok) {
+                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "No se pudo autenticar con el servidor")
+                return@launch
+            }
+            val channels = repository.getLiveChannels(config, categoryId = null)
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                isConfigured = true,
+                liveChannels = channels
+            )
+            channels.firstOrNull()?.let { playChannel(it) }
+        }
+    }
+
+    fun connectM3u(url: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            configStore.saveM3u(url)
+            currentMode = "m3u"
+            val result = repository.loadFromM3u(url)
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                isConfigured = true,
+                liveChannels = result.channels
+            )
+            result.channels.firstOrNull()?.let { playChannel(it) }
+        }
+    }
+
+    fun playChannel(channel: Channel) {
+        playerManager.playChannel(channel.streamUrl, channel.name)
+    }
+
+    // ---------------------------------------------------------------------
+    // Selector de subcategorías (evita traer TODO el catálogo de golpe)
+    // ---------------------------------------------------------------------
+
+    /** Paso 1: lista las subcategorías disponibles para el tipo tocado (Vivo/Serie/Película/Anime/Especial) */
+    fun loadCategoriesForType(type: ContentType) {
+        _categoryPickerState.value = CategoryPickerUiState(isLoading = true)
+
+        if (currentMode == "m3u") {
+            // El modo M3U simple no tiene categorías separadas por API; solo hay una lista plana.
+            _categoryPickerState.value = CategoryPickerUiState(
+                categories = if (type == ContentType.LIVE) {
+                    _uiState.value.liveChannels.map { it.categoryId }.distinct()
+                        .map { Category(it, it, ContentType.LIVE) }
+                } else emptyList()
+            )
+            return
+        }
+
+        val config = currentConfig ?: run {
+            _categoryPickerState.value = CategoryPickerUiState(errorMessage = "Sin configuración de servidor")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val categories = when (type) {
+                    ContentType.LIVE -> repository.getLiveCategories(config)
+                    ContentType.MOVIE -> repository.getVodCategories(config)
+                    ContentType.SERIES -> repository.getSeriesCategories(config)
+                    ContentType.ANIME -> repository.getVodCategoriesByKeyword(config, "anime")
+                    ContentType.SPECIAL -> {
+                        val especial = repository.getVodCategoriesByKeyword(config, "especial")
+                        val special = repository.getVodCategoriesByKeyword(config, "special")
+                        (especial + special).distinctBy { it.id }
+                    }
+                }
+                _categoryPickerState.value = CategoryPickerUiState(categories = categories)
+            } catch (e: Exception) {
+                _categoryPickerState.value = CategoryPickerUiState(errorMessage = "Error al cargar categorías: ${e.message}")
+            }
+        }
+    }
+
+    /** Paso 2: dentro de la subcategoría elegida, trae solo el contenido de esa categoría */
+    fun loadCategoryContent(type: ContentType, categoryId: String) {
+        _categoryContentState.value = CategoryContentUiState(isLoading = true)
+
+        if (currentMode == "m3u") {
+            val items = _uiState.value.liveChannels
+                .filter { it.categoryId == categoryId }
+                .map { ContentItem(it.streamId, it.name, it.logoUrl, ContentType.LIVE, it.streamUrl) }
+            _categoryContentState.value = CategoryContentUiState(items = items)
+            return
+        }
+
+        val config = currentConfig ?: run {
+            _categoryContentState.value = CategoryContentUiState(errorMessage = "Sin configuración de servidor")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val items = when (type) {
+                    ContentType.LIVE -> repository.getLiveChannels(config, categoryId).map {
+                        ContentItem(it.streamId, it.name, it.logoUrl, ContentType.LIVE, it.streamUrl)
+                    }
+                    ContentType.MOVIE, ContentType.ANIME, ContentType.SPECIAL -> repository.getMovies(config, categoryId).map {
+                        ContentItem(it.streamId, it.name, it.coverUrl, type, it.streamUrl)
+                    }
+                    ContentType.SERIES -> repository.getSeries(config, categoryId).map {
+                        ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null)
+                    }
+                }
+                _categoryContentState.value = CategoryContentUiState(items = items)
+            } catch (e: Exception) {
+                _categoryContentState.value = CategoryContentUiState(errorMessage = "Error al cargar contenido: ${e.message}")
+            }
+        }
+    }
+
+    /** Se llama al tocar un ítem final. Resuelve el episodio si es una serie. */
+    fun selectContentItem(item: ContentItem, onReady: () -> Unit) {
+        if (item.streamUrl != null) {
+            playerManager.playChannel(item.streamUrl, item.name)
+            onReady()
+            return
+        }
+        val config = currentConfig ?: return
+        viewModelScope.launch {
+            val url = repository.getFirstEpisodeUrl(config, item.id)
+            if (url != null) {
+                playerManager.playChannel(url, item.name)
+            }
+            onReady()
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Favoritos
+    // ---------------------------------------------------------------------
+
+    fun toggleFavorite(item: ContentItem) {
+        viewModelScope.launch { favoritesStore.toggleFavorite(item) }
+    }
+
+    fun isFavorite(item: ContentItem): Boolean =
+        _favorites.value.any { it.id == item.id && it.type == item.type }
+
+    fun playFavorite(item: ContentItem, onReady: () -> Unit) {
+        selectContentItem(item, onReady)
+    }
+
+    // ---------------------------------------------------------------------
+    // Búsqueda global (construye un catálogo en memoria una sola vez)
+    // ---------------------------------------------------------------------
+
+    fun onSearchQueryChanged(query: String) {
+        _searchState.value = _searchState.value.copy(query = query)
+        applySearchFilter()
+    }
+
+    /** Descarga todo el catálogo (canales, películas, series) una sola vez y lo cachea en memoria */
+    fun ensureSearchCatalogLoaded() {
+        if (searchCatalog != null || _searchState.value.isLoadingCatalog) return
+
+        val liveAsItems = _uiState.value.liveChannels.map {
+            ContentItem(it.streamId, it.name, it.logoUrl, ContentType.LIVE, it.streamUrl)
+        }
+
+        if (currentMode == "m3u") {
+            searchCatalog = liveAsItems
+            applySearchFilter()
+            return
+        }
+
+        val config = currentConfig ?: run {
+            searchCatalog = liveAsItems
+            applySearchFilter()
+            return
+        }
+
+        _searchState.value = _searchState.value.copy(isLoadingCatalog = true)
+        viewModelScope.launch {
+            val movies = try {
+                repository.getMovies(config, categoryId = null).map {
+                    ContentItem(it.streamId, it.name, it.coverUrl, ContentType.MOVIE, it.streamUrl)
+                }
+            } catch (e: Exception) { emptyList() }
+
+            val series = try {
+                repository.getSeries(config, categoryId = null).map {
+                    ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null)
+                }
+            } catch (e: Exception) { emptyList() }
+
+            searchCatalog = liveAsItems + movies + series
+            _searchState.value = _searchState.value.copy(isLoadingCatalog = false)
+            applySearchFilter()
+        }
+    }
+
+    private fun applySearchFilter() {
+        val query = _searchState.value.query.trim()
+        val catalog = searchCatalog ?: emptyList()
+        val results = if (query.isBlank()) emptyList() else catalog.filter {
+            it.name.contains(query, ignoreCase = true)
+        }
+        _searchState.value = _searchState.value.copy(results = results)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        playerManager.release()
+    }
+}
