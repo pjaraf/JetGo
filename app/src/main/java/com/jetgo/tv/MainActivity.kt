@@ -23,6 +23,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.data.model.ContentType
 import com.jetgo.tv.ui.screens.CategoryPickerScreen
 import com.jetgo.tv.ui.components.FullscreenPlayerEffect
@@ -38,6 +39,7 @@ import com.jetgo.tv.ui.screens.SetupScreen
 import com.jetgo.tv.ui.screens.phone.PhoneInicioScreen
 import com.jetgo.tv.ui.screens.phone.PhoneProfileScreen
 import com.jetgo.tv.ui.screens.phone.PhoneTvScreen
+import com.jetgo.tv.ui.screens.phone.SeriesDetailScreen
 import com.jetgo.tv.ui.theme.JetGoTheme
 import com.jetgo.tv.util.isTelevision
 
@@ -212,14 +214,49 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
 private fun PhoneApp(viewModel: HomeViewModel) {
     var selectedTab by remember { mutableStateOf(PhoneMainTab.TV) }
     var showSearch by remember { mutableStateOf(false) }
+    var seriesDetailItem by remember { mutableStateOf<ContentItem?>(null) }
 
     val categoryPickerState by viewModel.categoryPickerState.collectAsState()
     val categoryContentState by viewModel.categoryContentState.collectAsState()
     val favorites by viewModel.favorites.collectAsState()
     val searchState by viewModel.searchState.collectAsState()
     val homeCatalog by viewModel.homeCatalog.collectAsState()
+    val seriesDetailState by viewModel.seriesDetailState.collectAsState()
+
+    // Cualquier ítem: si es serie, abre la ficha con temporadas/capítulos; si no, reproduce directo
+    val handleItemClick: (ContentItem) -> Unit = { item ->
+        if (item.type == ContentType.SERIES) {
+            seriesDetailItem = item
+            viewModel.loadSeriesDetail(item)
+        } else {
+            viewModel.selectContentItem(item) { viewModel.enterFullscreenPlayer() }
+        }
+    }
 
     BackHandler(enabled = showSearch) { showSearch = false }
+    BackHandler(enabled = seriesDetailItem != null) {
+        viewModel.clearSeriesDetail()
+        seriesDetailItem = null
+    }
+
+    if (seriesDetailItem != null) {
+        val recommendations = (homeCatalog.series + homeCatalog.movies)
+            .filter { it.id != seriesDetailItem?.id }
+            .shuffled()
+            .take(10)
+
+        SeriesDetailScreen(
+            state = seriesDetailState,
+            playerManager = viewModel.playerManager,
+            recommendations = recommendations,
+            onBack = { viewModel.clearSeriesDetail(); seriesDetailItem = null },
+            onSelectSeason = { viewModel.selectSeason(it) },
+            onPlayEpisode = { viewModel.playEpisode(it) },
+            onEnterFullscreen = { viewModel.enterFullscreenPlayer() },
+            onRecommendationClick = { item -> handleItemClick(item) }
+        )
+        return
+    }
 
     if (showSearch) {
         SearchScreen(
@@ -231,7 +268,8 @@ private fun PhoneApp(viewModel: HomeViewModel) {
             onQueryChanged = { viewModel.onSearchQueryChanged(it) },
             onEnterScreen = { viewModel.ensureSearchCatalogLoaded() },
             onItemSelected = { item ->
-                viewModel.selectContentItem(item) { showSearch = false }
+                showSearch = false
+                handleItemClick(item)
             }
         )
         return
@@ -244,9 +282,7 @@ private fun PhoneApp(viewModel: HomeViewModel) {
                     PhoneInicioScreen(
                         catalog = homeCatalog,
                         onEnterScreen = { viewModel.ensureHomeCatalogLoaded() },
-                        onItemClick = { item ->
-                            viewModel.selectContentItem(item) { viewModel.enterFullscreenPlayer() }
-                        },
+                        onItemClick = handleItemClick,
                         onSearchClick = { showSearch = true }
                     )
                 }
@@ -263,7 +299,7 @@ private fun PhoneApp(viewModel: HomeViewModel) {
                             viewModel.loadCategoryContent(ContentType.LIVE, categoryId)
                         },
                         onChannelTap = { item -> viewModel.selectContentItem(item) {} },
-                        onFavoriteTap = { item -> viewModel.playFavorite(item) {} },
+                        onFavoriteTap = { item -> handleItemClick(item) },
                         onSearchClick = { showSearch = true },
                         onEnterFullscreen = { viewModel.enterFullscreenPlayer() }
                     )

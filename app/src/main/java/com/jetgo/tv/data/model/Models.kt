@@ -58,3 +58,24 @@ data class ContentItem(
     val type: ContentType,
     val streamUrl: String?
 )
+
+data class SeriesEpisode(
+    val id: String,
+    val title: String,
+    val episodeNum: Int,
+    val season: Int,
+    val streamUrl: String
+)
+
+data class SeriesDetail(
+    val seriesId: String,
+    val name: String,
+    val coverUrl: String?,
+    val plot: String?,
+    val cast: String?,
+    val director: String?,
+    val genre: String?,
+    val releaseDate: String?,
+    val rating: String?,
+    val episodesBySeason: Map<Int, List<SeriesEpisode>>
+)

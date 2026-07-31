@@ -54,5 +54,17 @@ data class EpisodeDto(
 )
 
 data class SeriesInfoResponse(
+    @SerializedName("info") val info: SeriesInfoDetailsDto?,
     @SerializedName("episodes") val episodes: Map<String, List<EpisodeDto>>?
+)
+
+data class SeriesInfoDetailsDto(
+    @SerializedName("name") val name: String?,
+    @SerializedName("cover") val cover: String?,
+    @SerializedName("plot") val plot: String?,
+    @SerializedName("cast") val cast: String?,
+    @SerializedName("director") val director: String?,
+    @SerializedName("genre") val genre: String?,
+    @SerializedName("releaseDate") val releaseDate: String?,
+    @SerializedName("rating") val rating: String?
 )

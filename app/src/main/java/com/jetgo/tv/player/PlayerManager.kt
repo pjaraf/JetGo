@@ -24,6 +24,9 @@ class PlayerManager(context: Context) {
     private val _stats = mutableStateOf(PlaybackStats())
     val stats: State<PlaybackStats> get() = _stats
 
+    /** Se dispara cuando el contenido actual termina de reproducirse por completo (fin de capítulo/película) */
+    var onPlaybackEnded: (() -> Unit)? = null
+
     init {
         exoPlayer.addAnalyticsListener(object : AnalyticsListener {
             override fun onBandwidthEstimate(
@@ -34,6 +37,14 @@ class PlayerManager(context: Context) {
             ) {
                 val kbps = (bitrateEstimate / 1000).toInt()
                 _stats.value = _stats.value.copy(bitrateKbps = kbps)
+            }
+        })
+
+        exoPlayer.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED) {
+                    onPlaybackEnded?.invoke()
+                }
             }
         })
     }

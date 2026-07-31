@@ -10,6 +10,8 @@ import com.jetgo.tv.data.model.Channel
 import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.data.model.ContentType
 import com.jetgo.tv.data.model.ServerConfig
+import com.jetgo.tv.data.model.SeriesDetail
+import com.jetgo.tv.data.model.SeriesEpisode
 import com.jetgo.tv.data.repository.StreamRepository
 import com.jetgo.tv.player.PlayerManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,6 +49,14 @@ data class HomeCatalogState(
     val movies: List<ContentItem> = emptyList(),
     val series: List<ContentItem> = emptyList(),
     val anime: List<ContentItem> = emptyList()
+)
+
+data class SeriesDetailUiState(
+    val isLoading: Boolean = false,
+    val detail: SeriesDetail? = null,
+    val selectedSeason: Int = 1,
+    val currentEpisodeId: String? = null,
+    val errorMessage: String? = null
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -89,6 +99,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _homeCatalog = MutableStateFlow(HomeCatalogState())
     val homeCatalog: StateFlow<HomeCatalogState> = _homeCatalog.asStateFlow()
     private var homeCatalogLoaded = false
+
+    private val _seriesDetailState = MutableStateFlow(SeriesDetailUiState())
+    val seriesDetailState: StateFlow<SeriesDetailUiState> = _seriesDetailState.asStateFlow()
 
     private var currentConfig: ServerConfig? = null
     private var currentMode: String = "xtream" // "xtream" o "m3u"
@@ -355,6 +368,81 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             _homeCatalog.value = HomeCatalogState(isLoading = false, movies = movies, series = series, anime = anime)
             homeCatalogLoaded = true
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // Pantalla de detalle de serie: temporadas, capítulos, auto-avance
+    // ---------------------------------------------------------------------
+
+    /** Carga toda la ficha de la serie (sinopsis + todas las temporadas/capítulos) */
+    fun loadSeriesDetail(item: ContentItem) {
+        _seriesDetailState.value = SeriesDetailUiState(isLoading = true)
+        val config = currentConfig ?: run {
+            _seriesDetailState.value = SeriesDetailUiState(errorMessage = "Sin configuración de servidor")
+            return
+        }
+        viewModelScope.launch {
+            val detail = try {
+                repository.getSeriesDetail(config, item.id, item.name, item.imageUrl)
+            } catch (e: Exception) { null }
+
+            if (detail == null) {
+                _seriesDetailState.value = SeriesDetailUiState(errorMessage = "No se pudo cargar la serie")
+                return@launch
+            }
+
+            val firstSeason = detail.episodesBySeason.keys.minOrNull() ?: 1
+            _seriesDetailState.value = SeriesDetailUiState(detail = detail, selectedSeason = firstSeason)
+
+            // Auto-avance: cuando termina un capítulo, reproduce el siguiente automáticamente
+            playerManager.onPlaybackEnded = { playNextEpisode() }
+
+            // Reproduce automáticamente el primer capítulo de la temporada al entrar
+            detail.episodesBySeason[firstSeason]?.firstOrNull()?.let { playEpisode(it.id) }
+        }
+    }
+
+    fun selectSeason(season: Int) {
+        _seriesDetailState.value = _seriesDetailState.value.copy(selectedSeason = season)
+    }
+
+    fun playEpisode(episodeId: String) {
+        val episode = currentEpisode(episodeId) ?: return
+        playerManager.playChannel(episode.streamUrl, "${_seriesDetailState.value.detail?.name} · ${episode.title}")
+        _seriesDetailState.value = _seriesDetailState.value.copy(
+            currentEpisodeId = episodeId,
+            selectedSeason = episode.season
+        )
+    }
+
+    /** Se llama automáticamente cuando ExoPlayer termina un capítulo */
+    private fun playNextEpisode() {
+        val state = _seriesDetailState.value
+        val detail = state.detail ?: return
+        val current = state.currentEpisodeId?.let { currentEpisode(it) } ?: return
+        val sameSeasonEpisodes = detail.episodesBySeason[current.season].orEmpty()
+        val currentIndex = sameSeasonEpisodes.indexOfFirst { it.id == current.id }
+
+        val next = if (currentIndex in sameSeasonEpisodes.indices.dropLast(1)) {
+            sameSeasonEpisodes[currentIndex + 1]
+        } else {
+            // Fin de temporada: pasa al primer capítulo de la siguiente temporada, si existe
+            val nextSeason = detail.episodesBySeason.keys.filter { it > current.season }.minOrNull()
+            nextSeason?.let { detail.episodesBySeason[it]?.firstOrNull() }
+        }
+
+        next?.let { playEpisode(it.id) }
+    }
+
+    private fun currentEpisode(episodeId: String): SeriesEpisode? {
+        val detail = _seriesDetailState.value.detail ?: return null
+        return detail.episodesBySeason.values.flatten().firstOrNull { it.id == episodeId }
+    }
+
+    /** Se llama al salir de la pantalla de detalle de serie, para no seguir auto-avanzando por error */
+    fun clearSeriesDetail() {
+        playerManager.onPlaybackEnded = null
+        _seriesDetailState.value = SeriesDetailUiState()
     }
 
     override fun onCleared() {

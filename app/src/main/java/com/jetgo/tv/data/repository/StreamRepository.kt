@@ -4,6 +4,8 @@ import com.jetgo.tv.data.model.Category
 import com.jetgo.tv.data.model.Channel
 import com.jetgo.tv.data.model.ContentType
 import com.jetgo.tv.data.model.MovieItem
+import com.jetgo.tv.data.model.SeriesDetail
+import com.jetgo.tv.data.model.SeriesEpisode
 import com.jetgo.tv.data.model.SeriesItem
 import com.jetgo.tv.data.model.ServerConfig
 import com.jetgo.tv.data.remote.M3uParser
@@ -124,6 +126,45 @@ class StreamRepository {
             episodeIdInt, firstEpisode.containerExtension ?: "mp4"
         )
     }
+
+    /** Trae toda la info de una serie: sinopsis, elenco, y TODOS los capítulos de TODAS las temporadas */
+    suspend fun getSeriesDetail(config: ServerConfig, seriesId: String, fallbackName: String, fallbackCover: String?): SeriesDetail? =
+        withContext(Dispatchers.IO) {
+            val api = XtreamApi.create(config.host.ensureTrailingSlash())
+            val resp = api.getSeriesInfo(config.username, config.password, seriesId = seriesId)
+            val body = resp.body() ?: return@withContext null
+
+            val episodesBySeason = body.episodes?.mapNotNull { (seasonKey, episodes) ->
+                val seasonNum = seasonKey.toIntOrNull() ?: return@mapNotNull null
+                val mapped = episodes.mapNotNull { ep ->
+                    val epIdInt = ep.id.toIntOrNull() ?: return@mapNotNull null
+                    SeriesEpisode(
+                        id = ep.id,
+                        title = ep.title?.takeIf { it.isNotBlank() } ?: "Episodio ${ep.episodeNum ?: 0}",
+                        episodeNum = ep.episodeNum ?: 0,
+                        season = seasonNum,
+                        streamUrl = XtreamApi.seriesStreamUrl(
+                            config.host, config.username, config.password,
+                            epIdInt, ep.containerExtension ?: "mp4"
+                        )
+                    )
+                }.sortedBy { it.episodeNum }
+                seasonNum to mapped
+            }?.toMap() ?: emptyMap()
+
+            SeriesDetail(
+                seriesId = seriesId,
+                name = body.info?.name?.takeIf { it.isNotBlank() } ?: fallbackName,
+                coverUrl = body.info?.cover?.takeIf { it.isNotBlank() } ?: fallbackCover,
+                plot = body.info?.plot,
+                cast = body.info?.cast,
+                director = body.info?.director,
+                genre = body.info?.genre,
+                releaseDate = body.info?.releaseDate,
+                rating = body.info?.rating,
+                episodesBySeason = episodesBySeason
+            )
+        }
 
     /** Modo alternativo: lista M3U simple en vez de API Xtream */
     suspend fun loadFromM3u(url: String): M3uParser.ParseResult = withContext(Dispatchers.IO) {
