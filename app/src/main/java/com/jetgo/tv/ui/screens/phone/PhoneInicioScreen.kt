@@ -1,5 +1,6 @@
 package com.jetgo.tv.ui.screens.phone
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -141,6 +142,7 @@ fun PhoneInicioScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FeaturedCarousel(items: List<ContentItem>, onItemClick: (ContentItem) -> Unit) {
     val pagerState = rememberPagerState(pageCount = { items.size })
