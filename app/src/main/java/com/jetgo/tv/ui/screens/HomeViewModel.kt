@@ -17,6 +17,7 @@ import com.jetgo.tv.data.model.SeriesEpisode
 import com.jetgo.tv.data.repository.StreamRepository
 import com.jetgo.tv.player.PlayerManager
 import com.jetgo.tv.util.AccessCodeChecker
+import com.jetgo.tv.util.AccessCodeResult
 import com.jetgo.tv.util.UpdateChecker
 import com.jetgo.tv.util.UpdateInfo
 import kotlinx.coroutines.Dispatchers
@@ -149,7 +150,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Al abrir la app: si ya había un código guardado, lo re-valida contra Firestore
-     *  (así una revocación hecha desde el panel de administración sí toma efecto). */
+     *  (así una revocación hecha desde el panel de administración sí toma efecto), y
+     *  refresca la conexión por si el administrador cambió el servidor de ese código. */
     private fun checkStoredAccess() {
         viewModelScope.launch {
             val projectId = getApplication<Application>().getString(com.jetgo.tv.R.string.firebase_project_id)
@@ -160,11 +162,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
-            val valid = withContext(Dispatchers.IO) {
-                AccessCodeChecker.isCodeValid(projectId, savedCode)
+            val result = withContext(Dispatchers.IO) {
+                AccessCodeChecker.checkCode(projectId, savedCode)
             }
 
-            if (valid) {
+            if (result.valid) {
+                applyAccessCodeResult(result)
                 _accessState.value = AccessUiState(isChecking = false, isGranted = true)
             } else {
                 accessStore.clear()
@@ -177,11 +180,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         _accessState.value = _accessState.value.copy(isChecking = true, errorMessage = null)
         viewModelScope.launch {
             val projectId = getApplication<Application>().getString(com.jetgo.tv.R.string.firebase_project_id)
-            val valid = withContext(Dispatchers.IO) {
-                AccessCodeChecker.isCodeValid(projectId, code)
+            val result = withContext(Dispatchers.IO) {
+                AccessCodeChecker.checkCode(projectId, code)
             }
-            if (valid) {
+            if (result.valid) {
                 accessStore.saveCode(code.trim().uppercase())
+                applyAccessCodeResult(result)
                 _accessState.value = AccessUiState(isChecking = false, isGranted = true)
             } else {
                 _accessState.value = AccessUiState(
@@ -191,6 +195,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
+    }
+
+    /** Conecta automáticamente al servidor cargado por el administrador para ese código,
+     *  sin que el cliente tenga que ver ni escribir host/usuario/contraseña. */
+    private fun applyAccessCodeResult(result: AccessCodeResult) {
+        if (result.mode == "m3u" && !result.m3uUrl.isNullOrBlank()) {
+            connectM3u(result.m3uUrl)
+        } else if (!result.host.isNullOrBlank() && !result.username.isNullOrBlank() && !result.password.isNullOrBlank()) {
+            connectXtream(ServerConfig(result.host, result.username, result.password))
+        }
+        // Si el código es válido pero el administrador no cargó credenciales todavía,
+        // simplemente no se auto-conecta nada (uiState.isConfigured queda en false).
     }
 
     /** Consulta en segundo plano si hay una versión más nueva publicada en GitHub Releases */

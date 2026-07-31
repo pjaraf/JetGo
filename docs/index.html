@@ -60,6 +60,29 @@
   button.secondary { background: var(--surface2); color: var(--text); }
   button.danger { background: var(--red); color: white; }
 
+  .mode-btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid #333842;
+    background: var(--surface2);
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .mode-btn.active { background: var(--orange); color: #1a1200; border-color: var(--orange); }
+
+  .credentials-box {
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 10px;
+    margin-top: 8px;
+    font-size: 12px;
+    font-family: monospace;
+    word-break: break-all;
+    display: none;
+  }
+
   #error { color: var(--red); font-size: 14px; margin-top: 8px; }
   #logout { display: none; }
 
@@ -99,6 +122,21 @@
 
     <div class="card">
       <input id="clientName" type="text" placeholder="Nombre del cliente (opcional)" />
+
+      <div class="row" style="display:flex; gap:10px; margin-bottom:12px;">
+        <button type="button" id="modeXtreamBtn" class="mode-btn active" onclick="setMode('xtream')">Xtream Codes</button>
+        <button type="button" id="modeM3uBtn" class="mode-btn" onclick="setMode('m3u')">Lista M3U</button>
+      </div>
+
+      <div id="xtreamFields">
+        <input id="host" type="text" placeholder="Host del servidor (http://servidor.com:8080)" />
+        <input id="username" type="text" placeholder="Usuario Xtream" />
+        <input id="password" type="text" placeholder="Contraseña Xtream" />
+      </div>
+      <div id="m3uFields" style="display:none;">
+        <input id="m3uUrl" type="text" placeholder="URL de la lista M3U" />
+      </div>
+
       <button id="generateBtn">Generar nuevo código</button>
     </div>
 
@@ -170,6 +208,17 @@
     }
   });
 
+  // ---------- Alternar entre modo Xtream Codes y M3U ----------
+  let currentMode = 'xtream';
+  function setMode(mode) {
+    currentMode = mode;
+    document.getElementById('modeXtreamBtn').classList.toggle('active', mode === 'xtream');
+    document.getElementById('modeM3uBtn').classList.toggle('active', mode === 'm3u');
+    document.getElementById('xtreamFields').style.display = mode === 'xtream' ? 'block' : 'none';
+    document.getElementById('m3uFields').style.display = mode === 'm3u' ? 'block' : 'none';
+  }
+  window.setMode = setMode;
+
   // ---------- Generar un codigo nuevo ----------
   function generateRandomCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin 0/O/1/I para evitar confusiones
@@ -184,11 +233,35 @@
   document.getElementById('generateBtn').addEventListener('click', async () => {
     const clientName = document.getElementById('clientName').value.trim();
     const code = generateRandomCode();
-    await db.collection('access_codes').doc(code).set({
+
+    const docData = {
       active: true,
       clientName: clientName || null,
+      mode: currentMode,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    };
+
+    if (currentMode === 'xtream') {
+      const host = document.getElementById('host').value.trim();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      if (!host || !username || !password) {
+        alert('Completa host, usuario y contraseña de Xtream Codes.');
+        return;
+      }
+      docData.host = host;
+      docData.username = username;
+      docData.password = password;
+    } else {
+      const m3uUrl = document.getElementById('m3uUrl').value.trim();
+      if (!m3uUrl) {
+        alert('Completa la URL de la lista M3U.');
+        return;
+      }
+      docData.m3uUrl = m3uUrl;
+    }
+
+    await db.collection('access_codes').doc(code).set(docData);
     document.getElementById('clientName').value = '';
     showToast('Codigo generado: ' + code);
   });
@@ -207,6 +280,16 @@
           const data = doc.data();
           const code = doc.id;
           const active = data.active !== false;
+
+          let credText = '';
+          if (data.mode === 'm3u') {
+            credText = 'M3U: ' + (data.m3uUrl || '(sin cargar)');
+          } else {
+            credText = 'Host: ' + (data.host || '(sin cargar)') +
+              ' | Usuario: ' + (data.username || '-') +
+              ' | Clave: ' + (data.password || '-');
+          }
+
           const tr = document.createElement('tr');
           tr.innerHTML =
             '<td class="code-cell">' + code + '</td>' +
@@ -214,13 +297,20 @@
             '<td><span class="badge ' + (active ? 'active' : 'revoked') + '">' + (active ? 'Activo' : 'Revocado') + '</span></td>' +
             '<td class="actions-cell">' +
               '<button class="secondary" onclick="copyCode(\'' + code + '\')">Copiar</button>' +
+              '<button class="secondary" onclick="toggleCreds(this)">Ver datos</button>' +
               '<button class="' + (active ? 'danger' : 'secondary') + '" onclick="toggleActive(\'' + code + '\', ' + active + ')">' + (active ? 'Revocar' : 'Reactivar') + '</button>' +
               '<button class="danger" onclick="deleteCode(\'' + code + '\')">Eliminar</button>' +
+              '<div class="credentials-box">' + credText + '</div>' +
             '</td>';
           tbody.appendChild(tr);
         });
       });
   }
+
+  window.toggleCreds = (btn) => {
+    const box = btn.closest('td').querySelector('.credentials-box');
+    box.style.display = box.style.display === 'block' ? 'none' : 'block';
+  };
 
   window.toggleActive = async (code, currentlyActive) => {
     await db.collection('access_codes').doc(code).update({ active: !currentlyActive });
