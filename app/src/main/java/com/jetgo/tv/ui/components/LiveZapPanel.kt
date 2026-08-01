@@ -20,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -80,6 +81,7 @@ fun LiveZapPanel(
                             .fillMaxWidth()
                             .background(if (isHighlighted) Color(0xFFFF7A2E).copy(alpha = 0.35f) else Color.Transparent)
                             .clickable { onSelectCategory(category) }
+                            .focusProperties { canFocus = false }
                             .padding(horizontal = 16.dp, vertical = 12.dp)
                     ) {
                         Text(
@@ -105,6 +107,7 @@ fun LiveZapPanel(
                                 }
                             )
                             .clickable { onSelectChannel(channel) }
+                            .focusProperties { canFocus = false }
                             .padding(horizontal = 16.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {

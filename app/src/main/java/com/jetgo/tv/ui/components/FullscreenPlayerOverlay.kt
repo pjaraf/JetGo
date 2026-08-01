@@ -21,7 +21,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
@@ -113,6 +115,13 @@ fun FullscreenPlayerOverlay(
                 if (!isVod) {
                     Modifier
                         .focusRequester(focusRequester)
+                        .onFocusChanged { focusState ->
+                            // Si algo más le robó el foco (ej. el botón de salir), lo recuperamos
+                            // para que el control remoto siga funcionando en la pantalla completa.
+                            if (!focusState.isFocused) {
+                                try { focusRequester.requestFocus() } catch (e: Exception) { /* ignorar */ }
+                            }
+                        }
                         .focusable()
                         .onKeyEvent { event ->
                             if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
@@ -193,6 +202,7 @@ fun FullscreenPlayerOverlay(
                     .size(40.dp)
                     .clip(CircleShape)
                     .background(Color.Black.copy(alpha = 0.5f))
+                    .focusProperties { canFocus = false }
             ) {
                 Icon(
                     imageVector = Icons.Default.FullscreenExit,
