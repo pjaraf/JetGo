@@ -242,19 +242,23 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
     NavHost(navController = navController, startDestination = "home") {
 
         composable("home") {
-            val newestItems = (homeCatalog.movies + homeCatalog.series).shuffled().take(10)
-            HomeScreen(
-                playerManager = viewModel.playerManager,
-                liveChannels = uiState.liveChannels,
-                newestItems = newestItems,
-                onItemClick = handleItemSelected,
-                onChannelSelected = { viewModel.playChannel(it) },
-                onCategoryClick = { category -> navController.navigate("categoryPicker/$category") },
-                onLiveClick = { viewModel.enterFullscreenPlayer() },
-                onSearchClick = { navController.navigate("search") },
-                onFavoritesClick = { navController.navigate("favorites") },
-                isFullscreen = isFullscreen
-            )
+            if (!isFullscreen) {
+                val newestItems = (homeCatalog.movies + homeCatalog.series).shuffled().take(10)
+                HomeScreen(
+                    playerManager = viewModel.playerManager,
+                    liveChannels = uiState.liveChannels,
+                    newestItems = newestItems,
+                    onItemClick = handleItemSelected,
+                    onChannelSelected = { viewModel.playChannel(it) },
+                    onCategoryClick = { category -> navController.navigate("categoryPicker/$category") },
+                    onLiveClick = { viewModel.enterFullscreenPlayer() },
+                    onSearchClick = { navController.navigate("search") },
+                    onFavoritesClick = { navController.navigate("favorites") },
+                    isFullscreen = isFullscreen
+                )
+            }
+            // Mientras isFullscreen es true, esta pantalla NO se dibuja (ni oculta): así el
+            // control remoto no puede "tocar sin querer" ninguno de estos botones por detrás.
         }
 
         composable("categoryPicker/{category}") { backStackEntry ->
@@ -310,67 +314,71 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
         }
 
         composable("seriesDetail") {
-            val recommendations = (homeCatalog.series + homeCatalog.movies)
-                .filter { it.id != seriesDetailState.detail?.seriesId }
-                .shuffled()
-                .take(10)
+            if (!isFullscreen) {
+                val recommendations = (homeCatalog.series + homeCatalog.movies)
+                    .filter { it.id != seriesDetailState.detail?.seriesId }
+                    .shuffled()
+                    .take(10)
 
-            TvSeriesDetailScreen(
-                state = seriesDetailState,
-                playerManager = viewModel.playerManager,
-                isFavorite = seriesDetailState.detail?.let {
-                    viewModel.isFavorite(ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null))
-                } ?: false,
-                recommendations = recommendations,
-                onBack = {
-                    viewModel.clearSeriesDetail()
-                    navController.popBackStack()
-                },
-                onSelectSeason = { viewModel.selectSeason(it) },
-                onPlayEpisode = { viewModel.playEpisode(it) },
-                onToggleFavorite = {
-                    seriesDetailState.detail?.let {
-                        viewModel.toggleFavorite(ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null))
-                    }
-                },
-                onEnterFullscreen = { viewModel.enterFullscreenPlayer() },
-                onRecommendationClick = { item ->
-                    viewModel.clearSeriesDetail()
-                    handleItemSelected(item)
-                },
-                isFullscreen = isFullscreen
-            )
+                TvSeriesDetailScreen(
+                    state = seriesDetailState,
+                    playerManager = viewModel.playerManager,
+                    isFavorite = seriesDetailState.detail?.let {
+                        viewModel.isFavorite(ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null))
+                    } ?: false,
+                    recommendations = recommendations,
+                    onBack = {
+                        viewModel.clearSeriesDetail()
+                        navController.popBackStack()
+                    },
+                    onSelectSeason = { viewModel.selectSeason(it) },
+                    onPlayEpisode = { viewModel.playEpisode(it) },
+                    onToggleFavorite = {
+                        seriesDetailState.detail?.let {
+                            viewModel.toggleFavorite(ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null))
+                        }
+                    },
+                    onEnterFullscreen = { viewModel.enterFullscreenPlayer() },
+                    onRecommendationClick = { item ->
+                        viewModel.clearSeriesDetail()
+                        handleItemSelected(item)
+                    },
+                    isFullscreen = isFullscreen
+                )
+            }
         }
 
         composable("movieDetail") {
-            val recommendations = (homeCatalog.movies + homeCatalog.series)
-                .filter { it.id != movieDetailState.detail?.streamId }
-                .shuffled()
-                .take(10)
+            if (!isFullscreen) {
+                val recommendations = (homeCatalog.movies + homeCatalog.series)
+                    .filter { it.id != movieDetailState.detail?.streamId }
+                    .shuffled()
+                    .take(10)
 
-            TvMovieDetailScreen(
-                state = movieDetailState,
-                playerManager = viewModel.playerManager,
-                isFavorite = movieDetailState.detail?.let {
-                    viewModel.isFavorite(ContentItem(it.streamId, it.name, it.coverUrl, ContentType.MOVIE, it.streamUrl))
-                } ?: false,
-                recommendations = recommendations,
-                onBack = {
-                    viewModel.clearMovieDetail()
-                    navController.popBackStack()
-                },
-                onToggleFavorite = {
-                    movieDetailState.detail?.let {
-                        viewModel.toggleFavorite(ContentItem(it.streamId, it.name, it.coverUrl, ContentType.MOVIE, it.streamUrl))
-                    }
-                },
-                onEnterFullscreen = { viewModel.enterFullscreenPlayer() },
-                onRecommendationClick = { item ->
-                    viewModel.clearMovieDetail()
-                    handleItemSelected(item)
-                },
-                isFullscreen = isFullscreen
-            )
+                TvMovieDetailScreen(
+                    state = movieDetailState,
+                    playerManager = viewModel.playerManager,
+                    isFavorite = movieDetailState.detail?.let {
+                        viewModel.isFavorite(ContentItem(it.streamId, it.name, it.coverUrl, ContentType.MOVIE, it.streamUrl))
+                    } ?: false,
+                    recommendations = recommendations,
+                    onBack = {
+                        viewModel.clearMovieDetail()
+                        navController.popBackStack()
+                    },
+                    onToggleFavorite = {
+                        movieDetailState.detail?.let {
+                            viewModel.toggleFavorite(ContentItem(it.streamId, it.name, it.coverUrl, ContentType.MOVIE, it.streamUrl))
+                        }
+                    },
+                    onEnterFullscreen = { viewModel.enterFullscreenPlayer() },
+                    onRecommendationClick = { item ->
+                        viewModel.clearMovieDetail()
+                        handleItemSelected(item)
+                    },
+                    isFullscreen = isFullscreen
+                )
+            }
         }
 
         composable("search") {
