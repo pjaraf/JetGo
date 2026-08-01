@@ -41,6 +41,16 @@ android {
                 keyPassword = keystoreProperties["keyPassword"] as String
             }
         }
+        // Firma de debug FIJA (el mismo keystore siempre, incluído en el repo).
+        // Sin esto, cada compilación en GitHub Actions se firmaría con una llave
+        // aleatoria distinta, y Android rechazaría instalar las "actualizaciones"
+        // por conflicto de firma.
+        getByName("debug") {
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {
