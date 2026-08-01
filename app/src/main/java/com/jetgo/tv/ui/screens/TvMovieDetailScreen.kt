@@ -64,6 +64,11 @@ fun TvMovieDetailScreen(
     onRecommendationClick: (ContentItem) -> Unit,
     isFullscreen: Boolean = false
 ) {
+    // Con el control remoto, "Atrás" debe volver a la grilla de películas (no cerrar la app
+    // ni saltarse pasos). Solo activo cuando NO está en pantalla completa (ahí manda el
+    // BackHandler de FullscreenPlayerEffect, que cierra la pantalla completa primero).
+    androidx.activity.compose.BackHandler(enabled = !isFullscreen) { onBack() }
+
     Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
         when {
             state.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))

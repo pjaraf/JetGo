@@ -70,6 +70,9 @@ fun TvSeriesDetailScreen(
     onRecommendationClick: (ContentItem) -> Unit,
     isFullscreen: Boolean = false
 ) {
+    // Misma lógica que en la ficha de película: "Atrás" vuelve a la grilla de series.
+    androidx.activity.compose.BackHandler(enabled = !isFullscreen) { onBack() }
+
     Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
         when {
             state.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
