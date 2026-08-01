@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.CircularProgressIndicator
@@ -47,7 +48,6 @@ import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.data.model.MovieDetail
 import com.jetgo.tv.player.PlayerManager
 import com.jetgo.tv.ui.components.LanguageTracksDialog
-import com.jetgo.tv.ui.components.VodPlayerControls
 import com.jetgo.tv.ui.theme.BackgroundDark
 import com.jetgo.tv.ui.theme.FocusOrange
 import com.jetgo.tv.ui.theme.SurfaceDark
@@ -206,13 +206,6 @@ private fun TvMovieDetailContent(
                     },
                     modifier = Modifier.fillMaxSize()
                 )
-                VodPlayerControls(
-                    playerManager = playerManager,
-                    posterUrl = detail.coverUrl,
-                    title = detail.name,
-                    onExit = null,
-                    onOpenLanguageMenu = { showLanguageDialog = true }
-                )
             }
         }
 
@@ -242,6 +235,11 @@ private fun TvMovieDetailContent(
                 label = "Favorito",
                 highlighted = isFavorite,
                 onClick = onToggleFavorite
+            )
+            MovieActionChip(
+                icon = Icons.Default.Language,
+                label = "Idioma y subtítulos",
+                onClick = { showLanguageDialog = true }
             )
         }
 

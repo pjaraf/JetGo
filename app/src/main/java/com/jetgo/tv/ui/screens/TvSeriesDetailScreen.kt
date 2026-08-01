@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
@@ -51,7 +52,6 @@ import com.jetgo.tv.data.model.SeriesDetail
 import com.jetgo.tv.data.model.SeriesEpisode
 import com.jetgo.tv.player.PlayerManager
 import com.jetgo.tv.ui.components.LanguageTracksDialog
-import com.jetgo.tv.ui.components.VodPlayerControls
 import com.jetgo.tv.ui.theme.BackgroundDark
 import com.jetgo.tv.ui.theme.FocusOrange
 import com.jetgo.tv.ui.theme.SurfaceDark
@@ -231,13 +231,6 @@ private fun TvSeriesDetailContent(
                     },
                     modifier = Modifier.fillMaxSize()
                 )
-                VodPlayerControls(
-                    playerManager = playerManager,
-                    posterUrl = detail.coverUrl,
-                    title = if (currentEpisode != null) "${detail.name} · ${currentEpisode.title}" else detail.name,
-                    onExit = null,
-                    onOpenLanguageMenu = { showLanguageDialog = true }
-                )
             }
         }
 
@@ -267,6 +260,11 @@ private fun TvSeriesDetailContent(
                 label = "Favorito",
                 highlighted = isFavorite,
                 onClick = onToggleFavorite
+            )
+            ActionChip(
+                icon = Icons.Default.Language,
+                label = "Idioma y subtítulos",
+                onClick = { showLanguageDialog = true }
             )
         }
 
