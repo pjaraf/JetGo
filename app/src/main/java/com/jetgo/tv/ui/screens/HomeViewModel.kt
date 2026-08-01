@@ -701,6 +701,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun clearSeriesDetail() {
         playerManager.onPlaybackEnded = null
         stopPositionTracking()
+        try { playerManager.exoPlayer.pause() } catch (e: Exception) { /* ignorar */ }
         _seriesDetailState.value = SeriesDetailUiState()
     }
 
@@ -739,6 +740,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     /** Se llama al salir de la pantalla de detalle de película */
     fun clearMovieDetail() {
         stopPositionTracking()
+        try { playerManager.exoPlayer.pause() } catch (e: Exception) { /* ignorar */ }
         _movieDetailState.value = MovieDetailUiState()
     }
 
