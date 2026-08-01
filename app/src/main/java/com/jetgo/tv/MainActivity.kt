@@ -242,18 +242,30 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
     NavHost(navController = navController, startDestination = "home") {
 
         composable("home") {
+            LaunchedEffect(Unit) {
+                viewModel.resumeLastLiveChannelIfNeeded()
+            }
             if (!isFullscreen) {
                 val newestItems = (homeCatalog.movies + homeCatalog.series).shuffled().take(10)
                 HomeScreen(
                     playerManager = viewModel.playerManager,
                     liveChannels = uiState.liveChannels,
                     newestItems = newestItems,
-                    onItemClick = handleItemSelected,
+                    onItemClick = { item -> viewModel.pausePreviewPlayer(); handleItemSelected(item) },
                     onChannelSelected = { viewModel.playChannel(it) },
-                    onCategoryClick = { category -> navController.navigate("categoryPicker/$category") },
+                    onCategoryClick = { category ->
+                        viewModel.pausePreviewPlayer()
+                        navController.navigate("categoryPicker/$category")
+                    },
                     onLiveClick = { viewModel.enterFullscreenPlayer() },
-                    onSearchClick = { navController.navigate("search") },
-                    onFavoritesClick = { navController.navigate("favorites") },
+                    onSearchClick = {
+                        viewModel.pausePreviewPlayer()
+                        navController.navigate("search")
+                    },
+                    onFavoritesClick = {
+                        viewModel.pausePreviewPlayer()
+                        navController.navigate("favorites")
+                    },
                     isFullscreen = isFullscreen
                 )
             }

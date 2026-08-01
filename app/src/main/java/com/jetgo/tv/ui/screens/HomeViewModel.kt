@@ -149,6 +149,28 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private var positionTrackingJob: kotlinx.coroutines.Job? = null
 
+    private data class LastLiveChannel(val id: String, val name: String, val url: String)
+    private var lastLiveChannel: LastLiveChannel? = null
+    private var isCurrentlyShowingLive = true
+
+    /** Pausa el reproductor de la pantalla principal (ej. al entrar a Películas/Series) */
+    fun pausePreviewPlayer() {
+        try { playerManager.exoPlayer.pause() } catch (e: Exception) { /* ignorar */ }
+    }
+
+    /** Al volver a Inicio: si estaba mostrando otra cosa (película/serie), retoma el último canal EN VIVO */
+    fun resumeLastLiveChannelIfNeeded() {
+        val last = lastLiveChannel ?: return
+        if (isCurrentlyShowingLive) {
+            // Ya está en el canal correcto, solo asegurarse de que esté reproduciendo
+            try { playerManager.exoPlayer.play() } catch (e: Exception) { /* ignorar */ }
+        } else {
+            playerManager.playChannel(last.url, last.name)
+            isCurrentlyShowingLive = true
+            _liveChannelInfo.value = LiveChannelInfo(last.name, null, null, null, null, last.id)
+        }
+    }
+
     private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
     val updateInfo: StateFlow<UpdateInfo?> = _updateInfo.asStateFlow()
 
@@ -339,6 +361,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun playChannel(channel: Channel) {
         playerManager.playChannel(channel.streamUrl, channel.name)
+        lastLiveChannel = LastLiveChannel(channel.streamId, channel.name, channel.streamUrl)
+        isCurrentlyShowingLive = true
         viewModelScope.launch { configStore.saveLastChannelId(channel.streamId) }
         _liveChannelInfo.value = LiveChannelInfo(channel.name, channel.logoUrl, channel.number, null, null, channel.streamId)
         val config = currentConfig ?: return
@@ -444,6 +468,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 playWithResumeCheck("movie:${item.id}", item.name, item.streamUrl)
             } else {
                 playerManager.playChannel(item.streamUrl, item.name)
+                lastLiveChannel = LastLiveChannel(item.id, item.name, item.streamUrl)
+                isCurrentlyShowingLive = true
                 viewModelScope.launch { configStore.saveLastChannelId(item.id) }
                 _liveChannelInfo.value = LiveChannelInfo(item.name, item.imageUrl, null, null, null, item.id)
                 val config = currentConfig
@@ -725,6 +751,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
      * pregunta antes de reproducir; si no, arranca directo desde el principio.
      */
     private fun playWithResumeCheck(contentKey: String, title: String, streamUrl: String) {
+        isCurrentlyShowingLive = false
         viewModelScope.launch {
             val saved = try { positionStore.get(contentKey) } catch (e: Exception) { null }
             val hasMeaningfulProgress = saved != null &&
