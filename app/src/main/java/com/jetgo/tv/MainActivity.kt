@@ -38,6 +38,7 @@ import com.jetgo.tv.ui.screens.FavoritesScreen
 import com.jetgo.tv.ui.screens.HomeScreen
 import com.jetgo.tv.ui.screens.HomeViewModel
 import com.jetgo.tv.ui.screens.SearchScreen
+import com.jetgo.tv.ui.screens.TvCategoryGridScreen
 import com.jetgo.tv.ui.screens.phone.PhoneInicioScreen
 import com.jetgo.tv.ui.screens.phone.PhoneProfileScreen
 import com.jetgo.tv.ui.screens.phone.PhoneTvScreen
@@ -67,6 +68,14 @@ private fun categoryFromRoute(route: String?): ContentType = when (route) {
     "ANIME" -> ContentType.ANIME
     "SPECIAL" -> ContentType.SPECIAL
     else -> ContentType.LIVE
+}
+
+private fun labelForType(type: ContentType): String = when (type) {
+    ContentType.LIVE -> "Vivo"
+    ContentType.SERIES -> "Series"
+    ContentType.MOVIE -> "Películas"
+    ContentType.ANIME -> "Anime"
+    ContentType.SPECIAL -> "Especiales"
 }
 
 @Composable
@@ -167,17 +176,38 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
             val category = backStackEntry.arguments?.getString("category")
             val type = categoryFromRoute(category)
 
-            LaunchedEffect(category) { viewModel.loadCategoriesForType(type) }
+            if (type == ContentType.LIVE) {
+                // Vivo sigue con el flujo clásico (lista de canales, no pósters)
+                LaunchedEffect(category) { viewModel.loadCategoriesForType(type) }
 
-            CategoryPickerScreen(
-                isLoading = categoryPickerState.isLoading,
-                categories = categoryPickerState.categories,
-                errorMessage = categoryPickerState.errorMessage,
-                onCategorySelected = { selectedCategory ->
-                    val encodedId = java.net.URLEncoder.encode(selectedCategory.id, "UTF-8")
-                    navController.navigate("categoryContent/$category/$encodedId")
-                }
-            )
+                CategoryPickerScreen(
+                    isLoading = categoryPickerState.isLoading,
+                    categories = categoryPickerState.categories,
+                    errorMessage = categoryPickerState.errorMessage,
+                    onCategorySelected = { selectedCategory ->
+                        val encodedId = java.net.URLEncoder.encode(selectedCategory.id, "UTF-8")
+                        navController.navigate("categoryContent/$category/$encodedId")
+                    }
+                )
+            } else {
+                // Película/Serie/Anime/Especial: categorías + grilla de pósters en una sola pantalla
+                TvCategoryGridScreen(
+                    typeLabel = labelForType(type),
+                    categories = categoryPickerState.categories,
+                    categoriesLoading = categoryPickerState.isLoading,
+                    items = categoryContentState.items,
+                    itemsLoading = categoryContentState.isLoading,
+                    onLoadCategories = { viewModel.loadCategoriesForType(type) },
+                    onCategorySelected = { categoryId -> viewModel.loadCategoryContent(type, categoryId) },
+                    onItemSelected = { item ->
+                        viewModel.selectContentItem(item) {
+                            navController.popBackStack("home", inclusive = false)
+                        }
+                    },
+                    isFavorite = { viewModel.isFavorite(it) },
+                    onToggleFavorite = { viewModel.toggleFavorite(it) }
+                )
+            }
         }
 
         composable("categoryContent/{category}/{categoryId}") { backStackEntry ->

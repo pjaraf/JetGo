@@ -29,7 +29,8 @@ data class SeriesItem(
     val name: String,
     val coverUrl: String?,
     val categoryId: String,
-    val plot: String? = null
+    val plot: String? = null,
+    val rating: String? = null
 )
 
 data class MovieItem(
@@ -37,7 +38,8 @@ data class MovieItem(
     val name: String,
     val coverUrl: String?,
     val categoryId: String,
-    val streamUrl: String
+    val streamUrl: String,
+    val rating: String? = null
 )
 
 /** Estado de reproducción mostrado en el overlay del reproductor (velocidad, en vivo, etc.) */
@@ -56,7 +58,8 @@ data class ContentItem(
     val name: String,
     val imageUrl: String?,
     val type: ContentType,
-    val streamUrl: String?
+    val streamUrl: String?,
+    val rating: String? = null
 )
 
 data class SeriesEpisode(

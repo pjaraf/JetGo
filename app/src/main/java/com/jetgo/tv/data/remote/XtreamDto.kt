@@ -22,7 +22,8 @@ data class VodStreamDto(
     @SerializedName("name") val name: String,
     @SerializedName("stream_icon") val streamIcon: String?,
     @SerializedName("category_id") val categoryId: String,
-    @SerializedName("container_extension") val containerExtension: String?
+    @SerializedName("container_extension") val containerExtension: String?,
+    @SerializedName("rating") val rating: String?
 )
 
 data class SeriesDto(
@@ -30,7 +31,8 @@ data class SeriesDto(
     @SerializedName("name") val name: String,
     @SerializedName("cover") val cover: String?,
     @SerializedName("category_id") val categoryId: String,
-    @SerializedName("plot") val plot: String?
+    @SerializedName("plot") val plot: String?,
+    @SerializedName("rating") val rating: String?
 )
 
 data class UserInfoResponse(

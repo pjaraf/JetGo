@@ -73,7 +73,8 @@ class StreamRepository {
                 streamUrl = XtreamApi.vodStreamUrl(
                     config.host, config.username, config.password, it.streamId,
                     it.containerExtension ?: "mp4"
-                )
+                ),
+                rating = it.rating
             )
         } ?: emptyList()
     }
@@ -93,7 +94,8 @@ class StreamRepository {
                 name = it.name,
                 coverUrl = it.cover,
                 categoryId = it.categoryId,
-                plot = it.plot
+                plot = it.plot,
+                rating = it.rating
             )
         } ?: emptyList()
     }

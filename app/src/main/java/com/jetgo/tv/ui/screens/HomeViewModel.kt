@@ -367,10 +367,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         ContentItem(it.streamId, it.name, it.logoUrl, ContentType.LIVE, it.streamUrl)
                     }
                     ContentType.MOVIE, ContentType.ANIME, ContentType.SPECIAL -> repository.getMovies(config, categoryId).map {
-                        ContentItem(it.streamId, it.name, it.coverUrl, type, it.streamUrl)
+                        ContentItem(it.streamId, it.name, it.coverUrl, type, it.streamUrl, rating = it.rating)
                     }
                     ContentType.SERIES -> repository.getSeries(config, categoryId).map {
-                        ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null)
+                        ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null, rating = it.rating)
                     }
                 }
                 _categoryContentState.value = CategoryContentUiState(items = items)
