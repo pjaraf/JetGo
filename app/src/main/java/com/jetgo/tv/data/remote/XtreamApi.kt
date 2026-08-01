@@ -78,6 +78,15 @@ interface XtreamApi {
         @Query("vod_id") vodId: String
     ): Response<VodInfoResponse>
 
+    @GET("player_api.php")
+    suspend fun getShortEpg(
+        @Query("username") username: String,
+        @Query("password") password: String,
+        @Query("action") action: String = "get_short_epg",
+        @Query("stream_id") streamId: String,
+        @Query("limit") limit: Int = 2
+    ): Response<ShortEpgResponse>
+
     companion object {
         /** [baseUrl] debe terminar en "/", ej: "http://midominio.com:8080/" */
         fun create(baseUrl: String): XtreamApi {

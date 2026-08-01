@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -41,6 +42,7 @@ fun CategoryCard(
     gradientStart: Color,
     gradientEnd: Color,
     modifier: Modifier = Modifier,
+    focusRequester: androidx.compose.ui.focus.FocusRequester? = null,
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -56,6 +58,9 @@ fun CategoryCard(
                 width = if (isFocused) 3.dp else 0.dp,
                 color = if (isFocused) FocusOrange else Color.Transparent,
                 shape = RoundedCornerShape(16.dp)
+            )
+            .then(
+                if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier
             )
             .onFocusChanged { isFocused = it.isFocused }
             .clickable(

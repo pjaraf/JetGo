@@ -14,7 +14,20 @@ data class LiveStreamDto(
     @SerializedName("name") val name: String,
     @SerializedName("stream_icon") val streamIcon: String?,
     @SerializedName("category_id") val categoryId: String,
-    @SerializedName("epg_channel_id") val epgChannelId: String?
+    @SerializedName("epg_channel_id") val epgChannelId: String?,
+    @SerializedName("num") val num: Int?
+)
+
+// ---- get_short_epg: programación actual/siguiente de un canal en vivo ----
+
+data class ShortEpgResponse(
+    @SerializedName("epg_listings") val epgListings: List<EpgListingDto>?
+)
+
+data class EpgListingDto(
+    @SerializedName("title") val title: String?,       // viene en base64
+    @SerializedName("start_timestamp") val startTimestamp: Long?,
+    @SerializedName("stop_timestamp") val stopTimestamp: Long?
 )
 
 data class VodStreamDto(

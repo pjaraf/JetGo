@@ -49,6 +49,11 @@ fun HomeScreen(
     onSearchClick: () -> Unit = {},
     onFavoritesClick: () -> Unit = {}
 ) {
+    val vivoFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        vivoFocusRequester.requestFocus()
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -82,7 +87,8 @@ fun HomeScreen(
                 CategoryCard(
                     label = "VIVO", icon = Icons.Default.PlayCircle,
                     gradientStart = Color(0xFFFF6B5B), gradientEnd = Color(0xFFE5493B),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    focusRequester = vivoFocusRequester
                 ) { onCategoryClick("LIVE") }
 
                 CategoryCard(

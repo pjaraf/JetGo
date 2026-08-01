@@ -21,7 +21,15 @@ data class Channel(
     val logoUrl: String?,
     val categoryId: String,
     val streamUrl: String,
-    val epgChannelId: String? = null
+    val epgChannelId: String? = null,
+    val number: Int? = null
+)
+
+/** Programa de la guía (EPG): título ya decodificado + horarios de inicio/fin */
+data class EpgProgram(
+    val title: String,
+    val startMs: Long,
+    val endMs: Long
 )
 
 data class SeriesItem(

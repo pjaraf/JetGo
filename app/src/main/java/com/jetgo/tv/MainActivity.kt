@@ -98,6 +98,14 @@ private fun AppRoot(viewModel: HomeViewModel) {
         onBackFromFullscreen = { viewModel.exitFullscreenPlayer() }
     )
 
+    // En TV: apenas se conecta, entra directo a ver el canal en vivo a pantalla completa
+    // (como una tele real al encenderla), en vez de mostrar primero el menú de Inicio.
+    LaunchedEffect(isTv, uiState.isConfigured) {
+        if (isTv && uiState.isConfigured) {
+            viewModel.enterFullscreenPlayer()
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             if (updateInfo != null && !isFullscreen && !isTv) {
@@ -146,6 +154,9 @@ private fun AppRoot(viewModel: HomeViewModel) {
         if (isFullscreen) {
             val movieDetailState by viewModel.movieDetailState.collectAsState()
             val seriesDetailState by viewModel.seriesDetailState.collectAsState()
+            val liveChannelInfo by viewModel.liveChannelInfo.collectAsState()
+            val categoryPickerState by viewModel.categoryPickerState.collectAsState()
+            val categoryContentState by viewModel.categoryContentState.collectAsState()
 
             val currentEpisode = seriesDetailState.detail?.episodesBySeason?.values
                 ?.flatten()
@@ -164,7 +175,13 @@ private fun AppRoot(viewModel: HomeViewModel) {
                 onExitFullscreen = { viewModel.exitFullscreenPlayer() },
                 isVod = isVod,
                 posterUrl = posterUrl,
-                title = title
+                title = title,
+                liveChannelInfo = if (!isVod) liveChannelInfo else null,
+                liveCategories = categoryPickerState.categories,
+                liveChannelsInCategory = categoryContentState.items,
+                onLoadLiveCategories = { viewModel.loadCategoriesForType(ContentType.LIVE) },
+                onSelectLiveCategory = { categoryId -> viewModel.loadCategoryContent(ContentType.LIVE, categoryId) },
+                onSelectLiveChannel = { item -> viewModel.selectContentItem(item) {} }
             )
         }
 

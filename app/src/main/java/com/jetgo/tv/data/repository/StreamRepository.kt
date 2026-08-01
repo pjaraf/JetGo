@@ -3,6 +3,7 @@ package com.jetgo.tv.data.repository
 import com.jetgo.tv.data.model.Category
 import com.jetgo.tv.data.model.Channel
 import com.jetgo.tv.data.model.ContentType
+import com.jetgo.tv.data.model.EpgProgram
 import com.jetgo.tv.data.model.MovieDetail
 import com.jetgo.tv.data.model.MovieItem
 import com.jetgo.tv.data.model.SeriesDetail
@@ -51,9 +52,34 @@ class StreamRepository {
                 logoUrl = it.streamIcon,
                 categoryId = it.categoryId,
                 streamUrl = XtreamApi.liveStreamUrl(config.host, config.username, config.password, it.streamId),
-                epgChannelId = it.epgChannelId
+                epgChannelId = it.epgChannelId,
+                number = it.num
             )
         } ?: emptyList()
+    }
+
+    /** Programa actual y siguiente de un canal en vivo (si tu servidor entrega guía EPG) */
+    suspend fun getShortEpg(config: ServerConfig, streamId: String): List<EpgProgram> = withContext(Dispatchers.IO) {
+        try {
+            val api = XtreamApi.create(config.host.ensureTrailingSlash())
+            val resp = api.getShortEpg(config.username, config.password, streamId = streamId, limit = 2)
+            resp.body()?.epgListings?.mapNotNull { listing ->
+                val startMs = (listing.startTimestamp ?: return@mapNotNull null) * 1000
+                val endMs = (listing.stopTimestamp ?: return@mapNotNull null) * 1000
+                EpgProgram(title = decodeEpgText(listing.title), startMs = startMs, endMs = endMs)
+            } ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun decodeEpgText(raw: String?): String {
+        if (raw.isNullOrBlank()) return "Sin información"
+        return try {
+            String(android.util.Base64.decode(raw, android.util.Base64.DEFAULT), Charsets.UTF_8)
+        } catch (e: Exception) {
+            raw
+        }
     }
 
     suspend fun getVodCategories(config: ServerConfig): List<Category> = withContext(Dispatchers.IO) {
