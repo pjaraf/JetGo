@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -35,6 +34,7 @@ import com.jetgo.tv.data.model.Channel
 import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.player.PlayerManager
 import com.jetgo.tv.ui.components.CategoryCard
+import com.jetgo.tv.ui.components.HeightMatchedPlayerRow
 import com.jetgo.tv.ui.components.NewestContentCarousel
 import com.jetgo.tv.ui.components.PlayerPanel
 import com.jetgo.tv.ui.theme.BackgroundDark
@@ -63,20 +63,22 @@ fun HomeScreen(
         Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
 
             // ---- Fila superior: reproductor + carrusel de contenido nuevo (misma altura) ----
-            Row(
-                modifier = Modifier.fillMaxWidth().weight(1f).height(IntrinsicSize.Min),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                PlayerPanel(
-                    playerManager = playerManager,
-                    modifier = Modifier.weight(2.1f)
-                )
-                NewestContentCarousel(
-                    items = newestItems,
-                    onItemClick = onItemClick,
-                    modifier = Modifier.weight(1f).fillMaxHeight()
-                )
-            }
+            HeightMatchedPlayerRow(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                playerContent = {
+                    PlayerPanel(
+                        playerManager = playerManager,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                sideContent = {
+                    NewestContentCarousel(
+                        items = newestItems,
+                        onItemClick = onItemClick,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            )
 
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(20.dp))
 
