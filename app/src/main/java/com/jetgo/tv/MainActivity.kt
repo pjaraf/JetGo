@@ -31,7 +31,9 @@ import com.jetgo.tv.ui.components.FullscreenPlayerEffect
 import com.jetgo.tv.ui.components.FullscreenPlayerOverlay
 import com.jetgo.tv.ui.components.PhoneBottomNav
 import com.jetgo.tv.ui.components.PhoneMainTab
+import com.jetgo.tv.ui.components.ResumeWatchingDialog
 import com.jetgo.tv.ui.components.UpdateBanner
+import com.jetgo.tv.ui.components.formatDurationLabel
 import com.jetgo.tv.ui.screens.ChannelListScreen
 import com.jetgo.tv.ui.screens.ConnectionIssueScreen
 import com.jetgo.tv.ui.screens.FavoritesScreen
@@ -144,6 +146,18 @@ private fun AppRoot(viewModel: HomeViewModel) {
             FullscreenPlayerOverlay(
                 playerManager = viewModel.playerManager,
                 onExitFullscreen = { viewModel.exitFullscreenPlayer() }
+            )
+        }
+
+        // "Seguir viendo" / "Desde el inicio" — por encima de cualquier pantalla
+        val resumePrompt by viewModel.resumePrompt.collectAsState()
+        resumePrompt?.let { prompt ->
+            ResumeWatchingDialog(
+                title = prompt.title,
+                resumeLabel = "Continuar en " + formatDurationLabel(prompt.resumePositionMs),
+                onResume = { viewModel.resumeFromPrompt() },
+                onStartOver = { viewModel.startOverFromPrompt() },
+                onDismiss = { viewModel.dismissResumePrompt() }
             )
         }
     }

@@ -76,4 +76,15 @@ class PlayerManager(context: Context) {
     fun release() {
         exoPlayer.release()
     }
+
+    /** Posición actual de reproducción, en milisegundos */
+    fun currentPositionMs(): Long = try { exoPlayer.currentPosition } catch (e: Exception) { 0L }
+
+    /** Duración total del contenido actual, en milisegundos (0 si aún no se sabe, ej. streams en vivo) */
+    fun durationMs(): Long = try { exoPlayer.duration.coerceAtLeast(0) } catch (e: Exception) { 0L }
+
+    /** Salta a una posición específica (usado para "Seguir viendo") */
+    fun seekTo(positionMs: Long) {
+        try { exoPlayer.seekTo(positionMs) } catch (e: Exception) { /* ignorar */ }
+    }
 }

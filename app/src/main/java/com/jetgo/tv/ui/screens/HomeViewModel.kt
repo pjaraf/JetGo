@@ -7,6 +7,7 @@ import com.jetgo.tv.BuildConfig
 import com.jetgo.tv.data.local.AccessStore
 import com.jetgo.tv.data.local.ConfigStore
 import com.jetgo.tv.data.local.FavoritesStore
+import com.jetgo.tv.data.local.PlaybackPositionStore
 import com.jetgo.tv.data.model.Category
 import com.jetgo.tv.data.model.Channel
 import com.jetgo.tv.data.model.ContentItem
@@ -133,6 +134,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _movieDetailState = MutableStateFlow(MovieDetailUiState())
     val movieDetailState: StateFlow<MovieDetailUiState> = _movieDetailState.asStateFlow()
+
+    private val positionStore = PlaybackPositionStore(application)
+
+    data class ResumePrompt(
+        val contentKey: String,
+        val title: String,
+        val streamUrl: String,
+        val resumePositionMs: Long
+    )
+
+    private val _resumePrompt = MutableStateFlow<ResumePrompt?>(null)
+    val resumePrompt: StateFlow<ResumePrompt?> = _resumePrompt.asStateFlow()
+
+    private var positionTrackingJob: kotlinx.coroutines.Job? = null
 
     private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
     val updateInfo: StateFlow<UpdateInfo?> = _updateInfo.asStateFlow()
@@ -265,6 +280,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     liveChannels = channels
                 )
                 channels.firstOrNull()?.let { playChannel(it) }
+                ensureHomeCatalogLoaded()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -393,7 +409,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     /** Se llama al tocar un ítem final. Resuelve el episodio si es una serie. */
     fun selectContentItem(item: ContentItem, onReady: () -> Unit) {
         if (item.streamUrl != null) {
-            playerManager.playChannel(item.streamUrl, item.name)
+            val isVod = item.type == ContentType.MOVIE || item.type == ContentType.ANIME || item.type == ContentType.SPECIAL
+            if (isVod) {
+                playWithResumeCheck("movie:${item.id}", item.name, item.streamUrl)
+            } else {
+                playerManager.playChannel(item.streamUrl, item.name)
+            }
             onReady()
             return
         }
@@ -553,7 +574,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun playEpisode(episodeId: String) {
         val episode = currentEpisode(episodeId) ?: return
+        _seriesDetailState.value = _seriesDetailState.value.copy(
+            currentEpisodeId = episodeId,
+            selectedSeason = episode.season
+        )
+        val title = "${_seriesDetailState.value.detail?.name} · ${episode.title}"
+        playWithResumeCheck("series:$episodeId", title, episode.streamUrl)
+    }
+
+    /** Reproduce directo, sin preguntar "seguir viendo" (usado en el auto-avance entre capítulos) */
+    private fun playEpisodeDirect(episodeId: String) {
+        val episode = currentEpisode(episodeId) ?: return
         playerManager.playChannel(episode.streamUrl, "${_seriesDetailState.value.detail?.name} · ${episode.title}")
+        startPositionTracking("series:$episodeId")
         _seriesDetailState.value = _seriesDetailState.value.copy(
             currentEpisodeId = episodeId,
             selectedSeason = episode.season
@@ -576,7 +609,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             nextSeason?.let { detail.episodesBySeason[it]?.firstOrNull() }
         }
 
-        next?.let { playEpisode(it.id) }
+        next?.let { playEpisodeDirect(it.id) }
     }
 
     private fun currentEpisode(episodeId: String): SeriesEpisode? {
@@ -587,6 +620,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     /** Se llama al salir de la pantalla de detalle de serie, para no seguir auto-avanzando por error */
     fun clearSeriesDetail() {
         playerManager.onPlaybackEnded = null
+        stopPositionTracking()
         _seriesDetailState.value = SeriesDetailUiState()
     }
 
@@ -618,13 +652,83 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
             _movieDetailState.value = MovieDetailUiState(detail = detail)
             playerManager.onPlaybackEnded = null
-            playerManager.playChannel(detail.streamUrl, detail.name)
+            playWithResumeCheck("movie:${item.id}", detail.name, detail.streamUrl)
         }
     }
 
     /** Se llama al salir de la pantalla de detalle de película */
     fun clearMovieDetail() {
+        stopPositionTracking()
         _movieDetailState.value = MovieDetailUiState()
+    }
+
+    // ---------------------------------------------------------------------
+    // "Seguir viendo" / "Desde el inicio" (películas, series y anime)
+    // ---------------------------------------------------------------------
+
+    /**
+     * Punto de entrada único para reproducir una película/episodio: si hay progreso guardado,
+     * pregunta antes de reproducir; si no, arranca directo desde el principio.
+     */
+    private fun playWithResumeCheck(contentKey: String, title: String, streamUrl: String) {
+        viewModelScope.launch {
+            val saved = try { positionStore.get(contentKey) } catch (e: Exception) { null }
+            val hasMeaningfulProgress = saved != null &&
+                saved.positionMs > 8_000 &&
+                saved.positionMs < (saved.durationMs * 0.95)
+
+            if (hasMeaningfulProgress && saved != null) {
+                _resumePrompt.value = ResumePrompt(contentKey, title, streamUrl, saved.positionMs)
+            } else {
+                playerManager.playChannel(streamUrl, title)
+                startPositionTracking(contentKey)
+            }
+        }
+    }
+
+    fun resumeFromPrompt() {
+        val prompt = _resumePrompt.value ?: return
+        playerManager.playChannel(prompt.streamUrl, prompt.title)
+        startPositionTracking(prompt.contentKey)
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(500) // deja que el reproductor prepare el contenido antes de saltar
+            playerManager.seekTo(prompt.resumePositionMs)
+        }
+        _resumePrompt.value = null
+    }
+
+    fun startOverFromPrompt() {
+        val prompt = _resumePrompt.value ?: return
+        playerManager.playChannel(prompt.streamUrl, prompt.title)
+        startPositionTracking(prompt.contentKey)
+        _resumePrompt.value = null
+    }
+
+    fun dismissResumePrompt() {
+        _resumePrompt.value = null
+    }
+
+    private fun startPositionTracking(contentKey: String) {
+        positionTrackingJob?.cancel()
+        positionTrackingJob = viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(7_000)
+                val pos = playerManager.currentPositionMs()
+                val dur = playerManager.durationMs()
+                if (dur > 0) {
+                    if (pos > dur * 0.95) {
+                        positionStore.clear(contentKey)
+                    } else if (pos > 5_000) {
+                        positionStore.save(contentKey, pos, dur)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun stopPositionTracking() {
+        positionTrackingJob?.cancel()
+        positionTrackingJob = null
     }
 
     override fun onCleared() {
