@@ -43,6 +43,7 @@ fun PlayerPanel(
     modifier: Modifier = Modifier,
     isFocused: Boolean = true,
     showFullscreenHint: Boolean = false,
+    showVideo: Boolean = true,
     onTap: () -> Unit = {}
 ) {
     val stats = playerManager.stats.value
@@ -63,15 +64,17 @@ fun PlayerPanel(
                 onClick = onTap
             )
     ) {
-        AndroidView(
-            factory = { context ->
-                PlayerView(context).apply {
-                    player = playerManager.exoPlayer
-                    useController = false
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
+        if (showVideo) {
+            AndroidView(
+                factory = { context ->
+                    PlayerView(context).apply {
+                        player = playerManager.exoPlayer
+                        useController = false
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         if (showFullscreenHint) {
             Box(

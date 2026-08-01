@@ -67,7 +67,8 @@ fun TvSeriesDetailScreen(
     onPlayEpisode: (String) -> Unit,
     onToggleFavorite: () -> Unit,
     onEnterFullscreen: () -> Unit,
-    onRecommendationClick: (ContentItem) -> Unit
+    onRecommendationClick: (ContentItem) -> Unit,
+    isFullscreen: Boolean = false
 ) {
     Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
         when {
@@ -89,7 +90,8 @@ fun TvSeriesDetailScreen(
                 onPlayEpisode = onPlayEpisode,
                 onToggleFavorite = onToggleFavorite,
                 onEnterFullscreen = onEnterFullscreen,
-                onRecommendationClick = onRecommendationClick
+                onRecommendationClick = onRecommendationClick,
+                isFullscreen = isFullscreen
             )
         }
     }
@@ -108,7 +110,8 @@ private fun TvSeriesDetailContent(
     onPlayEpisode: (String) -> Unit,
     onToggleFavorite: () -> Unit,
     onEnterFullscreen: () -> Unit,
-    onRecommendationClick: (ContentItem) -> Unit
+    onRecommendationClick: (ContentItem) -> Unit,
+    isFullscreen: Boolean = false
 ) {
     val episodes = detail.episodesBySeason[selectedSeason].orEmpty()
     val currentEpisode = detail.episodesBySeason.values.flatten().firstOrNull { it.id == currentEpisodeId }
@@ -222,15 +225,17 @@ private fun TvSeriesDetailContent(
                     .clip(RoundedCornerShape(10.dp))
                     .background(Color.Black)
             ) {
-                AndroidView(
-                    factory = { context ->
-                        PlayerView(context).apply {
-                            player = playerManager.exoPlayer
-                            useController = false
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
+                if (!isFullscreen) {
+                    AndroidView(
+                        factory = { context ->
+                            PlayerView(context).apply {
+                                player = playerManager.exoPlayer
+                                useController = false
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
 

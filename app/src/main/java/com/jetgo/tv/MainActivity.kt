@@ -218,6 +218,7 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
     val seriesDetailState by viewModel.seriesDetailState.collectAsState()
     val movieDetailState by viewModel.movieDetailState.collectAsState()
     val homeCatalog by viewModel.homeCatalog.collectAsState()
+    val isFullscreen by viewModel.isFullscreenPlayer.collectAsState()
 
     // Manejador único: si es una serie o película, abre su ficha; si no (Vivo), reproduce directo.
     val handleItemSelected: (ContentItem) -> Unit = { item ->
@@ -251,7 +252,8 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                 onCategoryClick = { category -> navController.navigate("categoryPicker/$category") },
                 onLiveClick = { viewModel.enterFullscreenPlayer() },
                 onSearchClick = { navController.navigate("search") },
-                onFavoritesClick = { navController.navigate("favorites") }
+                onFavoritesClick = { navController.navigate("favorites") },
+                isFullscreen = isFullscreen
             )
         }
 
@@ -335,7 +337,8 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                 onRecommendationClick = { item ->
                     viewModel.clearSeriesDetail()
                     handleItemSelected(item)
-                }
+                },
+                isFullscreen = isFullscreen
             )
         }
 
@@ -365,7 +368,8 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                 onRecommendationClick = { item ->
                     viewModel.clearMovieDetail()
                     handleItemSelected(item)
-                }
+                },
+                isFullscreen = isFullscreen
             )
         }
 

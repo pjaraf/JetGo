@@ -49,7 +49,8 @@ fun HomeScreen(
     onCategoryClick: (String) -> Unit,
     onLiveClick: () -> Unit = {},
     onSearchClick: () -> Unit = {},
-    onFavoritesClick: () -> Unit = {}
+    onFavoritesClick: () -> Unit = {},
+    isFullscreen: Boolean = false
 ) {
     val vivoFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
     androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -69,6 +70,7 @@ fun HomeScreen(
                 playerContent = {
                     PlayerPanel(
                         playerManager = playerManager,
+                        showVideo = !isFullscreen,
                         modifier = Modifier.fillMaxWidth()
                     )
                 },
