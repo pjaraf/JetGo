@@ -219,6 +219,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         // simplemente no se auto-conecta nada (uiState.isConfigured queda en false).
     }
 
+    /** Vuelve a intentar la conexión con el código ya guardado (sin pedirle nada al cliente) */
+    fun retryConnection() {
+        checkStoredAccess()
+    }
+
     /** Consulta en segundo plano si hay una versión más nueva publicada en GitHub Releases */
     private fun checkForUpdate() {
         viewModelScope.launch {

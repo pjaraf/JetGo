@@ -33,11 +33,11 @@ import com.jetgo.tv.ui.components.PhoneBottomNav
 import com.jetgo.tv.ui.components.PhoneMainTab
 import com.jetgo.tv.ui.components.UpdateBanner
 import com.jetgo.tv.ui.screens.ChannelListScreen
+import com.jetgo.tv.ui.screens.ConnectionIssueScreen
 import com.jetgo.tv.ui.screens.FavoritesScreen
 import com.jetgo.tv.ui.screens.HomeScreen
 import com.jetgo.tv.ui.screens.HomeViewModel
 import com.jetgo.tv.ui.screens.SearchScreen
-import com.jetgo.tv.ui.screens.SetupScreen
 import com.jetgo.tv.ui.screens.phone.PhoneInicioScreen
 import com.jetgo.tv.ui.screens.phone.PhoneProfileScreen
 import com.jetgo.tv.ui.screens.phone.PhoneTvScreen
@@ -103,16 +103,14 @@ private fun AppRoot(viewModel: HomeViewModel) {
                             onSubmitCode = { viewModel.submitAccessCode(it) }
                         )
                     }
-                    uiState.isLoading && !uiState.isConfigured -> {
+                    uiState.isLoading -> {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                     }
                     !uiState.isConfigured -> {
-                        SetupScreen(
-                            isLoading = uiState.isLoading,
-                            errorMessage = uiState.errorMessage,
-                            onConnectXtream = { viewModel.connectXtream(it) },
-                            onConnectM3u = { viewModel.connectM3u(it) }
-                        )
+                        // El código es válido, pero no se pudo conectar (credenciales del panel
+                        // mal cargadas, servidor caído, etc.). NUNCA se le muestra al cliente la
+                        // pantalla de configuración manual — solo un aviso + reintentar.
+                        ConnectionIssueScreen(onRetry = { viewModel.retryConnection() })
                     }
                     isTv -> {
                         // ---- Interfaz original para Android TV / Google TV / TV Box (sin cambios) ----
