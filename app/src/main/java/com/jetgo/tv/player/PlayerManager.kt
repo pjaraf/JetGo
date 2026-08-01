@@ -51,7 +51,7 @@ class PlayerManager(context: Context) {
 
     fun playChannel(url: String, name: String) {
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent("JetGo/1.0")
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
             .setConnectTimeoutMs(15000)
             .setReadTimeoutMs(15000)
             .setAllowCrossProtocolRedirects(true)
