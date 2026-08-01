@@ -98,14 +98,6 @@ private fun AppRoot(viewModel: HomeViewModel) {
         onBackFromFullscreen = { viewModel.exitFullscreenPlayer() }
     )
 
-    // En TV: apenas se conecta, entra directo a ver el canal en vivo a pantalla completa
-    // (como una tele real al encenderla), en vez de mostrar primero el menú de Inicio.
-    LaunchedEffect(isTv, uiState.isConfigured) {
-        if (isTv && uiState.isConfigured) {
-            viewModel.enterFullscreenPlayer()
-        }
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             if (updateInfo != null && !isFullscreen && !isTv) {
@@ -177,6 +169,8 @@ private fun AppRoot(viewModel: HomeViewModel) {
                 posterUrl = posterUrl,
                 title = title,
                 liveChannelInfo = if (!isVod) liveChannelInfo else null,
+                allLiveChannels = uiState.liveChannels,
+                onChangeChannel = { channel -> viewModel.playChannel(channel) },
                 liveCategories = categoryPickerState.categories,
                 liveChannelsInCategory = categoryContentState.items,
                 onLoadLiveCategories = { viewModel.loadCategoriesForType(ContentType.LIVE) },

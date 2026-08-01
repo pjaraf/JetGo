@@ -330,7 +330,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val channelLogo: String?,
         val channelNumber: Int?,
         val current: com.jetgo.tv.data.model.EpgProgram?,
-        val next: com.jetgo.tv.data.model.EpgProgram?
+        val next: com.jetgo.tv.data.model.EpgProgram?,
+        val channelId: String? = null
     )
 
     private val _liveChannelInfo = MutableStateFlow<LiveChannelInfo?>(null)
@@ -339,7 +340,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun playChannel(channel: Channel) {
         playerManager.playChannel(channel.streamUrl, channel.name)
         viewModelScope.launch { configStore.saveLastChannelId(channel.streamId) }
-        _liveChannelInfo.value = LiveChannelInfo(channel.name, channel.logoUrl, channel.number, null, null)
+        _liveChannelInfo.value = LiveChannelInfo(channel.name, channel.logoUrl, channel.number, null, null, channel.streamId)
         val config = currentConfig ?: return
         viewModelScope.launch {
             val epg = try { repository.getShortEpg(config, channel.streamId) } catch (e: Exception) { emptyList() }
@@ -348,7 +349,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 channelLogo = channel.logoUrl,
                 channelNumber = channel.number,
                 current = epg.getOrNull(0),
-                next = epg.getOrNull(1)
+                next = epg.getOrNull(1),
+                channelId = channel.streamId
             )
         }
     }
@@ -443,12 +445,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 playerManager.playChannel(item.streamUrl, item.name)
                 viewModelScope.launch { configStore.saveLastChannelId(item.id) }
-                _liveChannelInfo.value = LiveChannelInfo(item.name, item.imageUrl, null, null, null)
+                _liveChannelInfo.value = LiveChannelInfo(item.name, item.imageUrl, null, null, null, item.id)
                 val config = currentConfig
                 if (config != null) {
                     viewModelScope.launch {
                         val epg = try { repository.getShortEpg(config, item.id) } catch (e: Exception) { emptyList() }
-                        _liveChannelInfo.value = LiveChannelInfo(item.name, item.imageUrl, null, epg.getOrNull(0), epg.getOrNull(1))
+                        _liveChannelInfo.value = LiveChannelInfo(item.name, item.imageUrl, null, epg.getOrNull(0), epg.getOrNull(1), item.id)
                     }
                 }
             }

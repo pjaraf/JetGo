@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.ui.PlayerView
 import com.jetgo.tv.data.model.Category
+import com.jetgo.tv.data.model.Channel
 import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.player.PlayerManager
 import com.jetgo.tv.ui.screens.HomeViewModel
@@ -56,6 +57,8 @@ fun FullscreenPlayerOverlay(
     posterUrl: String? = null,
     title: String = "",
     liveChannelInfo: HomeViewModel.LiveChannelInfo? = null,
+    allLiveChannels: List<Channel> = emptyList(),
+    onChangeChannel: (Channel) -> Unit = {},
     liveCategories: List<Category> = emptyList(),
     liveChannelsInCategory: List<ContentItem> = emptyList(),
     onLoadLiveCategories: () -> Unit = {},
@@ -93,6 +96,15 @@ fun FullscreenPlayerOverlay(
         }
     }
 
+    /** Cambia de canal directo, como el botón CH+/CH- de un control de TV normal */
+    fun changeChannelDirect(step: Int) {
+        if (allLiveChannels.isEmpty()) return
+        val currentIndex = allLiveChannels.indexOfFirst { it.streamId == liveChannelInfo?.channelId }
+        val nextIndex = if (currentIndex == -1) 0
+        else ((currentIndex + step) % allLiveChannels.size + allLiveChannels.size) % allLiveChannels.size
+        onChangeChannel(allLiveChannels[nextIndex])
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -105,6 +117,8 @@ fun FullscreenPlayerOverlay(
                         .onKeyEvent { event ->
                             if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
                             when (event.key) {
+                                Key.ChannelUp -> { changeChannelDirect(1); true }
+                                Key.ChannelDown -> { changeChannelDirect(-1); true }
                                 Key.DirectionLeft -> {
                                     zapMode = when (zapMode) {
                                         ZapPanelMode.HIDDEN -> ZapPanelMode.CHANNELS
@@ -116,8 +130,10 @@ fun FullscreenPlayerOverlay(
                                 Key.DirectionUp -> {
                                     if (zapMode != ZapPanelMode.HIDDEN) {
                                         zapSelectedIndex = (zapSelectedIndex - 1).coerceAtLeast(0)
-                                        true
-                                    } else false
+                                    } else {
+                                        changeChannelDirect(-1) // como el canal - de una tele normal
+                                    }
+                                    true
                                 }
                                 Key.DirectionDown -> {
                                     if (zapMode != ZapPanelMode.HIDDEN) {
@@ -126,8 +142,10 @@ fun FullscreenPlayerOverlay(
                                             else liveChannelsInCategory.size
                                             ) - 1
                                         zapSelectedIndex = (zapSelectedIndex + 1).coerceAtMost(maxIndex.coerceAtLeast(0))
-                                        true
-                                    } else false
+                                    } else {
+                                        changeChannelDirect(1) // como el canal + de una tele normal
+                                    }
+                                    true
                                 }
                                 Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
                                     when (zapMode) {
