@@ -33,7 +33,8 @@ data class HomeUiState(
     val isLoading: Boolean = false,
     val isConfigured: Boolean = false,
     val liveChannels: List<Channel> = emptyList(),
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val debugDetail: String? = null
 )
 
 data class AccessUiState(
@@ -257,7 +258,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = "No se pudo conectar al servidor. Verifica el host, usuario y contraseña."
+                    errorMessage = "No se pudo conectar al servidor. Verifica el host, usuario y contraseña.",
+                    debugDetail = "${e.javaClass.simpleName}: ${e.message}"
                 )
             }
         }
@@ -286,7 +288,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = "No se pudo cargar la lista M3U. Verifica la URL o tu conexión a internet."
+                    errorMessage = "No se pudo cargar la lista M3U. Verifica la URL o tu conexión a internet.",
+                    debugDetail = "${e.javaClass.simpleName}: ${e.message}"
                 )
             }
         }

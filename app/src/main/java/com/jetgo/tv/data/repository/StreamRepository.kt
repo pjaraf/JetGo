@@ -17,13 +17,9 @@ class StreamRepository {
 
     /** Verifica credenciales contra el servidor Xtream Codes */
     suspend fun login(config: ServerConfig): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val api = XtreamApi.create(config.host.ensureTrailingSlash())
-            val resp = api.login(config.username, config.password)
-            resp.isSuccessful && resp.body()?.userInfo?.auth == 1
-        } catch (e: Exception) {
-            false
-        }
+        val api = XtreamApi.create(config.host.ensureTrailingSlash())
+        val resp = api.login(config.username, config.password)
+        resp.isSuccessful && resp.body()?.userInfo?.auth == 1
     }
 
     suspend fun getLiveCategories(config: ServerConfig): List<Category> = withContext(Dispatchers.IO) {

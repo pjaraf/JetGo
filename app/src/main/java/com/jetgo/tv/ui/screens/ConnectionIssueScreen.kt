@@ -25,7 +25,8 @@ import com.jetgo.tv.ui.theme.BackgroundDark
  */
 @Composable
 fun ConnectionIssueScreen(
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    debugDetail: String? = null
 ) {
     Column(
         modifier = Modifier
@@ -52,6 +53,14 @@ fun ConnectionIssueScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Reintentar")
+        }
+        if (!debugDetail.isNullOrBlank()) {
+            Text(
+                text = debugDetail,
+                color = Color(0xFF555555),
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 24.dp)
+            )
         }
     }
 }

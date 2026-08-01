@@ -110,7 +110,10 @@ private fun AppRoot(viewModel: HomeViewModel) {
                         // El código es válido, pero no se pudo conectar (credenciales del panel
                         // mal cargadas, servidor caído, etc.). NUNCA se le muestra al cliente la
                         // pantalla de configuración manual — solo un aviso + reintentar.
-                        ConnectionIssueScreen(onRetry = { viewModel.retryConnection() })
+                        ConnectionIssueScreen(
+                            onRetry = { viewModel.retryConnection() },
+                            debugDetail = uiState.debugDetail
+                        )
                     }
                     isTv -> {
                         // ---- Interfaz original para Android TV / Google TV / TV Box (sin cambios) ----
