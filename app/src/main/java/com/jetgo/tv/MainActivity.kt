@@ -39,6 +39,7 @@ import com.jetgo.tv.ui.screens.HomeScreen
 import com.jetgo.tv.ui.screens.HomeViewModel
 import com.jetgo.tv.ui.screens.SearchScreen
 import com.jetgo.tv.ui.screens.TvCategoryGridScreen
+import com.jetgo.tv.ui.screens.TvSeriesDetailScreen
 import com.jetgo.tv.ui.screens.phone.PhoneInicioScreen
 import com.jetgo.tv.ui.screens.phone.PhoneProfileScreen
 import com.jetgo.tv.ui.screens.phone.PhoneTvScreen
@@ -158,6 +159,20 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
     val favorites by viewModel.favorites.collectAsState()
     val searchState by viewModel.searchState.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
+    val seriesDetailState by viewModel.seriesDetailState.collectAsState()
+    val homeCatalog by viewModel.homeCatalog.collectAsState()
+
+    // Manejador único: si es una serie, abre su ficha; si no, reproduce directo y vuelve a Inicio.
+    val handleItemSelected: (ContentItem) -> Unit = { item ->
+        if (item.type == ContentType.SERIES) {
+            viewModel.loadSeriesDetail(item)
+            navController.navigate("seriesDetail")
+        } else {
+            viewModel.selectContentItem(item) {
+                navController.popBackStack("home", inclusive = false)
+            }
+        }
+    }
 
     NavHost(navController = navController, startDestination = "home") {
 
@@ -199,11 +214,7 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                     itemsLoading = categoryContentState.isLoading,
                     onLoadCategories = { viewModel.loadCategoriesForType(type) },
                     onCategorySelected = { categoryId -> viewModel.loadCategoryContent(type, categoryId) },
-                    onItemSelected = { item ->
-                        viewModel.selectContentItem(item) {
-                            navController.popBackStack("home", inclusive = false)
-                        }
-                    },
+                    onItemSelected = handleItemSelected,
                     isFavorite = { viewModel.isFavorite(it) },
                     onToggleFavorite = { viewModel.toggleFavorite(it) }
                 )
@@ -224,10 +235,38 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                 errorMessage = categoryContentState.errorMessage,
                 isFavorite = { viewModel.isFavorite(it) },
                 onToggleFavorite = { viewModel.toggleFavorite(it) },
-                onItemSelected = { item ->
-                    viewModel.selectContentItem(item) {
-                        navController.popBackStack("home", inclusive = false)
+                onItemSelected = handleItemSelected
+            )
+        }
+
+        composable("seriesDetail") {
+            val recommendations = (homeCatalog.series + homeCatalog.movies)
+                .filter { it.id != seriesDetailState.detail?.seriesId }
+                .shuffled()
+                .take(10)
+
+            TvSeriesDetailScreen(
+                state = seriesDetailState,
+                playerManager = viewModel.playerManager,
+                isFavorite = seriesDetailState.detail?.let {
+                    viewModel.isFavorite(ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null))
+                } ?: false,
+                recommendations = recommendations,
+                onBack = {
+                    viewModel.clearSeriesDetail()
+                    navController.popBackStack()
+                },
+                onSelectSeason = { viewModel.selectSeason(it) },
+                onPlayEpisode = { viewModel.playEpisode(it) },
+                onToggleFavorite = {
+                    seriesDetailState.detail?.let {
+                        viewModel.toggleFavorite(ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null))
                     }
+                },
+                onEnterFullscreen = { viewModel.enterFullscreenPlayer() },
+                onRecommendationClick = { item ->
+                    viewModel.clearSeriesDetail()
+                    handleItemSelected(item)
                 }
             )
         }
@@ -241,11 +280,7 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                 onToggleFavorite = { viewModel.toggleFavorite(it) },
                 onQueryChanged = { viewModel.onSearchQueryChanged(it) },
                 onEnterScreen = { viewModel.ensureSearchCatalogLoaded() },
-                onItemSelected = { item ->
-                    viewModel.selectContentItem(item) {
-                        navController.popBackStack("home", inclusive = false)
-                    }
-                }
+                onItemSelected = handleItemSelected
             )
         }
 
@@ -253,11 +288,7 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
             FavoritesScreen(
                 favorites = favorites,
                 onToggleFavorite = { viewModel.toggleFavorite(it) },
-                onItemSelected = { item ->
-                    viewModel.playFavorite(item) {
-                        navController.popBackStack("home", inclusive = false)
-                    }
-                }
+                onItemSelected = handleItemSelected
             )
         }
     }
