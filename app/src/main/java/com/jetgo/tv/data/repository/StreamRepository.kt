@@ -19,13 +19,16 @@ class StreamRepository {
     suspend fun login(config: ServerConfig): Boolean = withContext(Dispatchers.IO) {
         val api = XtreamApi.create(config.host.ensureTrailingSlash())
         val resp = api.login(config.username, config.password)
+        val requestUrl = resp.raw().request.url.toString()
+            .replace(Regex("password=[^&]*"), "password=***")
+
         if (!resp.isSuccessful) {
-            throw IllegalStateException("El servidor respondió con error HTTP ${resp.code()}")
+            throw IllegalStateException("HTTP ${resp.code()} en: $requestUrl")
         }
         val userInfo = resp.body()?.userInfo
         if (userInfo?.auth != 1) {
             throw IllegalStateException(
-                "El servidor respondió pero rechazó las credenciales (auth=${userInfo?.auth}, status=${userInfo?.status ?: "sin dato"})"
+                "auth=${userInfo?.auth}, status=${userInfo?.status ?: "sin dato"} — URL: $requestUrl"
             )
         }
         true
