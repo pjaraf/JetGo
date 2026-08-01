@@ -1,7 +1,10 @@
 package com.jetgo.tv.util
 
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
@@ -13,8 +16,11 @@ data class AccessCodeResult(
     val host: String? = null,
     val username: String? = null,
     val password: String? = null,
-    val m3uUrl: String? = null
+    val m3uUrl: String? = null,
+    val deviceLimitReached: Boolean = false
 )
+
+private const val MAX_DEVICES_PER_CODE = 3
 
 /**
  * Valida códigos de acceso contra Firestore usando su API REST pública (sin el SDK de Firebase,
@@ -22,8 +28,8 @@ data class AccessCodeResult(
  * Google Play Services).
  *
  * Requiere que en Firestore exista una colección "access_codes" donde cada documento tiene
- * como ID el código en sí, con los campos: active (bool), mode (string), host, username,
- * password, m3uUrl (todos string, según corresponda).
+ * como ID el código en sí, con campos: active (bool), mode/host/username/password/m3uUrl (string),
+ * y deviceIds (array de string) para llevar el control de máximo 3 dispositivos por código.
  */
 object AccessCodeChecker {
 
@@ -32,14 +38,19 @@ object AccessCodeChecker {
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
 
-    fun checkCode(projectId: String, code: String): AccessCodeResult {
+    /**
+     * Valida el código y, si está activo, registra este dispositivo (hasta un máximo de
+     * [MAX_DEVICES_PER_CODE]). Si el dispositivo ya estaba registrado, no hace nada extra.
+     */
+    fun checkCodeAndRegisterDevice(projectId: String, code: String, deviceId: String): AccessCodeResult {
         if (projectId.isBlank() || code.isBlank()) return AccessCodeResult(valid = false)
-        return try {
-            val normalizedCode = code.trim().uppercase()
-            val url = "https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/access_codes/$normalizedCode"
-            val request = Request.Builder().url(url).build()
+        val normalizedCode = code.trim().uppercase()
+        val docPath = "projects/$projectId/databases/(default)/documents/access_codes/$normalizedCode"
+        val docUrl = "https://firestore.googleapis.com/v1/$docPath"
 
-            client.newCall(request).execute().use { response ->
+        return try {
+            val getRequest = Request.Builder().url(docUrl).build()
+            client.newCall(getRequest).execute().use { response ->
                 if (!response.isSuccessful) return AccessCodeResult(valid = false)
                 val body = response.body?.string() ?: return AccessCodeResult(valid = false)
                 val json = JSONObject(body)
@@ -50,6 +61,16 @@ object AccessCodeChecker {
 
                 fun textField(name: String): String? =
                     fields.optJSONObject(name)?.optString("stringValue")?.takeIf { it.isNotBlank() }
+
+                val deviceIds = parseDeviceIds(fields)
+
+                if (!deviceIds.contains(deviceId)) {
+                    if (deviceIds.size >= MAX_DEVICES_PER_CODE) {
+                        return AccessCodeResult(valid = false, deviceLimitReached = true)
+                    }
+                    // Registra este dispositivo nuevo (no bloquea el acceso si falla la escritura)
+                    registerDevice(docUrl, deviceIds + deviceId)
+                }
 
                 AccessCodeResult(
                     valid = true,
@@ -65,6 +86,28 @@ object AccessCodeChecker {
         }
     }
 
-    /** Mantiene compatibilidad con código existente que solo necesita saber si es válido */
-    fun isCodeValid(projectId: String, code: String): Boolean = checkCode(projectId, code).valid
+    private fun parseDeviceIds(fields: JSONObject): List<String> {
+        val arr = fields.optJSONObject("deviceIds")?.optJSONObject("arrayValue")?.optJSONArray("values") ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.optString("stringValue") }
+    }
+
+    private fun registerDevice(docUrl: String, updatedDeviceIds: List<String>) {
+        try {
+            val valuesArray = JSONArray()
+            updatedDeviceIds.forEach { id -> valuesArray.put(JSONObject().put("stringValue", id)) }
+            val payload = JSONObject().put(
+                "fields", JSONObject().put(
+                    "deviceIds", JSONObject().put(
+                        "arrayValue", JSONObject().put("values", valuesArray)
+                    )
+                )
+            )
+            val patchUrl = "$docUrl?updateMask.fieldPaths=deviceIds"
+            val requestBody = payload.toString().toRequestBody("application/json".toMediaType())
+            val patchRequest = Request.Builder().url(patchUrl).patch(requestBody).build()
+            client.newCall(patchRequest).execute().close()
+        } catch (e: Exception) {
+            // Si falla el registro del dispositivo, no bloqueamos el acceso de este intento
+        }
+    }
 }

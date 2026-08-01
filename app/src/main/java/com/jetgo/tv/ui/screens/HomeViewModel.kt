@@ -18,6 +18,7 @@ import com.jetgo.tv.data.repository.StreamRepository
 import com.jetgo.tv.player.PlayerManager
 import com.jetgo.tv.util.AccessCodeChecker
 import com.jetgo.tv.util.AccessCodeResult
+import com.jetgo.tv.util.getDeviceId
 import com.jetgo.tv.util.UpdateChecker
 import com.jetgo.tv.util.UpdateInfo
 import kotlinx.coroutines.Dispatchers
@@ -154,7 +155,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
      *  refresca la conexión por si el administrador cambió el servidor de ese código. */
     private fun checkStoredAccess() {
         viewModelScope.launch {
-            val projectId = getApplication<Application>().getString(com.jetgo.tv.R.string.firebase_project_id)
+            val context = getApplication<Application>()
+            val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
+            val deviceId = getDeviceId(context)
             val savedCode = accessStore.savedCode.first()
 
             if (savedCode.isNullOrBlank()) {
@@ -163,7 +166,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             val result = withContext(Dispatchers.IO) {
-                AccessCodeChecker.checkCode(projectId, savedCode)
+                AccessCodeChecker.checkCodeAndRegisterDevice(projectId, savedCode, deviceId)
             }
 
             if (result.valid) {
@@ -179,19 +182,26 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun submitAccessCode(code: String) {
         _accessState.value = _accessState.value.copy(isChecking = true, errorMessage = null)
         viewModelScope.launch {
-            val projectId = getApplication<Application>().getString(com.jetgo.tv.R.string.firebase_project_id)
+            val context = getApplication<Application>()
+            val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
+            val deviceId = getDeviceId(context)
             val result = withContext(Dispatchers.IO) {
-                AccessCodeChecker.checkCode(projectId, code)
+                AccessCodeChecker.checkCodeAndRegisterDevice(projectId, code, deviceId)
             }
             if (result.valid) {
                 accessStore.saveCode(code.trim().uppercase())
                 applyAccessCodeResult(result)
                 _accessState.value = AccessUiState(isChecking = false, isGranted = true)
             } else {
+                val message = if (result.deviceLimitReached) {
+                    "Este código ya alcanzó el máximo de 3 dispositivos"
+                } else {
+                    "Código inválido o inactivo"
+                }
                 _accessState.value = AccessUiState(
                     isChecking = false,
                     isGranted = false,
-                    errorMessage = "Código inválido o inactivo"
+                    errorMessage = message
                 )
             }
         }
