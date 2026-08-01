@@ -3,6 +3,7 @@ package com.jetgo.tv.data.repository
 import com.jetgo.tv.data.model.Category
 import com.jetgo.tv.data.model.Channel
 import com.jetgo.tv.data.model.ContentType
+import com.jetgo.tv.data.model.MovieDetail
 import com.jetgo.tv.data.model.MovieItem
 import com.jetgo.tv.data.model.SeriesDetail
 import com.jetgo.tv.data.model.SeriesEpisode
@@ -175,6 +176,42 @@ class StreamRepository {
                 episodesBySeason = episodesBySeason
             )
         }
+
+    /** Trae toda la info de una película: sinopsis, elenco, país, etc. */
+    suspend fun getMovieDetail(
+        config: ServerConfig,
+        streamId: String,
+        fallbackName: String,
+        fallbackCover: String?,
+        fallbackStreamUrl: String
+    ): MovieDetail? = withContext(Dispatchers.IO) {
+        val api = XtreamApi.create(config.host.ensureTrailingSlash())
+        val resp = api.getVodInfo(config.username, config.password, vodId = streamId)
+        val body = resp.body() ?: return@withContext null
+        val info = body.info
+
+        val streamIdInt = body.movieData?.streamId ?: streamId.toIntOrNull()
+        val streamUrl = if (streamIdInt != null) {
+            XtreamApi.vodStreamUrl(
+                config.host, config.username, config.password,
+                streamIdInt, body.movieData?.containerExtension ?: "mp4"
+            )
+        } else fallbackStreamUrl
+
+        MovieDetail(
+            streamId = streamId,
+            name = info?.name?.takeIf { it.isNotBlank() } ?: fallbackName,
+            coverUrl = (info?.coverBig ?: info?.movieImage)?.takeIf { it.isNotBlank() } ?: fallbackCover,
+            plot = info?.plot,
+            cast = info?.cast,
+            director = info?.director,
+            genre = info?.genre,
+            country = info?.country,
+            releaseDate = info?.releaseDate,
+            rating = info?.rating,
+            streamUrl = streamUrl
+        )
+    }
 
     /** Modo alternativo: lista M3U simple en vez de API Xtream */
     suspend fun loadFromM3u(url: String): M3uParser.ParseResult = withContext(Dispatchers.IO) {

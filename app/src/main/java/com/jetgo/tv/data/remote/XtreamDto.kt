@@ -70,3 +70,29 @@ data class SeriesInfoDetailsDto(
     @SerializedName("releaseDate") val releaseDate: String?,
     @SerializedName("rating") val rating: String?
 )
+
+// ---- get_vod_info: detalle completo de una película ----
+
+data class VodInfoResponse(
+    @SerializedName("info") val info: VodInfoDetailsDto?,
+    @SerializedName("movie_data") val movieData: VodMovieDataDto?
+)
+
+data class VodInfoDetailsDto(
+    @SerializedName("name") val name: String?,
+    @SerializedName("o_name") val originalName: String?,
+    @SerializedName("cover_big") val coverBig: String?,
+    @SerializedName("movie_image") val movieImage: String?,
+    @SerializedName("plot") val plot: String?,
+    @SerializedName("cast") val cast: String?,
+    @SerializedName("director") val director: String?,
+    @SerializedName("genre") val genre: String?,
+    @SerializedName("country") val country: String?,
+    @SerializedName("releasedate") val releaseDate: String?,
+    @SerializedName("rating") val rating: String?
+)
+
+data class VodMovieDataDto(
+    @SerializedName("stream_id") val streamId: Int?,
+    @SerializedName("container_extension") val containerExtension: String?
+)

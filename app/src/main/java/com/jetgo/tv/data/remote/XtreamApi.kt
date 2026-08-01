@@ -70,6 +70,14 @@ interface XtreamApi {
         @Query("series_id") seriesId: String
     ): Response<SeriesInfoResponse>
 
+    @GET("player_api.php")
+    suspend fun getVodInfo(
+        @Query("username") username: String,
+        @Query("password") password: String,
+        @Query("action") action: String = "get_vod_info",
+        @Query("vod_id") vodId: String
+    ): Response<VodInfoResponse>
+
     companion object {
         /** [baseUrl] debe terminar en "/", ej: "http://midominio.com:8080/" */
         fun create(baseUrl: String): XtreamApi {

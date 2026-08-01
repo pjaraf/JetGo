@@ -12,6 +12,7 @@ import com.jetgo.tv.data.model.Channel
 import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.data.model.ContentType
 import com.jetgo.tv.data.model.ServerConfig
+import com.jetgo.tv.data.model.MovieDetail
 import com.jetgo.tv.data.model.SeriesDetail
 import com.jetgo.tv.data.model.SeriesEpisode
 import com.jetgo.tv.data.repository.StreamRepository
@@ -76,6 +77,12 @@ data class SeriesDetailUiState(
     val errorMessage: String? = null
 )
 
+data class MovieDetailUiState(
+    val isLoading: Boolean = false,
+    val detail: MovieDetail? = null,
+    val errorMessage: String? = null
+)
+
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = StreamRepository()
@@ -123,6 +130,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _seriesDetailState = MutableStateFlow(SeriesDetailUiState())
     val seriesDetailState: StateFlow<SeriesDetailUiState> = _seriesDetailState.asStateFlow()
+
+    private val _movieDetailState = MutableStateFlow(MovieDetailUiState())
+    val movieDetailState: StateFlow<MovieDetailUiState> = _movieDetailState.asStateFlow()
 
     private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
     val updateInfo: StateFlow<UpdateInfo?> = _updateInfo.asStateFlow()
@@ -578,6 +588,43 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun clearSeriesDetail() {
         playerManager.onPlaybackEnded = null
         _seriesDetailState.value = SeriesDetailUiState()
+    }
+
+    // ---------------------------------------------------------------------
+    // Pantalla de detalle de película (info + reproducción automática)
+    // ---------------------------------------------------------------------
+
+    /** Carga la ficha completa de la película y empieza a reproducirla automáticamente */
+    fun loadMovieDetail(item: ContentItem) {
+        _movieDetailState.value = MovieDetailUiState(isLoading = true)
+        val config = currentConfig ?: run {
+            _movieDetailState.value = MovieDetailUiState(errorMessage = "Sin configuración de servidor")
+            return
+        }
+        val fallbackStreamUrl = item.streamUrl
+        if (fallbackStreamUrl == null) {
+            _movieDetailState.value = MovieDetailUiState(errorMessage = "No se pudo reproducir esta película")
+            return
+        }
+        viewModelScope.launch {
+            val detail = try {
+                repository.getMovieDetail(config, item.id, item.name, item.imageUrl, fallbackStreamUrl)
+            } catch (e: Exception) { null }
+
+            if (detail == null) {
+                _movieDetailState.value = MovieDetailUiState(errorMessage = "No se pudo cargar la película")
+                return@launch
+            }
+
+            _movieDetailState.value = MovieDetailUiState(detail = detail)
+            playerManager.onPlaybackEnded = null
+            playerManager.playChannel(detail.streamUrl, detail.name)
+        }
+    }
+
+    /** Se llama al salir de la pantalla de detalle de película */
+    fun clearMovieDetail() {
+        _movieDetailState.value = MovieDetailUiState()
     }
 
     override fun onCleared() {

@@ -39,6 +39,7 @@ import com.jetgo.tv.ui.screens.HomeScreen
 import com.jetgo.tv.ui.screens.HomeViewModel
 import com.jetgo.tv.ui.screens.SearchScreen
 import com.jetgo.tv.ui.screens.TvCategoryGridScreen
+import com.jetgo.tv.ui.screens.TvMovieDetailScreen
 import com.jetgo.tv.ui.screens.TvSeriesDetailScreen
 import com.jetgo.tv.ui.screens.phone.PhoneInicioScreen
 import com.jetgo.tv.ui.screens.phone.PhoneProfileScreen
@@ -160,16 +161,24 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
     val searchState by viewModel.searchState.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val seriesDetailState by viewModel.seriesDetailState.collectAsState()
+    val movieDetailState by viewModel.movieDetailState.collectAsState()
     val homeCatalog by viewModel.homeCatalog.collectAsState()
 
-    // Manejador único: si es una serie, abre su ficha; si no, reproduce directo y vuelve a Inicio.
+    // Manejador único: si es una serie o película, abre su ficha; si no (Vivo), reproduce directo.
     val handleItemSelected: (ContentItem) -> Unit = { item ->
-        if (item.type == ContentType.SERIES) {
-            viewModel.loadSeriesDetail(item)
-            navController.navigate("seriesDetail")
-        } else {
-            viewModel.selectContentItem(item) {
-                navController.popBackStack("home", inclusive = false)
+        when (item.type) {
+            ContentType.SERIES -> {
+                viewModel.loadSeriesDetail(item)
+                navController.navigate("seriesDetail")
+            }
+            ContentType.MOVIE, ContentType.ANIME, ContentType.SPECIAL -> {
+                viewModel.loadMovieDetail(item)
+                navController.navigate("movieDetail")
+            }
+            else -> {
+                viewModel.selectContentItem(item) {
+                    navController.popBackStack("home", inclusive = false)
+                }
             }
         }
     }
@@ -266,6 +275,36 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                 onEnterFullscreen = { viewModel.enterFullscreenPlayer() },
                 onRecommendationClick = { item ->
                     viewModel.clearSeriesDetail()
+                    handleItemSelected(item)
+                }
+            )
+        }
+
+        composable("movieDetail") {
+            val recommendations = (homeCatalog.movies + homeCatalog.series)
+                .filter { it.id != movieDetailState.detail?.streamId }
+                .shuffled()
+                .take(10)
+
+            TvMovieDetailScreen(
+                state = movieDetailState,
+                playerManager = viewModel.playerManager,
+                isFavorite = movieDetailState.detail?.let {
+                    viewModel.isFavorite(ContentItem(it.streamId, it.name, it.coverUrl, ContentType.MOVIE, it.streamUrl))
+                } ?: false,
+                recommendations = recommendations,
+                onBack = {
+                    viewModel.clearMovieDetail()
+                    navController.popBackStack()
+                },
+                onToggleFavorite = {
+                    movieDetailState.detail?.let {
+                        viewModel.toggleFavorite(ContentItem(it.streamId, it.name, it.coverUrl, ContentType.MOVIE, it.streamUrl))
+                    }
+                },
+                onEnterFullscreen = { viewModel.enterFullscreenPlayer() },
+                onRecommendationClick = { item ->
+                    viewModel.clearMovieDetail()
                     handleItemSelected(item)
                 }
             )

@@ -82,3 +82,17 @@ data class SeriesDetail(
     val rating: String?,
     val episodesBySeason: Map<Int, List<SeriesEpisode>>
 )
+
+data class MovieDetail(
+    val streamId: String,
+    val name: String,
+    val coverUrl: String?,
+    val plot: String?,
+    val cast: String?,
+    val director: String?,
+    val genre: String?,
+    val country: String?,
+    val releaseDate: String?,
+    val rating: String?,
+    val streamUrl: String
+)
