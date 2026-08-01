@@ -62,7 +62,6 @@ jobs:
             app/build/outputs/apk/debug/app-debug.apk \
             version.txt \
             --title "JetGo (build ${{ github.run_number }})" \
-            --notes "Compilación automática desde GitHub Actions (commit ${{ github.sha }})" \
-            --prerelease
+            --notes "Compilación automática desde GitHub Actions (commit ${{ github.sha }})"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

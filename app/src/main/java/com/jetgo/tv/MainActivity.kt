@@ -86,7 +86,7 @@ private fun AppRoot(viewModel: HomeViewModel) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (updateInfo != null && uiState.isConfigured && accessState.isGranted && !isFullscreen) {
+            if (updateInfo != null && !isFullscreen) {
                 UpdateBanner(updateInfo = updateInfo!!)
             }
 
