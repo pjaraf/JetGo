@@ -19,7 +19,16 @@ class StreamRepository {
     suspend fun login(config: ServerConfig): Boolean = withContext(Dispatchers.IO) {
         val api = XtreamApi.create(config.host.ensureTrailingSlash())
         val resp = api.login(config.username, config.password)
-        resp.isSuccessful && resp.body()?.userInfo?.auth == 1
+        if (!resp.isSuccessful) {
+            throw IllegalStateException("El servidor respondió con error HTTP ${resp.code()}")
+        }
+        val userInfo = resp.body()?.userInfo
+        if (userInfo?.auth != 1) {
+            throw IllegalStateException(
+                "El servidor respondió pero rechazó las credenciales (auth=${userInfo?.auth}, status=${userInfo?.status ?: "sin dato"})"
+            )
+        }
+        true
     }
 
     suspend fun getLiveCategories(config: ServerConfig): List<Category> = withContext(Dispatchers.IO) {
