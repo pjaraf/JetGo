@@ -1,6 +1,7 @@
 package com.jetgo.tv
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -59,11 +60,28 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // No queremos que la pantalla (TV o teléfono) se apague sola mientras se usa la app.
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         setContent {
             JetGoTheme {
                 AppRoot(viewModel)
             }
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // La app no debe seguir reproduciendo cuando queda en segundo plano (se minimiza,
+        // se apaga la pantalla, o se cambia a otra app) — se pausa por completo.
+        try { viewModel.playerManager.exoPlayer.pause() } catch (e: Exception) { /* ignorar */ }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Al volver al primer plano, retoma automáticamente lo que se estaba viendo.
+        try { viewModel.playerManager.exoPlayer.play() } catch (e: Exception) { /* ignorar */ }
     }
 }
 

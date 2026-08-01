@@ -23,6 +23,7 @@ import com.jetgo.tv.data.repository.StreamRepository
 import com.jetgo.tv.player.PlayerManager
 import com.jetgo.tv.util.AccessCodeChecker
 import com.jetgo.tv.util.AccessCodeResult
+import com.jetgo.tv.util.AdultContentFilter
 import com.jetgo.tv.util.getDeviceId
 import com.jetgo.tv.util.UpdateChecker
 import com.jetgo.tv.util.UpdateInfo
@@ -196,6 +197,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             parentalControlStore.setEnabled(true, pin)
             refreshParentalState()
+            homeCatalogLoaded = false
+            ensureHomeCatalogLoaded()
         }
     }
 
@@ -204,6 +207,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             parentalControlStore.setEnabled(false)
             refreshParentalState()
+            homeCatalogLoaded = false
+            ensureHomeCatalogLoaded()
         }
     }
 
@@ -405,6 +410,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 startingChannel?.let { playChannel(it) }
                 ensureHomeCatalogLoaded()
                 refreshContinueWatching()
+                refreshParentalState()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -516,7 +522,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         (especial + special).distinctBy { it.id }
                     }
                 }
-                _categoryPickerState.value = CategoryPickerUiState(categories = categories)
+                val filtered = if (_parentalState.value.enabled) {
+                    categories.filterNot { AdultContentFilter.isAdult(it.name) }
+                } else categories
+                _categoryPickerState.value = CategoryPickerUiState(categories = filtered)
             } catch (e: Exception) {
                 _categoryPickerState.value = CategoryPickerUiState(errorMessage = "Error al cargar categorías: ${e.message}")
             }
@@ -553,7 +562,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null, rating = it.rating)
                     }
                 }
-                _categoryContentState.value = CategoryContentUiState(items = items)
+                val filteredItems = if (type != ContentType.LIVE && _parentalState.value.enabled) {
+                    items.filterNot { AdultContentFilter.isAdult(it.name) }
+                } else items
+                _categoryContentState.value = CategoryContentUiState(items = filteredItems)
             } catch (e: Exception) {
                 _categoryContentState.value = CategoryContentUiState(errorMessage = "Error al cargar contenido: ${e.message}")
             }
@@ -660,8 +672,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private fun applySearchFilter() {
         val query = _searchState.value.query.trim()
         val catalog = searchCatalog ?: emptyList()
-        val results = if (query.isBlank()) emptyList() else catalog.filter {
+        var results = if (query.isBlank()) emptyList() else catalog.filter {
             it.name.contains(query, ignoreCase = true)
+        }
+        if (_parentalState.value.enabled) {
+            results = results.filterNot { AdultContentFilter.isAdult(it.name) }
         }
         _searchState.value = _searchState.value.copy(results = results)
     }
@@ -696,7 +711,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: Exception) { emptyList() }
 
-            _homeCatalog.value = HomeCatalogState(isLoading = false, movies = movies, series = series, anime = anime)
+            val parentalOn = _parentalState.value.enabled
+            val cleanMovies = if (parentalOn) movies.filterNot { AdultContentFilter.isAdult(it.name) } else movies
+            val cleanSeries = if (parentalOn) series.filterNot { AdultContentFilter.isAdult(it.name) } else series
+            val cleanAnime = if (parentalOn) anime.filterNot { AdultContentFilter.isAdult(it.name) } else anime
+
+            _homeCatalog.value = HomeCatalogState(isLoading = false, movies = cleanMovies, series = cleanSeries, anime = cleanAnime)
             homeCatalogLoaded = true
         }
     }
