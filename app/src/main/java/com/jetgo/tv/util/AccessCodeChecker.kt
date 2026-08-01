@@ -17,7 +17,10 @@ data class AccessCodeResult(
     val username: String? = null,
     val password: String? = null,
     val m3uUrl: String? = null,
-    val deviceLimitReached: Boolean = false
+    val deviceLimitReached: Boolean = false,
+    val clientName: String? = null,
+    val deviceCount: Int = 0,
+    val maxDevices: Int = 3
 )
 
 private const val MAX_DEVICES_PER_CODE = 3
@@ -78,7 +81,10 @@ object AccessCodeChecker {
                     host = textField("host"),
                     username = textField("username"),
                     password = textField("password"),
-                    m3uUrl = textField("m3uUrl")
+                    m3uUrl = textField("m3uUrl"),
+                    clientName = textField("clientName"),
+                    deviceCount = if (deviceIds.contains(deviceId)) deviceIds.size else deviceIds.size + 1,
+                    maxDevices = MAX_DEVICES_PER_CODE
                 )
             }
         } catch (e: Exception) {

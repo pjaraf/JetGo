@@ -36,6 +36,7 @@ import com.jetgo.tv.ui.components.UpdateBanner
 import com.jetgo.tv.ui.components.UpdateDialogTv
 import com.jetgo.tv.ui.components.formatDurationLabel
 import com.jetgo.tv.ui.screens.ChannelListScreen
+import com.jetgo.tv.ui.screens.ContinueWatchingScreen
 import com.jetgo.tv.ui.screens.ConnectionIssueScreen
 import com.jetgo.tv.ui.screens.FavoritesScreen
 import com.jetgo.tv.ui.screens.HomeScreen
@@ -44,6 +45,7 @@ import com.jetgo.tv.ui.screens.SearchScreen
 import com.jetgo.tv.ui.screens.TvCategoryGridScreen
 import com.jetgo.tv.ui.screens.TvMovieDetailScreen
 import com.jetgo.tv.ui.screens.TvSeriesDetailScreen
+import com.jetgo.tv.ui.screens.TvSettingsScreen
 import com.jetgo.tv.ui.screens.phone.PhoneInicioScreen
 import com.jetgo.tv.ui.screens.phone.PhoneProfileScreen
 import com.jetgo.tv.ui.screens.phone.PhoneTvScreen
@@ -266,6 +268,14 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                         viewModel.pausePreviewPlayer()
                         navController.navigate("favorites")
                     },
+                    onContinueWatchingClick = {
+                        viewModel.pausePreviewPlayer()
+                        navController.navigate("continueWatching")
+                    },
+                    onSettingsClick = {
+                        viewModel.pausePreviewPlayer()
+                        navController.navigate("settings")
+                    },
                     isFullscreen = isFullscreen
                 )
             }
@@ -411,6 +421,31 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                 favorites = favorites,
                 onToggleFavorite = { viewModel.toggleFavorite(it) },
                 onItemSelected = handleItemSelected
+            )
+        }
+
+        composable("continueWatching") {
+            val continueWatching by viewModel.continueWatching.collectAsState()
+            ContinueWatchingScreen(
+                items = continueWatching,
+                onItemClick = handleItemSelected,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable("settings") {
+            val settingsInfo by viewModel.settingsInfo.collectAsState()
+            val parentalState by viewModel.parentalState.collectAsState()
+            TvSettingsScreen(
+                settingsInfo = settingsInfo,
+                parentalState = parentalState,
+                onEnterScreen = { viewModel.refreshParentalState() },
+                onEnableParental = { pin -> viewModel.enableParentalControl(pin) },
+                onDisableParental = { viewModel.disableParentalControl() },
+                onCheckPin = { pin -> viewModel.checkParentalPin(pin) },
+                onClearCache = { viewModel.clearCache() },
+                onLogout = { viewModel.logout() },
+                onBack = { navController.popBackStack() }
             )
         }
     }

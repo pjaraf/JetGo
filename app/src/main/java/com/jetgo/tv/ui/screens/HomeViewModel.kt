@@ -7,7 +7,10 @@ import com.jetgo.tv.BuildConfig
 import com.jetgo.tv.data.local.AccessStore
 import com.jetgo.tv.data.local.ConfigStore
 import com.jetgo.tv.data.local.FavoritesStore
+import com.jetgo.tv.data.local.ParentalControlStore
 import com.jetgo.tv.data.local.PlaybackPositionStore
+import com.jetgo.tv.data.local.WatchHistoryEntry
+import com.jetgo.tv.data.local.WatchHistoryStore
 import com.jetgo.tv.data.model.Category
 import com.jetgo.tv.data.model.Channel
 import com.jetgo.tv.data.model.ContentItem
@@ -122,6 +125,43 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    data class SettingsInfo(
+        val clientName: String? = null,
+        val accessCode: String? = null,
+        val deviceCount: Int = 0,
+        val maxDevices: Int = 3
+    )
+
+    private val _settingsInfo = MutableStateFlow(SettingsInfo())
+    val settingsInfo: StateFlow<SettingsInfo> = _settingsInfo.asStateFlow()
+
+    /** Borra archivos temporales/caché (imágenes, progreso e historial) SIN cerrar la sesión */
+    fun clearCache(onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                val context = getApplication<Application>()
+                coil.Coil.imageLoader(context).memoryCache?.clear()
+                coil.Coil.imageLoader(context).diskCache?.clear()
+                watchHistoryStore.clear()
+                _continueWatching.value = emptyList()
+            } catch (e: Exception) { /* ignorar */ }
+            onDone()
+        }
+    }
+
+    /** Cierra la sesión por completo: pide el código de acceso de nuevo la próxima vez */
+    fun logout() {
+        viewModelScope.launch {
+            playerManager.exoPlayer.stop()
+            configStore.clear()
+            accessStore.clear()
+            currentConfig = null
+            _uiState.value = HomeUiState()
+            _settingsInfo.value = SettingsInfo()
+            _accessState.value = AccessUiState(isChecking = false, isGranted = false)
+        }
+    }
+
     private val _searchState = MutableStateFlow(SearchUiState())
     val searchState: StateFlow<SearchUiState> = _searchState.asStateFlow()
 
@@ -136,6 +176,59 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val movieDetailState: StateFlow<MovieDetailUiState> = _movieDetailState.asStateFlow()
 
     private val positionStore = PlaybackPositionStore(application)
+    private val watchHistoryStore = WatchHistoryStore(application)
+    private val parentalControlStore = ParentalControlStore(application)
+
+    data class ParentalState(val enabled: Boolean = false, val hasPin: Boolean = false)
+    private val _parentalState = MutableStateFlow(ParentalState())
+    val parentalState: StateFlow<ParentalState> = _parentalState.asStateFlow()
+
+    fun refreshParentalState() {
+        viewModelScope.launch {
+            val enabled = try { parentalControlStore.isEnabled() } catch (e: Exception) { false }
+            val pin = try { parentalControlStore.getPin() } catch (e: Exception) { null }
+            _parentalState.value = ParentalState(enabled, !pin.isNullOrBlank())
+        }
+    }
+
+    /** Activa el control parental con un PIN nuevo de 4 dígitos */
+    fun enableParentalControl(pin: String) {
+        viewModelScope.launch {
+            parentalControlStore.setEnabled(true, pin)
+            refreshParentalState()
+        }
+    }
+
+    /** Desactiva el control parental (ya validado el PIN antes de llamar esto) */
+    fun disableParentalControl() {
+        viewModelScope.launch {
+            parentalControlStore.setEnabled(false)
+            refreshParentalState()
+        }
+    }
+
+    suspend fun checkParentalPin(pin: String): Boolean {
+        val saved = try { parentalControlStore.getPin() } catch (e: Exception) { null }
+        return saved != null && saved == pin
+    }
+
+    private val _continueWatching = MutableStateFlow<List<ContentItem>>(emptyList())
+    val continueWatching: StateFlow<List<ContentItem>> = _continueWatching.asStateFlow()
+
+    fun refreshContinueWatching() {
+        viewModelScope.launch {
+            val entries = try { watchHistoryStore.getAll() } catch (e: Exception) { emptyList() }
+            _continueWatching.value = entries.map {
+                ContentItem(
+                    id = it.id,
+                    name = it.name,
+                    imageUrl = it.imageUrl,
+                    type = if (it.type == "SERIES") ContentType.SERIES else ContentType.MOVIE,
+                    streamUrl = null
+                )
+            }
+        }
+    }
 
     data class ResumePrompt(
         val contentKey: String,
@@ -218,7 +311,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             if (result.valid) {
-                applyAccessCodeResult(result)
+                applyAccessCodeResult(result, savedCode)
                 _accessState.value = AccessUiState(isChecking = false, isGranted = true)
             } else {
                 accessStore.clear()
@@ -238,7 +331,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
             if (result.valid) {
                 accessStore.saveCode(code.trim().uppercase())
-                applyAccessCodeResult(result)
+                applyAccessCodeResult(result, code)
                 _accessState.value = AccessUiState(isChecking = false, isGranted = true)
             } else {
                 val message = if (result.deviceLimitReached) {
@@ -257,7 +350,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Conecta automáticamente al servidor cargado por el administrador para ese código,
      *  sin que el cliente tenga que ver ni escribir host/usuario/contraseña. */
-    private fun applyAccessCodeResult(result: AccessCodeResult) {
+    private fun applyAccessCodeResult(result: AccessCodeResult, code: String) {
+        _settingsInfo.value = SettingsInfo(
+            clientName = result.clientName,
+            accessCode = code.trim().uppercase(),
+            deviceCount = result.deviceCount,
+            maxDevices = result.maxDevices
+        )
         if (result.mode == "m3u" && !result.m3uUrl.isNullOrBlank()) {
             connectM3u(result.m3uUrl)
         } else if (!result.host.isNullOrBlank() && !result.username.isNullOrBlank() && !result.password.isNullOrBlank()) {
@@ -305,6 +404,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val startingChannel = channels.firstOrNull { it.streamId == lastId } ?: channels.firstOrNull()
                 startingChannel?.let { playChannel(it) }
                 ensureHomeCatalogLoaded()
+                refreshContinueWatching()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -608,6 +708,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     /** Carga toda la ficha de la serie (sinopsis + todas las temporadas/capítulos) */
     fun loadSeriesDetail(item: ContentItem) {
         _seriesDetailState.value = SeriesDetailUiState(isLoading = true)
+        viewModelScope.launch {
+            watchHistoryStore.record(
+                WatchHistoryEntry(item.id, item.name, item.imageUrl, "SERIES", System.currentTimeMillis())
+            )
+            refreshContinueWatching()
+        }
         val config = currentConfig ?: run {
             _seriesDetailState.value = SeriesDetailUiState(errorMessage = "Sin configuración de servidor")
             return
@@ -712,21 +818,23 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     /** Carga la ficha completa de la película y empieza a reproducirla automáticamente */
     fun loadMovieDetail(item: ContentItem) {
         _movieDetailState.value = MovieDetailUiState(isLoading = true)
+        viewModelScope.launch {
+            watchHistoryStore.record(
+                WatchHistoryEntry(item.id, item.name, item.imageUrl, "MOVIE", System.currentTimeMillis())
+            )
+            refreshContinueWatching()
+        }
         val config = currentConfig ?: run {
             _movieDetailState.value = MovieDetailUiState(errorMessage = "Sin configuración de servidor")
             return
         }
-        val fallbackStreamUrl = item.streamUrl
-        if (fallbackStreamUrl == null) {
-            _movieDetailState.value = MovieDetailUiState(errorMessage = "No se pudo reproducir esta película")
-            return
-        }
+        val fallbackStreamUrl = item.streamUrl ?: ""
         viewModelScope.launch {
             val detail = try {
                 repository.getMovieDetail(config, item.id, item.name, item.imageUrl, fallbackStreamUrl)
             } catch (e: Exception) { null }
 
-            if (detail == null) {
+            if (detail == null || detail.streamUrl.isBlank()) {
                 _movieDetailState.value = MovieDetailUiState(errorMessage = "No se pudo cargar la película")
                 return@launch
             }

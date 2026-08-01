@@ -123,12 +123,6 @@ private fun TvSeriesDetailContent(
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(28.dp)) {
 
-        Row {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.White)
-            }
-        }
-
         Row(modifier = Modifier.fillMaxWidth()) {
             // ---- Columna izquierda: info ----
             Column(modifier = Modifier.weight(1.2f).padding(end = 24.dp)) {

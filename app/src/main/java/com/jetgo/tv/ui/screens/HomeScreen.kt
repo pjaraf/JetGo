@@ -15,9 +15,11 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.outlined.Face
@@ -50,6 +52,8 @@ fun HomeScreen(
     onLiveClick: () -> Unit = {},
     onSearchClick: () -> Unit = {},
     onFavoritesClick: () -> Unit = {},
+    onContinueWatchingClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     isFullscreen: Boolean = false
 ) {
     val vivoFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
@@ -110,16 +114,16 @@ fun HomeScreen(
                 ) { onCategoryClick("MOVIE") }
 
                 CategoryCard(
-                    label = "ANIME", icon = Icons.Outlined.Face,
+                    label = "SEGUIR VIENDO", icon = Icons.Default.History,
                     gradientStart = Color(0xFF8E8CFF), gradientEnd = Color(0xFF5B57E0),
                     modifier = Modifier.weight(1f)
-                ) { onCategoryClick("ANIME") }
+                ) { onContinueWatchingClick() }
 
                 CategoryCard(
-                    label = "ESPECIAL", icon = Icons.Default.Star,
+                    label = "AJUSTES", icon = Icons.Default.Settings,
                     gradientStart = Color(0xFFFFA24E), gradientEnd = Color(0xFFE77A1F),
                     modifier = Modifier.weight(1f)
-                ) { onCategoryClick("SPECIAL") }
+                ) { onSettingsClick() }
             }
         }
 
