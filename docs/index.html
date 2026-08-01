@@ -129,9 +129,9 @@
       </div>
 
       <div id="xtreamFields">
-        <input id="host" type="text" placeholder="Host del servidor (http://servidor.com:8080)" />
-        <input id="username" type="text" placeholder="Usuario Xtream" />
-        <input id="password" type="text" placeholder="Contraseña Xtream" />
+        <input id="host" type="text" placeholder="Host del servidor (http://servidor.com:8080)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+        <input id="username" type="text" placeholder="Usuario Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+        <input id="xtreamPassword" type="text" placeholder="Contraseña Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
       </div>
       <div id="m3uFields" style="display:none;">
         <input id="m3uUrl" type="text" placeholder="URL de la lista M3U" />
@@ -243,7 +243,7 @@
     if (currentMode === 'xtream') {
       const host = document.getElementById('host').value.trim();
       const username = document.getElementById('username').value.trim();
-      const password = document.getElementById('password').value.trim();
+      const password = document.getElementById('xtreamPassword').value.trim();
       if (!host || !username || !password) {
         alert('Completa host, usuario y contraseña de Xtream Codes.');
         return;
@@ -262,6 +262,10 @@
 
     await db.collection('access_codes').doc(code).set(docData);
     document.getElementById('clientName').value = '';
+    document.getElementById('host').value = '';
+    document.getElementById('username').value = '';
+    document.getElementById('xtreamPassword').value = '';
+    document.getElementById('m3uUrl').value = '';
     showToast('Codigo generado: ' + code);
   });
 
