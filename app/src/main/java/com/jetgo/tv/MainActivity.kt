@@ -33,6 +33,7 @@ import com.jetgo.tv.ui.components.PhoneBottomNav
 import com.jetgo.tv.ui.components.PhoneMainTab
 import com.jetgo.tv.ui.components.ResumeWatchingDialog
 import com.jetgo.tv.ui.components.UpdateBanner
+import com.jetgo.tv.ui.components.UpdateDialogTv
 import com.jetgo.tv.ui.components.formatDurationLabel
 import com.jetgo.tv.ui.screens.ChannelListScreen
 import com.jetgo.tv.ui.screens.ConnectionIssueScreen
@@ -99,7 +100,7 @@ private fun AppRoot(viewModel: HomeViewModel) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (updateInfo != null && !isFullscreen) {
+            if (updateInfo != null && !isFullscreen && !isTv) {
                 UpdateBanner(updateInfo = updateInfo!!)
             }
 
@@ -178,6 +179,17 @@ private fun AppRoot(viewModel: HomeViewModel) {
                 onDismiss = { viewModel.dismissResumePrompt() }
             )
         }
+
+        // En TV, la actualización se muestra como ventana centrada (no como barra arriba)
+        if (isTv && updateInfo != null && !isFullscreen) {
+            var updateDismissed by remember { mutableStateOf(false) }
+            if (!updateDismissed) {
+                UpdateDialogTv(
+                    updateInfo = updateInfo!!,
+                    onDismiss = { updateDismissed = true }
+                )
+            }
+        }
     }
 }
 
@@ -218,9 +230,12 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
     NavHost(navController = navController, startDestination = "home") {
 
         composable("home") {
+            val newestItems = (homeCatalog.movies + homeCatalog.series).shuffled().take(10)
             HomeScreen(
                 playerManager = viewModel.playerManager,
                 liveChannels = uiState.liveChannels,
+                newestItems = newestItems,
+                onItemClick = handleItemSelected,
                 onChannelSelected = { viewModel.playChannel(it) },
                 onCategoryClick = { category -> navController.navigate("categoryPicker/$category") },
                 onSearchClick = { navController.navigate("search") },

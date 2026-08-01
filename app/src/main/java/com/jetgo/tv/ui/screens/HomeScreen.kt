@@ -4,8 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,16 +31,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.jetgo.tv.data.model.Channel
+import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.player.PlayerManager
 import com.jetgo.tv.ui.components.CategoryCard
+import com.jetgo.tv.ui.components.NewestContentCarousel
 import com.jetgo.tv.ui.components.PlayerPanel
-import com.jetgo.tv.ui.components.PromoBanner
 import com.jetgo.tv.ui.theme.BackgroundDark
 
 @Composable
 fun HomeScreen(
     playerManager: PlayerManager,
     liveChannels: List<Channel>,
+    newestItems: List<ContentItem> = emptyList(),
+    onItemClick: (ContentItem) -> Unit = {},
     onChannelSelected: (Channel) -> Unit,
     onCategoryClick: (String) -> Unit,
     onSearchClick: () -> Unit = {},
@@ -51,19 +56,19 @@ fun HomeScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
 
-            // ---- Fila superior: reproductor + banner promocional (igual a la captura) ----
+            // ---- Fila superior: reproductor + carrusel de contenido nuevo (misma altura) ----
             Row(
-                modifier = Modifier.fillMaxWidth().weight(1f),
+                modifier = Modifier.fillMaxWidth().weight(1f).height(IntrinsicSize.Min),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 PlayerPanel(
                     playerManager = playerManager,
                     modifier = Modifier.weight(2.1f)
                 )
-                PromoBanner(
-                    imageUrl = null, // conéctalo a tu propio feed de destacados/EPG
-                    contentDescription = "Contenido destacado",
-                    modifier = Modifier.weight(1f)
+                NewestContentCarousel(
+                    items = newestItems,
+                    onItemClick = onItemClick,
+                    modifier = Modifier.weight(1f).fillMaxHeight()
                 )
             }
 
