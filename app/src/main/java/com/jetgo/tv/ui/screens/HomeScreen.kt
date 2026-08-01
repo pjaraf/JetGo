@@ -52,7 +52,7 @@ fun HomeScreen(
 ) {
     val vivoFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
     androidx.compose.runtime.LaunchedEffect(Unit) {
-        vivoFocusRequester.requestFocus()
+        try { vivoFocusRequester.requestFocus() } catch (e: Exception) { /* ignorar si aún no está listo */ }
     }
 
     Box(

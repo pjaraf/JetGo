@@ -32,7 +32,9 @@ fun FullscreenPlayerEffect(
     DisposableEffect(isFullscreen) {
         val window = activity?.window
         if (isFullscreen) {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            try {
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            } catch (e: Exception) { /* algunos TV Box no permiten forzar orientación; no es crítico */ }
             if (window != null) {
                 WindowCompat.setDecorFitsSystemWindows(window, false)
                 val controller = WindowInsetsControllerCompat(window, window.decorView)
@@ -41,7 +43,9 @@ fun FullscreenPlayerEffect(
                     WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
         } else {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            try {
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            } catch (e: Exception) { /* ignorar */ }
             if (window != null) {
                 WindowCompat.setDecorFitsSystemWindows(window, true)
                 val controller = WindowInsetsControllerCompat(window, window.decorView)

@@ -68,7 +68,7 @@ fun FullscreenPlayerOverlay(
     LaunchedEffect(isVod) {
         if (!isVod) {
             onLoadLiveCategories()
-            focusRequester.requestFocus()
+            try { focusRequester.requestFocus() } catch (e: Exception) { /* ignorar si aún no está listo */ }
         }
     }
 
