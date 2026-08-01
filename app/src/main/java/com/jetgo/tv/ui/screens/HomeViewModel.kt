@@ -279,7 +279,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     isConfigured = true,
                     liveChannels = channels
                 )
-                channels.firstOrNull()?.let { playChannel(it) }
+                val lastId = try { configStore.getLastChannelId() } catch (e: Exception) { null }
+                val startingChannel = channels.firstOrNull { it.streamId == lastId } ?: channels.firstOrNull()
+                startingChannel?.let { playChannel(it) }
                 ensureHomeCatalogLoaded()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
@@ -310,7 +312,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     isConfigured = true,
                     liveChannels = result.channels
                 )
-                result.channels.firstOrNull()?.let { playChannel(it) }
+                val lastId = try { configStore.getLastChannelId() } catch (e: Exception) { null }
+                val startingChannel = result.channels.firstOrNull { it.streamId == lastId } ?: result.channels.firstOrNull()
+                startingChannel?.let { playChannel(it) }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -334,6 +338,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun playChannel(channel: Channel) {
         playerManager.playChannel(channel.streamUrl, channel.name)
+        viewModelScope.launch { configStore.saveLastChannelId(channel.streamId) }
         _liveChannelInfo.value = LiveChannelInfo(channel.name, channel.logoUrl, channel.number, null, null)
         val config = currentConfig ?: return
         viewModelScope.launch {
@@ -437,6 +442,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 playWithResumeCheck("movie:${item.id}", item.name, item.streamUrl)
             } else {
                 playerManager.playChannel(item.streamUrl, item.name)
+                viewModelScope.launch { configStore.saveLastChannelId(item.id) }
                 _liveChannelInfo.value = LiveChannelInfo(item.name, item.imageUrl, null, null, null)
                 val config = currentConfig
                 if (config != null) {

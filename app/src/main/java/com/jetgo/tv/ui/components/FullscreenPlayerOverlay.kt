@@ -45,7 +45,8 @@ import com.jetgo.tv.ui.screens.HomeViewModel
  *
  * Para canales en vivo ([isVod] = false) muestra el banner de programación (EPG) al cambiar
  * de canal, y permite abrir el panel lateral de canales/categorías presionando IZQUIERDA en
- * el control remoto (1 vez = canales, 2 veces = categorías).
+ * el control remoto (1 vez = canales, 2 veces = categorías). Con el panel abierto: ARRIBA/ABAJO
+ * mueve la selección y el CENTRO/OK del control confirma (cambia de canal o entra a la categoría).
  */
 @Composable
 fun FullscreenPlayerOverlay(
@@ -63,12 +64,32 @@ fun FullscreenPlayerOverlay(
 ) {
     var showLanguageDialog by remember { mutableStateOf(false) }
     var zapMode by remember { mutableStateOf(ZapPanelMode.HIDDEN) }
+    var zapSelectedIndex by remember { mutableStateOf(0) }
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(isVod) {
         if (!isVod) {
             onLoadLiveCategories()
             try { focusRequester.requestFocus() } catch (e: Exception) { /* ignorar si aún no está listo */ }
+        }
+    }
+
+    // Al cambiar de modo (canales <-> categorías), la selección arranca en el primer elemento
+    LaunchedEffect(zapMode) {
+        zapSelectedIndex = 0
+    }
+
+    fun confirmCategorySelection() {
+        liveCategories.getOrNull(zapSelectedIndex)?.let { category ->
+            onSelectLiveCategory(category.id)
+            zapMode = ZapPanelMode.CHANNELS
+        }
+    }
+
+    fun confirmChannelSelection() {
+        liveChannelsInCategory.getOrNull(zapSelectedIndex)?.let { channel ->
+            onSelectLiveChannel(channel)
+            zapMode = ZapPanelMode.HIDDEN
         }
     }
 
@@ -82,15 +103,46 @@ fun FullscreenPlayerOverlay(
                         .focusRequester(focusRequester)
                         .focusable()
                         .onKeyEvent { event ->
-                            if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
-                                zapMode = when (zapMode) {
-                                    ZapPanelMode.HIDDEN -> ZapPanelMode.CHANNELS
-                                    ZapPanelMode.CHANNELS -> ZapPanelMode.CATEGORIES
-                                    ZapPanelMode.CATEGORIES -> ZapPanelMode.HIDDEN
+                            if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                            when (event.key) {
+                                Key.DirectionLeft -> {
+                                    zapMode = when (zapMode) {
+                                        ZapPanelMode.HIDDEN -> ZapPanelMode.CHANNELS
+                                        ZapPanelMode.CHANNELS -> ZapPanelMode.CATEGORIES
+                                        ZapPanelMode.CATEGORIES -> ZapPanelMode.HIDDEN
+                                    }
+                                    true
                                 }
-                                true
-                            } else {
-                                false
+                                Key.DirectionUp -> {
+                                    if (zapMode != ZapPanelMode.HIDDEN) {
+                                        zapSelectedIndex = (zapSelectedIndex - 1).coerceAtLeast(0)
+                                        true
+                                    } else false
+                                }
+                                Key.DirectionDown -> {
+                                    if (zapMode != ZapPanelMode.HIDDEN) {
+                                        val maxIndex = (
+                                            if (zapMode == ZapPanelMode.CATEGORIES) liveCategories.size
+                                            else liveChannelsInCategory.size
+                                            ) - 1
+                                        zapSelectedIndex = (zapSelectedIndex + 1).coerceAtMost(maxIndex.coerceAtLeast(0))
+                                        true
+                                    } else false
+                                }
+                                Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                    when (zapMode) {
+                                        ZapPanelMode.CATEGORIES -> { confirmCategorySelection(); true }
+                                        ZapPanelMode.CHANNELS -> { confirmChannelSelection(); true }
+                                        ZapPanelMode.HIDDEN -> false
+                                    }
+                                }
+                                Key.Back -> {
+                                    if (zapMode != ZapPanelMode.HIDDEN) {
+                                        zapMode = ZapPanelMode.HIDDEN
+                                        true
+                                    } else false
+                                }
+                                else -> false
                             }
                         }
                 } else Modifier
@@ -143,6 +195,7 @@ fun FullscreenPlayerOverlay(
                 categories = liveCategories,
                 channels = liveChannelsInCategory,
                 currentChannelName = liveChannelInfo?.channelName ?: "",
+                selectedIndex = zapSelectedIndex,
                 onSelectCategory = { category ->
                     onSelectLiveCategory(category.id)
                     zapMode = ZapPanelMode.CHANNELS

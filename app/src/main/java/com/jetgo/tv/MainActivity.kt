@@ -255,6 +255,7 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                 onItemClick = handleItemSelected,
                 onChannelSelected = { viewModel.playChannel(it) },
                 onCategoryClick = { category -> navController.navigate("categoryPicker/$category") },
+                onLiveClick = { viewModel.enterFullscreenPlayer() },
                 onSearchClick = { navController.navigate("search") },
                 onFavoritesClick = { navController.navigate("favorites") }
             )

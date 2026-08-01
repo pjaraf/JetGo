@@ -47,6 +47,7 @@ fun HomeScreen(
     onItemClick: (ContentItem) -> Unit = {},
     onChannelSelected: (Channel) -> Unit,
     onCategoryClick: (String) -> Unit,
+    onLiveClick: () -> Unit = {},
     onSearchClick: () -> Unit = {},
     onFavoritesClick: () -> Unit = {}
 ) {
@@ -92,7 +93,7 @@ fun HomeScreen(
                     gradientStart = Color(0xFFFF6B5B), gradientEnd = Color(0xFFE5493B),
                     modifier = Modifier.weight(1f),
                     focusRequester = vivoFocusRequester
-                ) { onCategoryClick("LIVE") }
+                ) { onLiveClick() }
 
                 CategoryCard(
                     label = "SERIE", icon = Icons.Default.Tv,

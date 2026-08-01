@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.jetgo.tv.data.model.ServerConfig
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore(name = "stream_config")
@@ -18,6 +19,16 @@ class ConfigStore(private val context: Context) {
         private val KEY_PASS = stringPreferencesKey("password")
         private val KEY_MODE = stringPreferencesKey("mode") // "xtream" o "m3u"
         private val KEY_M3U_URL = stringPreferencesKey("m3u_url")
+        private val KEY_LAST_CHANNEL_ID = stringPreferencesKey("last_channel_id")
+    }
+
+    /** Recuerda el último canal en vivo que se estaba viendo, para retomarlo la próxima vez */
+    suspend fun saveLastChannelId(streamId: String) {
+        context.dataStore.edit { prefs -> prefs[KEY_LAST_CHANNEL_ID] = streamId }
+    }
+
+    suspend fun getLastChannelId(): String? {
+        return context.dataStore.data.first()[KEY_LAST_CHANNEL_ID]
     }
 
     val config: Flow<ServerConfig?> = context.dataStore.data.map { prefs ->
