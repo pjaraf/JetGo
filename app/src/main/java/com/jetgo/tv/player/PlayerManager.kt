@@ -1,8 +1,10 @@
 package com.jetgo.tv.player
 
 import android.content.Context
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime
@@ -11,6 +13,14 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 import com.jetgo.tv.data.model.PlaybackStats
+
+/** Una pista de audio o subtítulo disponible para elegir */
+data class TrackOption(
+    val group: androidx.media3.common.TrackGroup,
+    val trackIndex: Int,
+    val label: String,
+    val isSelected: Boolean
+)
 
 /**
  * Encapsula un único ExoPlayer reutilizable para el panel de reproducción en vivo,
@@ -23,6 +33,9 @@ class PlayerManager(context: Context) {
 
     private val _stats = mutableStateOf(PlaybackStats())
     val stats: State<PlaybackStats> get() = _stats
+
+    private val _isPlaying = mutableStateOf(true)
+    val isPlaying: State<Boolean> get() = _isPlaying
 
     /** Se dispara cuando el contenido actual termina de reproducirse por completo (fin de capítulo/película) */
     var onPlaybackEnded: (() -> Unit)? = null
@@ -45,6 +58,10 @@ class PlayerManager(context: Context) {
                 if (playbackState == Player.STATE_ENDED) {
                     onPlaybackEnded?.invoke()
                 }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                _isPlaying.value = isPlaying
             }
         })
     }
@@ -83,8 +100,78 @@ class PlayerManager(context: Context) {
     /** Duración total del contenido actual, en milisegundos (0 si aún no se sabe, ej. streams en vivo) */
     fun durationMs(): Long = try { exoPlayer.duration.coerceAtLeast(0) } catch (e: Exception) { 0L }
 
-    /** Salta a una posición específica (usado para "Seguir viendo") */
+    /** Salta a una posición específica (usado para "Seguir viendo" y la barra de progreso) */
     fun seekTo(positionMs: Long) {
         try { exoPlayer.seekTo(positionMs) } catch (e: Exception) { /* ignorar */ }
+    }
+
+    fun togglePlayPause() {
+        if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+    }
+
+    fun seekForward(ms: Long = 10_000) {
+        seekTo((currentPositionMs() + ms).coerceAtMost(durationMs()))
+    }
+
+    fun seekBackward(ms: Long = 10_000) {
+        seekTo((currentPositionMs() - ms).coerceAtLeast(0))
+    }
+
+    /** Pistas de audio disponibles en el contenido actual */
+    fun getAudioTracks(): List<TrackOption> = getTracks(C.TRACK_TYPE_AUDIO)
+
+    /** Pistas de subtítulos disponibles en el contenido actual */
+    fun getSubtitleTracks(): List<TrackOption> = getTracks(C.TRACK_TYPE_TEXT)
+
+    private fun getTracks(type: Int): List<TrackOption> {
+        val result = mutableListOf<TrackOption>()
+        try {
+            val tracks = exoPlayer.currentTracks
+            for (group in tracks.groups) {
+                if (group.type != type) continue
+                for (i in 0 until group.length) {
+                    val format = group.getTrackFormat(i)
+                    val label = format.label
+                        ?: format.language?.uppercase()
+                        ?: "Pista ${result.size + 1}"
+                    result.add(TrackOption(group.mediaTrackGroup, i, label, group.isTrackSelected(i)))
+                }
+            }
+        } catch (e: Exception) { /* sin pistas disponibles */ }
+        return result
+    }
+
+    fun selectTrack(option: TrackOption) {
+        try {
+            val override = TrackSelectionOverride(option.group, listOf(option.trackIndex))
+            exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+                .buildUpon()
+                .setOverrideForType(override)
+                .build()
+        } catch (e: Exception) { /* ignorar */ }
+    }
+
+    /** Apaga los subtítulos por completo */
+    fun disableSubtitles() {
+        try {
+            exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+                .buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                .build()
+        } catch (e: Exception) { /* ignorar */ }
+    }
+
+    private fun enableSubtitleType() {
+        try {
+            exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+                .buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                .build()
+        } catch (e: Exception) { /* ignorar */ }
+    }
+
+    fun selectSubtitleTrack(option: TrackOption) {
+        enableSubtitleType()
+        selectTrack(option)
     }
 }

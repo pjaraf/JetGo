@@ -3,6 +3,7 @@ package com.jetgo.tv.data.local
 import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
 
@@ -38,5 +39,16 @@ class PlaybackPositionStore(private val context: Context) {
             prefs.remove(posKey(contentKey))
             prefs.remove(durKey(contentKey))
         }
+    }
+
+    // ---- Recuerda el último capítulo visto de cada serie (para retomarla donde quedó) ----
+    private fun lastEpisodeKey(seriesId: String) = stringPreferencesKey("last_episode_$seriesId")
+
+    suspend fun saveLastWatchedEpisode(seriesId: String, episodeId: String) {
+        context.playbackDataStore.edit { prefs -> prefs[lastEpisodeKey(seriesId)] = episodeId }
+    }
+
+    suspend fun getLastWatchedEpisode(seriesId: String): String? {
+        return context.playbackDataStore.data.first()[lastEpisodeKey(seriesId)]
     }
 }

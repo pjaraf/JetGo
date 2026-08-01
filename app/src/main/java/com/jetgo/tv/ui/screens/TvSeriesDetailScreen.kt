@@ -50,6 +50,8 @@ import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.data.model.SeriesDetail
 import com.jetgo.tv.data.model.SeriesEpisode
 import com.jetgo.tv.player.PlayerManager
+import com.jetgo.tv.ui.components.LanguageTracksDialog
+import com.jetgo.tv.ui.components.VodPlayerControls
 import com.jetgo.tv.ui.theme.BackgroundDark
 import com.jetgo.tv.ui.theme.FocusOrange
 import com.jetgo.tv.ui.theme.SurfaceDark
@@ -111,6 +113,7 @@ private fun TvSeriesDetailContent(
     val episodes = detail.episodesBySeason[selectedSeason].orEmpty()
     val currentEpisode = detail.episodesBySeason.values.flatten().firstOrNull { it.id == currentEpisodeId }
     var sinopsisExpanded by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(28.dp)) {
 
@@ -228,7 +231,25 @@ private fun TvSeriesDetailContent(
                     },
                     modifier = Modifier.fillMaxSize()
                 )
+                VodPlayerControls(
+                    playerManager = playerManager,
+                    posterUrl = detail.coverUrl,
+                    title = if (currentEpisode != null) "${detail.name} · ${currentEpisode.title}" else detail.name,
+                    onExit = null,
+                    onOpenLanguageMenu = { showLanguageDialog = true }
+                )
             }
+        }
+
+        if (showLanguageDialog) {
+            LanguageTracksDialog(
+                audioTracks = playerManager.getAudioTracks(),
+                subtitleTracks = playerManager.getSubtitleTracks(),
+                onSelectAudio = { playerManager.selectTrack(it); showLanguageDialog = false },
+                onSelectSubtitle = { playerManager.selectSubtitleTrack(it); showLanguageDialog = false },
+                onDisableSubtitles = { playerManager.disableSubtitles(); showLanguageDialog = false },
+                onDismiss = { showLanguageDialog = false }
+            )
         }
 
         // ---- Barra de acciones ----

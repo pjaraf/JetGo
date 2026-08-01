@@ -143,9 +143,27 @@ private fun AppRoot(viewModel: HomeViewModel) {
 
         // El reproductor a pantalla completa se dibuja por ENCIMA de todo lo demás
         if (isFullscreen) {
+            val movieDetailState by viewModel.movieDetailState.collectAsState()
+            val seriesDetailState by viewModel.seriesDetailState.collectAsState()
+
+            val currentEpisode = seriesDetailState.detail?.episodesBySeason?.values
+                ?.flatten()
+                ?.firstOrNull { it.id == seriesDetailState.currentEpisodeId }
+
+            val isVod = movieDetailState.detail != null || seriesDetailState.detail != null
+            val posterUrl = movieDetailState.detail?.coverUrl ?: seriesDetailState.detail?.coverUrl
+            val title = movieDetailState.detail?.name
+                ?: seriesDetailState.detail?.let { detail ->
+                    if (currentEpisode != null) "${detail.name} · ${currentEpisode.title}" else detail.name
+                }
+                ?: ""
+
             FullscreenPlayerOverlay(
                 playerManager = viewModel.playerManager,
-                onExitFullscreen = { viewModel.exitFullscreenPlayer() }
+                onExitFullscreen = { viewModel.exitFullscreenPlayer() },
+                isVod = isVod,
+                posterUrl = posterUrl,
+                title = title
             )
         }
 

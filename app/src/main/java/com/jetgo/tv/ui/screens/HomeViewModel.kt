@@ -557,14 +557,23 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
-            val firstSeason = detail.episodesBySeason.keys.minOrNull() ?: 1
-            _seriesDetailState.value = SeriesDetailUiState(detail = detail, selectedSeason = firstSeason)
+            val allEpisodes = detail.episodesBySeason.values.flatten()
+            val lastWatchedId = try { positionStore.getLastWatchedEpisode(detail.seriesId) } catch (e: Exception) { null }
+            val lastWatchedEpisode = lastWatchedId?.let { id -> allEpisodes.firstOrNull { it.id == id } }
+
+            val startingEpisode = lastWatchedEpisode ?: detail.episodesBySeason.keys.minOrNull()
+                ?.let { detail.episodesBySeason[it]?.firstOrNull() }
+
+            _seriesDetailState.value = SeriesDetailUiState(
+                detail = detail,
+                selectedSeason = startingEpisode?.season ?: (detail.episodesBySeason.keys.minOrNull() ?: 1)
+            )
 
             // Auto-avance: cuando termina un capítulo, reproduce el siguiente automáticamente
             playerManager.onPlaybackEnded = { playNextEpisode() }
 
-            // Reproduce automáticamente el primer capítulo de la temporada al entrar
-            detail.episodesBySeason[firstSeason]?.firstOrNull()?.let { playEpisode(it.id) }
+            // Retoma el último capítulo visto de esta serie; si nunca la habías visto, arranca en el primero
+            startingEpisode?.let { playEpisode(it.id) }
         }
     }
 
@@ -578,6 +587,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             currentEpisodeId = episodeId,
             selectedSeason = episode.season
         )
+        _seriesDetailState.value.detail?.seriesId?.let { seriesId ->
+            viewModelScope.launch { positionStore.saveLastWatchedEpisode(seriesId, episodeId) }
+        }
         val title = "${_seriesDetailState.value.detail?.name} · ${episode.title}"
         playWithResumeCheck("series:$episodeId", title, episode.streamUrl)
     }
@@ -591,6 +603,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             currentEpisodeId = episodeId,
             selectedSeason = episode.season
         )
+        _seriesDetailState.value.detail?.seriesId?.let { seriesId ->
+            viewModelScope.launch { positionStore.saveLastWatchedEpisode(seriesId, episodeId) }
+        }
     }
 
     /** Se llama automáticamente cuando ExoPlayer termina un capítulo */
@@ -724,9 +739,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
-    }
-
-    private fun stopPositionTracking() {
+    }    private fun stopPositionTracking() {
         positionTrackingJob?.cancel()
         positionTrackingJob = null
     }
