@@ -112,9 +112,28 @@ interface XtreamApi {
             return Retrofit.Builder()
                 .baseUrl(baseUrl)
                 .client(client)
-                .addConverterFactory(GsonConverterFactory.create())
+                .addConverterFactory(GsonConverterFactory.create(lenientGson))
                 .build()
                 .create(XtreamApi::class.java)
+        }
+
+        /**
+         * Gson especial: algunos paneles Xtream mandan el campo "info" como una LISTA VACÍA `[]`
+         * en vez de un objeto `{}` cuando una película/serie no tiene datos adicionales cargados
+         * (sinopsis, elenco, etc.). Sin esto, la app se cae al intentar leer esos casos.
+         */
+        private val lenientGson: com.google.gson.Gson by lazy {
+            val safeInfoAdapter = com.google.gson.JsonDeserializer<Any?> { json, typeOfT, context ->
+                if (json != null && json.isJsonObject) {
+                    context.deserialize(json, typeOfT)
+                } else {
+                    null // era una lista vacía (u otra cosa rara): no hay info real
+                }
+            }
+            com.google.gson.GsonBuilder()
+                .registerTypeAdapter(VodInfoDetailsDto::class.java, safeInfoAdapter)
+                .registerTypeAdapter(SeriesInfoDetailsDto::class.java, safeInfoAdapter)
+                .create()
         }
 
         /** Construye la URL directa de un canal en vivo para pasarla al reproductor */
