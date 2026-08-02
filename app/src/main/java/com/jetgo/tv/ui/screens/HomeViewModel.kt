@@ -1039,7 +1039,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             val current = items.toMutableList()
-            var changedCount = 0
+            var changedSinceLastUpdate = 0
 
             for (item in missing) {
                 val posterUrl = try { fetchPosterFromTmdb(item.name, isSeries) } catch (e: Exception) { null }
@@ -1047,15 +1047,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     val idx = current.indexOfFirst { it.id == item.id && it.type == item.type }
                     if (idx != -1) {
                         current[idx] = current[idx].copy(imageUrl = posterUrl)
-                        changedCount++
+                        changedSinceLastUpdate++
                     }
                 }
-                kotlinx.coroutines.delay(250) // no saturar la API de TMDB
+                // Actualiza la pantalla cada 6 carátulas encontradas (no una por una: evita el
+                // parpadeo; tampoco todo junto al final: se ve avanzar y no parece "colgado").
+                if (changedSinceLastUpdate >= 6) {
+                    onUpdated(current.toList())
+                    changedSinceLastUpdate = 0
+                }
+                kotlinx.coroutines.delay(150) // más rápido, TMDB tolera bien este ritmo
             }
 
-            // Se actualiza la pantalla UNA sola vez al final (no una vez por cada carátula
-            // encontrada), para que no parezca que todo sigue "cargando" sin parar.
-            if (changedCount > 0) {
+            if (changedSinceLastUpdate > 0) {
                 onUpdated(current.toList())
             }
         }
