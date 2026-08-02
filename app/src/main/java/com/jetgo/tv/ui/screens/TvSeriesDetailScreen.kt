@@ -39,7 +39,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -126,18 +128,40 @@ private fun TvSeriesDetailContent(
     var sinopsisExpanded by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(start = 28.dp, end = 28.dp, top = 20.dp, bottom = 48.dp)
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        // ---- Fondo: la carátula, difuminada y oscurecida, cubriendo toda la pantalla ----
+        if (!detail.coverUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = detail.coverUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(40.dp)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(BackgroundDark.copy(alpha = 0.80f), BackgroundDark.copy(alpha = 0.97f))
+                        )
+                    )
+            )
+        }
 
-        Row(modifier = Modifier.fillMaxWidth()) {
-            // ---- Columna izquierda: info ----
-            Column(modifier = Modifier.weight(1.2f).padding(end = 24.dp)) {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(detail.name, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 28.dp, end = 28.dp, top = 20.dp, bottom = 48.dp)
+        ) {
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                // ---- Columna izquierda: info ----
+                Column(modifier = Modifier.weight(1.2f).padding(end = 24.dp)) {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(detail.name, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
                     if (!detail.rating.isNullOrBlank()) {
                         Text(
                             "  ${detail.rating}",
@@ -347,6 +371,7 @@ private fun TvSeriesDetailContent(
         }
 
         // ---- Recomendados ----
+    }
     }
 }
 
