@@ -279,6 +279,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
     val updateInfo: StateFlow<UpdateInfo?> = _updateInfo.asStateFlow()
 
+    /** Se llama apenas el usuario toca "Actualizar": el aviso no debe volver a salir hasta
+     *  que exista una actualización realmente NUEVA (evita que reaparezca si el proceso
+     *  de la app sigue vivo después de instalar, en vez de arrancar de cero). */
+    fun dismissUpdateBanner() {
+        _updateInfo.value = null
+    }
+
     private var currentConfig: ServerConfig? = null
     private var currentMode: String = "xtream" // "xtream" o "m3u"
 

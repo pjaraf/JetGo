@@ -121,7 +121,10 @@ private fun AppRoot(viewModel: HomeViewModel) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             if (updateInfo != null && !isFullscreen && !isTv) {
-                UpdateBanner(updateInfo = updateInfo!!)
+                UpdateBanner(
+                    updateInfo = updateInfo!!,
+                    onUpdateStarted = { viewModel.dismissUpdateBanner() }
+                )
             }
 
             Box(modifier = Modifier.weight(1f)) {
@@ -218,7 +221,8 @@ private fun AppRoot(viewModel: HomeViewModel) {
             if (!updateDismissed) {
                 UpdateDialogTv(
                     updateInfo = updateInfo!!,
-                    onDismiss = { updateDismissed = true }
+                    onDismiss = { updateDismissed = true },
+                    onUpdateStarted = { viewModel.dismissUpdateBanner() }
                 )
             }
         }

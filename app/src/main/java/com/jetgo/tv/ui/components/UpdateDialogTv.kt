@@ -33,7 +33,7 @@ import com.jetgo.tv.util.UpdateInstaller
  * el control remoto).
  */
 @Composable
-fun UpdateDialogTv(updateInfo: UpdateInfo, onDismiss: () -> Unit) {
+fun UpdateDialogTv(updateInfo: UpdateInfo, onDismiss: () -> Unit, onUpdateStarted: () -> Unit = {}) {
     val context = LocalContext.current
     var isDownloading by remember { mutableStateOf(false) }
 
@@ -64,6 +64,7 @@ fun UpdateDialogTv(updateInfo: UpdateInfo, onDismiss: () -> Unit) {
                             UpdateInstaller.requestInstallPermission(context)
                         } else {
                             isDownloading = true
+                            onUpdateStarted() // el aviso no debe volver a salir después de esto
                             UpdateInstaller.downloadAndInstall(context, updateInfo.apkDownloadUrl) {
                                 isDownloading = false
                             }
