@@ -99,7 +99,7 @@ class StreamRepository {
                 categoryId = it.categoryId,
                 streamUrl = XtreamApi.vodStreamUrl(
                     config.host, config.username, config.password, it.streamId,
-                    it.containerExtension ?: "mp4"
+                    it.containerExtension?.takeIf { ext -> ext.isNotBlank() } ?: "mp4"
                 ),
                 rating = it.rating
             )
@@ -160,7 +160,7 @@ class StreamRepository {
         val episodeIdInt = firstEpisode.id.toIntOrNull() ?: return@withContext null
         XtreamApi.seriesStreamUrl(
             config.host, config.username, config.password,
-            episodeIdInt, firstEpisode.containerExtension ?: "mp4"
+            episodeIdInt, firstEpisode.containerExtension?.takeIf { it.isNotBlank() } ?: "mp4"
         )
     }
 
@@ -182,7 +182,7 @@ class StreamRepository {
                         season = seasonNum,
                         streamUrl = XtreamApi.seriesStreamUrl(
                             config.host, config.username, config.password,
-                            epIdInt, ep.containerExtension ?: "mp4"
+                            epIdInt, ep.containerExtension?.takeIf { it.isNotBlank() } ?: "mp4"
                         )
                     )
                 }.sortedBy { it.episodeNum }
@@ -220,7 +220,7 @@ class StreamRepository {
         val streamUrl = if (streamIdInt != null) {
             XtreamApi.vodStreamUrl(
                 config.host, config.username, config.password,
-                streamIdInt, body.movieData?.containerExtension ?: "mp4"
+                streamIdInt, body.movieData?.containerExtension?.takeIf { it.isNotBlank() } ?: "mp4"
             )
         } else fallbackStreamUrl
 
