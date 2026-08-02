@@ -1039,9 +1039,34 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             val current = items.toMutableList()
-            var changedSinceLastUpdate = 0
+
+            // ---- Paso 1: aplicar de una lo que YA está guardado (sin pausas, al instante) ----
+            val cache = try { posterCacheStore.getAll() } catch (e: Exception) { emptyMap() }
+            val stillMissing = mutableListOf<ContentItem>()
+            var appliedFromCache = 0
 
             for (item in missing) {
+                val cachedUrl = cache[item.name.trim().lowercase()]
+                if (cachedUrl != null) {
+                    if (cachedUrl.isNotBlank()) {
+                        val idx = current.indexOfFirst { it.id == item.id && it.type == item.type }
+                        if (idx != -1) {
+                            current[idx] = current[idx].copy(imageUrl = cachedUrl)
+                            appliedFromCache++
+                        }
+                    }
+                    // si cachedUrl está vacío, ya se buscó antes y no había carátula: no reintentar
+                } else {
+                    stillMissing.add(item)
+                }
+            }
+            if (appliedFromCache > 0) {
+                onUpdated(current.toList())
+            }
+
+            // ---- Paso 2: buscar en TMDB solo los títulos genuinamente nuevos ----
+            var changedSinceLastUpdate = 0
+            for (item in stillMissing) {
                 val posterUrl = try { fetchPosterFromTmdb(item.name, isSeries) } catch (e: Exception) { null }
                 if (!posterUrl.isNullOrBlank()) {
                     val idx = current.indexOfFirst { it.id == item.id && it.type == item.type }
@@ -1050,15 +1075,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         changedSinceLastUpdate++
                     }
                 }
-                // Actualiza la pantalla cada 6 carátulas encontradas (no una por una: evita el
-                // parpadeo; tampoco todo junto al final: se ve avanzar y no parece "colgado").
                 if (changedSinceLastUpdate >= 6) {
                     onUpdated(current.toList())
                     changedSinceLastUpdate = 0
                 }
-                kotlinx.coroutines.delay(150) // más rápido, TMDB tolera bien este ritmo
+                kotlinx.coroutines.delay(150)
             }
-
             if (changedSinceLastUpdate > 0) {
                 onUpdated(current.toList())
             }

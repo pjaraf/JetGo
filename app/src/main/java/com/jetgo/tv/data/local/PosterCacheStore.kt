@@ -21,6 +21,23 @@ class PosterCacheStore(private val context: Context) {
         return if (stored == NOT_FOUND) "" else stored
     }
 
+    /**
+     * Trae TODO el caché guardado de una sola vez (título normalizado -> URL o "" si no había).
+     * Mucho más rápido que llamar [get] uno por uno cuando hay que revisar muchos títulos.
+     */
+    suspend fun getAll(): Map<String, String> {
+        val prefs = context.posterCacheDataStore.data.first()
+        val result = mutableMapOf<String, String>()
+        prefs.asMap().forEach { (key, value) ->
+            val name = key.name
+            if (name.startsWith("poster_") && value is String) {
+                val title = name.removePrefix("poster_")
+                result[title] = if (value == NOT_FOUND) "" else value
+            }
+        }
+        return result
+    }
+
     suspend fun save(title: String, posterUrl: String?) {
         context.posterCacheDataStore.edit { prefs ->
             prefs[keyFor(title)] = posterUrl ?: NOT_FOUND
