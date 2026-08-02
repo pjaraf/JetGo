@@ -178,6 +178,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val positionStore = PlaybackPositionStore(application)
     private val watchHistoryStore = WatchHistoryStore(application)
+    private val posterCacheStore = com.jetgo.tv.data.local.PosterCacheStore(application)
+    private val tmdbApi = com.jetgo.tv.data.remote.TmdbApi.create()
     private val parentalControlStore = ParentalControlStore(application)
 
     data class ParentalState(val enabled: Boolean = false, val hasPin: Boolean = false)
@@ -570,6 +572,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     items.filterNot { AdultContentFilter.isAdult(it.name) }
                 } else items
                 _categoryContentState.value = CategoryContentUiState(items = filteredItems)
+
+                if (type != ContentType.LIVE) {
+                    fillMissingPosters(filteredItems, isSeries = type == ContentType.SERIES) { updated ->
+                        _categoryContentState.value = _categoryContentState.value.copy(items = updated)
+                    }
+                }
             } catch (e: Exception) {
                 _categoryContentState.value = CategoryContentUiState(errorMessage = "Error al cargar contenido: ${e.message}")
             }
@@ -727,6 +735,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
             _homeCatalog.value = HomeCatalogState(isLoading = false, movies = cleanMovies, series = cleanSeries, anime = cleanAnime)
             homeCatalogLoaded = true
+
+            fillMissingPosters(cleanMovies, isSeries = false) { updated ->
+                _homeCatalog.value = _homeCatalog.value.copy(movies = updated)
+            }
+            fillMissingPosters(cleanSeries, isSeries = true) { updated ->
+                _homeCatalog.value = _homeCatalog.value.copy(series = updated)
+            }
+            fillMissingPosters(cleanAnime, isSeries = false) { updated ->
+                _homeCatalog.value = _homeCatalog.value.copy(anime = updated)
+            }
         }
     }
 
@@ -995,6 +1013,57 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             watchHistoryStore.remove(item.id, if (item.type == ContentType.SERIES) "SERIES" else "MOVIE")
             refreshContinueWatching()
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // Búsqueda automática de carátulas faltantes (TMDB)
+    // ---------------------------------------------------------------------
+
+    /** Para películas/series/anime/especial que no traen carátula del servidor, busca una en TMDB */
+    private fun fillMissingPosters(
+        items: List<ContentItem>,
+        isSeries: Boolean,
+        onUpdated: (List<ContentItem>) -> Unit
+    ) {
+        if (!com.jetgo.tv.data.remote.TmdbConfig.isConfigured) return
+        val missing = items.filter { it.imageUrl.isNullOrBlank() && it.name.isNotBlank() }
+        if (missing.isEmpty()) return
+
+        viewModelScope.launch {
+            val current = items.toMutableList()
+            for (item in missing) {
+                val posterUrl = try { fetchPosterFromTmdb(item.name, isSeries) } catch (e: Exception) { null }
+                if (!posterUrl.isNullOrBlank()) {
+                    val idx = current.indexOfFirst { it.id == item.id && it.type == item.type }
+                    if (idx != -1) {
+                        current[idx] = current[idx].copy(imageUrl = posterUrl)
+                        onUpdated(current.toList())
+                    }
+                }
+                kotlinx.coroutines.delay(300) // no saturar la API de TMDB
+            }
+        }
+    }
+
+    private suspend fun fetchPosterFromTmdb(name: String, isSeries: Boolean): String? {
+        val cached = try { posterCacheStore.get(name) } catch (e: Exception) { null }
+        if (cached != null) return cached.ifBlank { null }
+        if (!com.jetgo.tv.data.remote.TmdbConfig.isConfigured) return null
+
+        // Quita cosas como "(2016)" del título para que la búsqueda encuentre mejor coincidencia
+        val cleanQuery = name.replace(Regex("\\(\\d{4}\\)"), "").trim()
+        if (cleanQuery.isBlank()) return null
+
+        val response = if (isSeries) {
+            tmdbApi.searchTv(com.jetgo.tv.data.remote.TmdbConfig.API_KEY, cleanQuery)
+        } else {
+            tmdbApi.searchMovie(com.jetgo.tv.data.remote.TmdbConfig.API_KEY, cleanQuery)
+        }
+
+        val posterPath = response.body()?.results?.firstOrNull { !it.poster_path.isNullOrBlank() }?.poster_path
+        val posterUrl = posterPath?.let { "${com.jetgo.tv.data.remote.TmdbApi.IMAGE_BASE_URL}$it" }
+        posterCacheStore.save(name, posterUrl)
+        return posterUrl
     }
 
     override fun onCleared() {
