@@ -121,22 +121,20 @@ private fun TvMovieDetailContent(
     var showLanguageDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // ---- Fondo: la carátula, difuminada y oscurecida, cubriendo toda la pantalla ----
+        // ---- Fondo: la carátula, oscurecida, cubriendo toda la pantalla ----
         if (!detail.coverUrl.isNullOrBlank()) {
             AsyncImage(
                 model = detail.coverUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(40.dp)
+                modifier = Modifier.fillMaxSize()
             )
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            listOf(BackgroundDark.copy(alpha = 0.80f), BackgroundDark.copy(alpha = 0.97f))
+                            listOf(BackgroundDark.copy(alpha = 0.85f), BackgroundDark.copy(alpha = 0.98f))
                         )
                     )
             )
