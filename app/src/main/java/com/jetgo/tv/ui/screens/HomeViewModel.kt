@@ -846,9 +846,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 kotlinx.coroutines.delay(2500)
                 _showNextEpisodeMessage.value = false
             }
+            playEpisodeDirect(next.id)
+        } else {
+            // No hay más capítulos: sale de pantalla completa y avisa para volver atrás
+            exitFullscreenPlayer()
+            onSeriesFullyFinished?.invoke()
         }
-        next?.let { playEpisodeDirect(it.id) }
     }
+
+    /** MainActivity la usa para volver a la pantalla anterior cuando termina el último capítulo */
+    var onSeriesFullyFinished: (() -> Unit)? = null
 
     private fun currentEpisode(episodeId: String): SeriesEpisode? {
         val detail = _seriesDetailState.value.detail ?: return null
@@ -858,6 +865,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     /** Se llama al salir de la pantalla de detalle de serie, para no seguir auto-avanzando por error */
     fun clearSeriesDetail() {
         playerManager.onPlaybackEnded = null
+        onSeriesFullyFinished = null
         stopPositionTracking()
         try { playerManager.exoPlayer.pause() } catch (e: Exception) { /* ignorar */ }
         _seriesDetailState.value = SeriesDetailUiState()

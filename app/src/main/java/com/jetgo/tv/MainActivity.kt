@@ -356,19 +356,22 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
         }
 
         composable("seriesDetail") {
+            LaunchedEffect(seriesDetailState.detail?.seriesId) {
+                if (seriesDetailState.detail != null) {
+                    viewModel.onSeriesFullyFinished = {
+                        viewModel.clearSeriesDetail()
+                        navController.popBackStack()
+                    }
+                }
+            }
             if (!isFullscreen) {
-                val recommendations = (homeCatalog.series + homeCatalog.movies)
-                    .filter { it.id != seriesDetailState.detail?.seriesId }
-                    .shuffled()
-                    .take(10)
-
                 TvSeriesDetailScreen(
                     state = seriesDetailState,
                     playerManager = viewModel.playerManager,
                     isFavorite = seriesDetailState.detail?.let {
                         viewModel.isFavorite(ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null))
                     } ?: false,
-                    recommendations = recommendations,
+                    recommendations = emptyList(),
                     onBack = {
                         viewModel.clearSeriesDetail()
                         navController.popBackStack()
@@ -395,6 +398,7 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
             LaunchedEffect(movieDetailState.detail?.streamId) {
                 if (movieDetailState.detail != null) {
                     viewModel.playerManager.onPlaybackEnded = {
+                        viewModel.exitFullscreenPlayer()
                         viewModel.clearMovieDetail()
                         navController.popBackStack()
                     }
