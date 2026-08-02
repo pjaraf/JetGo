@@ -85,7 +85,8 @@ data class SeriesDetailUiState(
 data class MovieDetailUiState(
     val isLoading: Boolean = false,
     val detail: MovieDetail? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val debugDetail: String? = null
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -908,12 +909,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         val fallbackStreamUrl = item.streamUrl ?: ""
         viewModelScope.launch {
+            var debugDetail: String? = null
             val detail = try {
                 repository.getMovieDetail(config, item.id, item.name, item.imageUrl, fallbackStreamUrl)
-            } catch (e: Exception) { null }
+            } catch (e: Exception) {
+                debugDetail = "${e.javaClass.simpleName}: ${e.message}"
+                null
+            }
 
             if (detail == null || detail.streamUrl.isBlank()) {
-                _movieDetailState.value = MovieDetailUiState(errorMessage = "No se pudo cargar la película")
+                _movieDetailState.value = MovieDetailUiState(
+                    errorMessage = "No se pudo cargar la película",
+                    debugDetail = debugDetail ?: "El servidor no devolvió una URL de video válida (streamUrl vacío)"
+                )
                 return@launch
             }
 

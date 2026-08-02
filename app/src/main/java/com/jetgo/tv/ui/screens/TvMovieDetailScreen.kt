@@ -74,11 +74,20 @@ fun TvMovieDetailScreen(
     Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
         when {
             state.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            state.errorMessage != null -> Text(
-                text = state.errorMessage,
-                color = Color.Red,
-                modifier = Modifier.align(Alignment.Center).padding(24.dp)
-            )
+            state.errorMessage != null -> Column(
+                modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(text = state.errorMessage, color = Color.Red)
+                if (!state.debugDetail.isNullOrBlank()) {
+                    Text(
+                        text = state.debugDetail,
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+                }
+            }
             state.detail != null -> TvMovieDetailContent(
                 detail = state.detail,
                 playerManager = playerManager,
