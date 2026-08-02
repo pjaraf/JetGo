@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,6 +32,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.ui.PlayerView
 import com.jetgo.tv.data.model.Category
@@ -65,7 +67,8 @@ fun FullscreenPlayerOverlay(
     liveChannelsInCategory: List<ContentItem> = emptyList(),
     onLoadLiveCategories: () -> Unit = {},
     onSelectLiveCategory: (String) -> Unit = {},
-    onSelectLiveChannel: (ContentItem) -> Unit = {}
+    onSelectLiveChannel: (ContentItem) -> Unit = {},
+    showNextEpisodeMessage: Boolean = false
 ) {
     var showLanguageDialog by remember { mutableStateOf(false) }
     var zapMode by remember { mutableStateOf(ZapPanelMode.HIDDEN) }
@@ -193,6 +196,19 @@ fun FullscreenPlayerOverlay(
                 onExit = onExitFullscreen,
                 onOpenLanguageMenu = { showLanguageDialog = true }
             )
+            if (showNextEpisodeMessage) {
+                Box(
+                    modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Siguiente capítulo",
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    )
+                }
+            }
         } else {
             IconButton(
                 onClick = onExitFullscreen,

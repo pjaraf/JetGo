@@ -195,7 +195,8 @@ private fun AppRoot(viewModel: HomeViewModel) {
                 liveChannelsInCategory = categoryContentState.items,
                 onLoadLiveCategories = { viewModel.loadCategoriesForType(ContentType.LIVE) },
                 onSelectLiveCategory = { categoryId -> viewModel.loadCategoryContent(ContentType.LIVE, categoryId) },
-                onSelectLiveChannel = { item -> viewModel.selectContentItem(item) {} }
+                onSelectLiveChannel = { item -> viewModel.selectContentItem(item) {} },
+                showNextEpisodeMessage = viewModel.showNextEpisodeMessage.collectAsState().value
             )
         }
 
@@ -239,6 +240,7 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
     val movieDetailState by viewModel.movieDetailState.collectAsState()
     val homeCatalog by viewModel.homeCatalog.collectAsState()
     val isFullscreen by viewModel.isFullscreenPlayer.collectAsState()
+    val showNextEpisodeMessage by viewModel.showNextEpisodeMessage.collectAsState()
 
     // Manejador único: si es una serie o película, abre su ficha; si no (Vivo), reproduce directo.
     val handleItemSelected: (ContentItem) -> Unit = { item ->
@@ -383,25 +385,29 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                         viewModel.clearSeriesDetail()
                         handleItemSelected(item)
                     },
-                    isFullscreen = isFullscreen
+                    isFullscreen = isFullscreen,
+                    showNextEpisodeMessage = showNextEpisodeMessage
                 )
             }
         }
 
         composable("movieDetail") {
+            LaunchedEffect(movieDetailState.detail?.streamId) {
+                if (movieDetailState.detail != null) {
+                    viewModel.playerManager.onPlaybackEnded = {
+                        viewModel.clearMovieDetail()
+                        navController.popBackStack()
+                    }
+                }
+            }
             if (!isFullscreen) {
-                val recommendations = (homeCatalog.movies + homeCatalog.series)
-                    .filter { it.id != movieDetailState.detail?.streamId }
-                    .shuffled()
-                    .take(10)
-
                 TvMovieDetailScreen(
                     state = movieDetailState,
                     playerManager = viewModel.playerManager,
                     isFavorite = movieDetailState.detail?.let {
                         viewModel.isFavorite(ContentItem(it.streamId, it.name, it.coverUrl, ContentType.MOVIE, it.streamUrl))
                     } ?: false,
-                    recommendations = recommendations,
+                    recommendations = emptyList(),
                     onBack = {
                         viewModel.clearMovieDetail()
                         navController.popBackStack()
@@ -447,6 +453,7 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
             ContinueWatchingScreen(
                 items = continueWatching,
                 onItemClick = handleItemSelected,
+                onRemoveItem = { item -> viewModel.removeFromContinueWatching(item) },
                 onBack = { navController.popBackStack() }
             )
         }

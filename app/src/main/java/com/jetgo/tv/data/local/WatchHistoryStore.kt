@@ -68,6 +68,12 @@ class WatchHistoryStore(private val context: Context) {
         context.watchHistoryDataStore.edit { prefs -> prefs[KEY] = array.toString() }
     }
 
+    suspend fun remove(id: String, type: String) {
+        val current = getAll().toMutableList()
+        current.removeAll { it.id == id && it.type == type }
+        save(current)
+    }
+
     suspend fun clear() {
         context.watchHistoryDataStore.edit { prefs -> prefs.remove(KEY) }
     }

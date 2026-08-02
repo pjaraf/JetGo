@@ -220,6 +220,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _continueWatching = MutableStateFlow<List<ContentItem>>(emptyList())
     val continueWatching: StateFlow<List<ContentItem>> = _continueWatching.asStateFlow()
 
+    private val _showNextEpisodeMessage = MutableStateFlow(false)
+    val showNextEpisodeMessage: StateFlow<Boolean> = _showNextEpisodeMessage.asStateFlow()
+
     fun refreshContinueWatching() {
         viewModelScope.launch {
             val entries = try { watchHistoryStore.getAll() } catch (e: Exception) { emptyList() }
@@ -239,7 +242,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val contentKey: String,
         val title: String,
         val streamUrl: String,
-        val resumePositionMs: Long
+        val resumePositionMs: Long,
+        val onCompleted: (() -> Unit)? = null
     )
 
     private val _resumePrompt = MutableStateFlow<ResumePrompt?>(null)
@@ -577,7 +581,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         if (item.streamUrl != null) {
             val isVod = item.type == ContentType.MOVIE || item.type == ContentType.ANIME || item.type == ContentType.SPECIAL
             if (isVod) {
-                playWithResumeCheck("movie:${item.id}", item.name, item.streamUrl)
+                playWithResumeCheck("movie:${item.id}", item.name, item.streamUrl, onCompleted = {
+                    viewModelScope.launch {
+                        watchHistoryStore.remove(item.id, "MOVIE")
+                        refreshContinueWatching()
+                    }
+                })
             } else {
                 playerManager.playChannel(item.streamUrl, item.name)
                 lastLiveChannel = LastLiveChannel(item.id, item.name, item.streamUrl)
@@ -778,18 +787,34 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             currentEpisodeId = episodeId,
             selectedSeason = episode.season
         )
-        _seriesDetailState.value.detail?.seriesId?.let { seriesId ->
-            viewModelScope.launch { positionStore.saveLastWatchedEpisode(seriesId, episodeId) }
+        val seriesId = _seriesDetailState.value.detail?.seriesId
+        seriesId?.let { id ->
+            viewModelScope.launch { positionStore.saveLastWatchedEpisode(id, episodeId) }
         }
         val title = "${_seriesDetailState.value.detail?.name} · ${episode.title}"
-        playWithResumeCheck("series:$episodeId", title, episode.streamUrl)
+        playWithResumeCheck("series:$episodeId", title, episode.streamUrl, onCompleted = {
+            seriesId?.let { id ->
+                viewModelScope.launch {
+                    watchHistoryStore.remove(id, "SERIES")
+                    refreshContinueWatching()
+                }
+            }
+        })
     }
 
     /** Reproduce directo, sin preguntar "seguir viendo" (usado en el auto-avance entre capítulos) */
     private fun playEpisodeDirect(episodeId: String) {
         val episode = currentEpisode(episodeId) ?: return
+        val seriesId = _seriesDetailState.value.detail?.seriesId
         playerManager.playChannel(episode.streamUrl, "${_seriesDetailState.value.detail?.name} · ${episode.title}")
-        startPositionTracking("series:$episodeId")
+        startPositionTracking("series:$episodeId", onCompleted = {
+            seriesId?.let { id ->
+                viewModelScope.launch {
+                    watchHistoryStore.remove(id, "SERIES")
+                    refreshContinueWatching()
+                }
+            }
+        })
         _seriesDetailState.value = _seriesDetailState.value.copy(
             currentEpisodeId = episodeId,
             selectedSeason = episode.season
@@ -815,6 +840,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             nextSeason?.let { detail.episodesBySeason[it]?.firstOrNull() }
         }
 
+        if (next != null) {
+            _showNextEpisodeMessage.value = true
+            viewModelScope.launch {
+                kotlinx.coroutines.delay(2500)
+                _showNextEpisodeMessage.value = false
+            }
+        }
         next?.let { playEpisodeDirect(it.id) }
     }
 
@@ -861,13 +893,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
             _movieDetailState.value = MovieDetailUiState(detail = detail)
             playerManager.onPlaybackEnded = null
-            playWithResumeCheck("movie:${item.id}", detail.name, detail.streamUrl)
+            playWithResumeCheck("movie:${item.id}", detail.name, detail.streamUrl, onCompleted = {
+                viewModelScope.launch {
+                    watchHistoryStore.remove(item.id, "MOVIE")
+                    refreshContinueWatching()
+                }
+            })
         }
     }
 
     /** Se llama al salir de la pantalla de detalle de película */
     fun clearMovieDetail() {
         stopPositionTracking()
+        playerManager.onPlaybackEnded = null
         try { playerManager.exoPlayer.pause() } catch (e: Exception) { /* ignorar */ }
         _movieDetailState.value = MovieDetailUiState()
     }
@@ -880,7 +918,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
      * Punto de entrada único para reproducir una película/episodio: si hay progreso guardado,
      * pregunta antes de reproducir; si no, arranca directo desde el principio.
      */
-    private fun playWithResumeCheck(contentKey: String, title: String, streamUrl: String) {
+    private fun playWithResumeCheck(contentKey: String, title: String, streamUrl: String, onCompleted: (() -> Unit)? = null) {
         isCurrentlyShowingLive = false
         viewModelScope.launch {
             val saved = try { positionStore.get(contentKey) } catch (e: Exception) { null }
@@ -889,10 +927,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 saved.positionMs < (saved.durationMs * 0.95)
 
             if (hasMeaningfulProgress && saved != null) {
-                _resumePrompt.value = ResumePrompt(contentKey, title, streamUrl, saved.positionMs)
+                _resumePrompt.value = ResumePrompt(contentKey, title, streamUrl, saved.positionMs, onCompleted)
             } else {
                 playerManager.playChannel(streamUrl, title)
-                startPositionTracking(contentKey)
+                startPositionTracking(contentKey, onCompleted)
             }
         }
     }
@@ -900,7 +938,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun resumeFromPrompt() {
         val prompt = _resumePrompt.value ?: return
         playerManager.playChannel(prompt.streamUrl, prompt.title)
-        startPositionTracking(prompt.contentKey)
+        startPositionTracking(prompt.contentKey, prompt.onCompleted)
         viewModelScope.launch {
             kotlinx.coroutines.delay(500) // deja que el reproductor prepare el contenido antes de saltar
             playerManager.seekTo(prompt.resumePositionMs)
@@ -911,7 +949,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun startOverFromPrompt() {
         val prompt = _resumePrompt.value ?: return
         playerManager.playChannel(prompt.streamUrl, prompt.title)
-        startPositionTracking(prompt.contentKey)
+        startPositionTracking(prompt.contentKey, prompt.onCompleted)
         _resumePrompt.value = null
     }
 
@@ -919,7 +957,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         _resumePrompt.value = null
     }
 
-    private fun startPositionTracking(contentKey: String) {
+    private fun startPositionTracking(contentKey: String, onCompleted: (() -> Unit)? = null) {
         positionTrackingJob?.cancel()
         positionTrackingJob = viewModelScope.launch {
             while (true) {
@@ -929,15 +967,26 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 if (dur > 0) {
                     if (pos > dur * 0.95) {
                         positionStore.clear(contentKey)
+                        onCompleted?.invoke()
                     } else if (pos > 5_000) {
                         positionStore.save(contentKey, pos, dur)
                     }
                 }
             }
         }
-    }    private fun stopPositionTracking() {
+    }
+
+    private fun stopPositionTracking() {
         positionTrackingJob?.cancel()
         positionTrackingJob = null
+    }
+
+    /** Quita manualmente un ítem de "Seguir viendo" (botón de basurero) */
+    fun removeFromContinueWatching(item: ContentItem) {
+        viewModelScope.launch {
+            watchHistoryStore.remove(item.id, if (item.type == ContentType.SERIES) "SERIES" else "MOVIE")
+            refreshContinueWatching()
+        }
     }
 
     override fun onCleared() {

@@ -253,45 +253,6 @@ private fun TvMovieDetailContent(
                 onClick = { showLanguageDialog = true }
             )
         }
-
-        // ---- Recomendados ----
-        if (recommendations.isNotEmpty()) {
-            Text(
-                "Quizás te guste",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                modifier = Modifier.padding(top = 28.dp, bottom = 12.dp)
-            )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(recommendations) { item ->
-                    Column(
-                        modifier = Modifier
-                            .width(140.dp)
-                            .clickable { onRecommendationClick(item) }
-                    ) {
-                        AsyncImage(
-                            model = item.imageUrl,
-                            contentDescription = item.name,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(2f / 3f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(SurfaceDark)
-                        )
-                        Text(
-                            text = item.name,
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(32.dp))
-        }
     }
 }
 

@@ -70,7 +70,8 @@ fun TvSeriesDetailScreen(
     onToggleFavorite: () -> Unit,
     onEnterFullscreen: () -> Unit,
     onRecommendationClick: (ContentItem) -> Unit,
-    isFullscreen: Boolean = false
+    isFullscreen: Boolean = false,
+    showNextEpisodeMessage: Boolean = false
 ) {
     // Misma lógica que en la ficha de película: "Atrás" vuelve a la grilla de series.
     androidx.activity.compose.BackHandler(enabled = !isFullscreen) { onBack() }
@@ -96,7 +97,8 @@ fun TvSeriesDetailScreen(
                 onToggleFavorite = onToggleFavorite,
                 onEnterFullscreen = onEnterFullscreen,
                 onRecommendationClick = onRecommendationClick,
-                isFullscreen = isFullscreen
+                isFullscreen = isFullscreen,
+                showNextEpisodeMessage = showNextEpisodeMessage
             )
         }
     }
@@ -116,7 +118,8 @@ private fun TvSeriesDetailContent(
     onToggleFavorite: () -> Unit,
     onEnterFullscreen: () -> Unit,
     onRecommendationClick: (ContentItem) -> Unit,
-    isFullscreen: Boolean = false
+    isFullscreen: Boolean = false,
+    showNextEpisodeMessage: Boolean = false
 ) {
     val episodes = detail.episodesBySeason[selectedSeason].orEmpty()
     val currentEpisode = detail.episodesBySeason.values.flatten().firstOrNull { it.id == currentEpisodeId }
@@ -239,6 +242,19 @@ private fun TvSeriesDetailContent(
                         },
                         modifier = Modifier.fillMaxSize()
                     )
+                    if (showNextEpisodeMessage) {
+                        Box(
+                            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "Siguiente capítulo",
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -331,43 +347,6 @@ private fun TvSeriesDetailContent(
         }
 
         // ---- Recomendados ----
-        if (recommendations.isNotEmpty()) {
-            Text(
-                "Quizás te guste",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                modifier = Modifier.padding(top = 28.dp, bottom = 12.dp)
-            )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(recommendations) { item ->
-                    Column(
-                        modifier = Modifier
-                            .width(140.dp)
-                            .clickable { onRecommendationClick(item) }
-                    ) {
-                        AsyncImage(
-                            model = item.imageUrl,
-                            contentDescription = item.name,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(2f / 3f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(SurfaceDark)
-                        )
-                        Text(
-                            text = item.name,
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(32.dp))
-        }
     }
 }
 
