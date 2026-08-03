@@ -1,21 +1,28 @@
 package com.jetgo.tv.util
 
-import android.app.DownloadManager
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 /** Maneja la descarga del APK de actualización y su instalación, sin salir de la app. */
 object UpdateInstaller {
 
     private const val FILE_NAME = "jetgo-update.apk"
     private const val SUB_DIR = "updates"
+
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .build()
 
     /** true si el sistema ya permite instalar APKs desde esta app; si no, hay que pedirlo primero. */
     fun canInstallUnknownApps(context: Context): Boolean {
@@ -36,41 +43,64 @@ object UpdateInstaller {
     }
 
     /**
-     * Descarga el APK en segundo plano (con notificación de progreso del sistema) y,
-     * al terminar, abre automáticamente el instalador. [onDownloadStarted] avisa a la UI
-     * que ya se encoló la descarga.
+     * Descarga el APK manejando el progreso NOSOTROS MISMOS (no depende del cajón de
+     * notificaciones del sistema, que en muchos TV Box no se ve ni se puede tocar).
+     * [onProgress] recibe el porcentaje (0-100). Al terminar, abre el instalador solo.
      */
-    fun downloadAndInstall(context: Context, apkUrl: String, onDownloadStarted: () -> Unit = {}) {
-        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+    suspend fun downloadWithProgress(
+        context: Context,
+        apkUrl: String,
+        onProgress: (Int) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        withContext(Dispatchers.IO) {
+            try {
+                val request = Request.Builder().url(apkUrl).build()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        withContext(Dispatchers.Main) { onError("HTTP ${response.code}") }
+                        return@use
+                    }
+                    val body = response.body ?: run {
+                        withContext(Dispatchers.Main) { onError("Sin contenido") }
+                        return@use
+                    }
 
-        val request = DownloadManager.Request(Uri.parse(apkUrl))
-            .setTitle("Actualizando JetGo")
-            .setDescription("Descargando la última versión...")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalFilesDir(context, SUB_DIR, FILE_NAME)
-            .setMimeType("application/vnd.android.package-archive")
+                    val totalBytes = body.contentLength()
+                    val dir = File(context.getExternalFilesDir(SUB_DIR)?.path ?: context.filesDir.path)
+                    if (!dir.exists()) dir.mkdirs()
+                    val outFile = File(dir, FILE_NAME)
 
-        val downloadId = downloadManager.enqueue(request)
+                    body.byteStream().use { input ->
+                        outFile.outputStream().use { output ->
+                            val buffer = ByteArray(8 * 1024)
+                            var bytesReadTotal = 0L
+                            var lastReportedPercent = -1
+                            while (true) {
+                                val read = input.read(buffer)
+                                if (read == -1) break
+                                output.write(buffer, 0, read)
+                                bytesReadTotal += read
+                                if (totalBytes > 0) {
+                                    val percent = ((bytesReadTotal * 100) / totalBytes).toInt().coerceIn(0, 100)
+                                    if (percent != lastReportedPercent) {
+                                        lastReportedPercent = percent
+                                        withContext(Dispatchers.Main) { onProgress(percent) }
+                                    }
+                                }
+                            }
+                        }
+                    }
 
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(ctx: Context, intent: Intent) {
-                val completedId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
-                if (completedId == downloadId) {
-                    try { context.unregisterReceiver(this) } catch (e: Exception) { /* ya estaba desregistrado */ }
-                    installDownloadedApk(context)
+                    withContext(Dispatchers.Main) {
+                        onProgress(100)
+                        installDownloadedApk(context)
+                    }
                 }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { onError(e.message ?: "Error desconocido") }
             }
         }
-
-        val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            context.registerReceiver(receiver, filter)
-        }
-
-        onDownloadStarted()
     }
 
     private fun installDownloadedApk(context: Context) {
