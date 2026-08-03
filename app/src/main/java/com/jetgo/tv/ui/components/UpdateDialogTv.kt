@@ -97,12 +97,17 @@ fun UpdateDialogTv(updateInfo: UpdateInfo, onDismiss: () -> Unit, onUpdateStarte
                         } else {
                             errorMessage = null
                             downloadProgress = 0
-                            onUpdateStarted() // el aviso no debe volver a salir después de esto
                             scope.launch {
                                 UpdateInstaller.downloadWithProgress(
                                     context = context,
                                     apkUrl = updateInfo.apkDownloadUrl,
-                                    onProgress = { percent -> downloadProgress = percent },
+                                    onProgress = { percent ->
+                                        downloadProgress = percent
+                                        if (percent >= 100) {
+                                            // Recién ahora (terminó de verdad) se oculta el aviso
+                                            onUpdateStarted()
+                                        }
+                                    },
                                     onError = { message ->
                                         errorMessage = message
                                         downloadProgress = null

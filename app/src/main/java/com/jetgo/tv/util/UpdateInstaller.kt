@@ -93,8 +93,8 @@ object UpdateInstaller {
                     }
 
                     withContext(Dispatchers.Main) {
-                        onProgress(100)
                         installDownloadedApk(context)
+                        onProgress(100)
                     }
                 }
             } catch (e: Exception) {

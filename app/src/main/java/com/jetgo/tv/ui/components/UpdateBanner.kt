@@ -63,12 +63,14 @@ fun UpdateBanner(updateInfo: UpdateInfo, onUpdateStarted: () -> Unit = {}) {
                     } else {
                         errorMessage = null
                         downloadProgress = 0
-                        onUpdateStarted()
                         scope.launch {
                             UpdateInstaller.downloadWithProgress(
                                 context = context,
                                 apkUrl = updateInfo.apkDownloadUrl,
-                                onProgress = { percent -> downloadProgress = percent },
+                                onProgress = { percent ->
+                                    downloadProgress = percent
+                                    if (percent >= 100) onUpdateStarted()
+                                },
                                 onError = { message ->
                                     errorMessage = message
                                     downloadProgress = null
