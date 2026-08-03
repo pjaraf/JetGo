@@ -46,8 +46,6 @@ fun PlayerPanel(
     showVideo: Boolean = true,
     onTap: () -> Unit = {}
 ) {
-    val stats = playerManager.stats.value
-
     Box(
         modifier = modifier
             .aspectRatio(16f / 9f)
@@ -90,44 +88,6 @@ fun PlayerPanel(
                     contentDescription = "Pantalla completa",
                     tint = Color.White,
                     modifier = Modifier.padding(4.dp)
-                )
-            }
-        }
-
-        // Barra inferior con estado del canal, igual a "Discovery World HD ... 4Kb/s"
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .background(Color.Black.copy(alpha = 0.55f))
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .padding(end = 6.dp)
-                        .size(8.dp)
-                        .background(LiveGreen, shape = RoundedCornerShape(50))
-                )
-                Text(
-                    text = stats.channelName.ifBlank { "Selecciona un canal" },
-                    color = Color.White,
-                    fontSize = 13.sp
-                )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.ArrowDownward,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.padding(end = 4.dp)
-                )
-                Text(
-                    text = "${stats.bitrateKbps}Kb/s",
-                    color = Color.White,
-                    fontSize = 13.sp
                 )
             }
         }

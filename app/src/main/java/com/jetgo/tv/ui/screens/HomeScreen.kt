@@ -126,26 +126,5 @@ fun HomeScreen(
                 ) { onSettingsClick() }
             }
         }
-
-        // ---- Íconos flotantes laterales (buscar / favoritos), como en la captura ----
-        Column(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            IconButton(
-                onClick = onSearchClick,
-                modifier = Modifier.clip(CircleShape).background(Color(0xFF2A2E38))
-            ) {
-                Icon(Icons.Default.Search, contentDescription = "Buscar", tint = Color.White)
-            }
-            IconButton(
-                onClick = onFavoritesClick,
-                modifier = Modifier.clip(CircleShape).background(Color(0xFF2A2E38))
-            ) {
-                Icon(Icons.Default.Star, contentDescription = "Favoritos", tint = Color.White)
-            }
-        }
     }
 }
