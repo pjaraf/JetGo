@@ -273,17 +273,25 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                 viewModel.resumeLastLiveChannelIfNeeded()
             }
             if (!isFullscreen) {
-                TvHomeScreen(
+                val newestItems = (homeCatalog.movies + homeCatalog.series).shuffled().take(10)
+                HomeScreen(
                     playerManager = viewModel.playerManager,
                     liveChannels = uiState.liveChannels,
+                    newestItems = newestItems,
+                    onItemClick = { item -> viewModel.pausePreviewPlayer(); handleItemSelected(item) },
                     onChannelSelected = { viewModel.playChannel(it) },
-                    onMovieClick = {
+                    onCategoryClick = { category ->
                         viewModel.pausePreviewPlayer()
-                        navController.navigate("categoryPicker/MOVIE")
+                        navController.navigate("categoryPicker/$category")
                     },
-                    onSeriesClick = {
+                    onLiveClick = { viewModel.enterFullscreenPlayer() },
+                    onSearchClick = {
                         viewModel.pausePreviewPlayer()
-                        navController.navigate("categoryPicker/SERIES")
+                        navController.navigate("search")
+                    },
+                    onFavoritesClick = {
+                        viewModel.pausePreviewPlayer()
+                        navController.navigate("favorites")
                     },
                     onContinueWatchingClick = {
                         viewModel.pausePreviewPlayer()
@@ -292,10 +300,6 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                     onSettingsClick = {
                         viewModel.pausePreviewPlayer()
                         navController.navigate("settings")
-                    },
-                    onSearchClick = {
-                        viewModel.pausePreviewPlayer()
-                        navController.navigate("search")
                     },
                     isFullscreen = isFullscreen
                 )
