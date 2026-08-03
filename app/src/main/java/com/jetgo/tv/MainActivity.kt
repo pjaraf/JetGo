@@ -41,6 +41,7 @@ import com.jetgo.tv.ui.screens.ContinueWatchingScreen
 import com.jetgo.tv.ui.screens.ConnectionIssueScreen
 import com.jetgo.tv.ui.screens.FavoritesScreen
 import com.jetgo.tv.ui.screens.HomeScreen
+import com.jetgo.tv.ui.screens.TvHomeScreen
 import com.jetgo.tv.ui.screens.HomeViewModel
 import com.jetgo.tv.ui.screens.SearchScreen
 import com.jetgo.tv.ui.screens.TvCategoryGridScreen
@@ -272,25 +273,17 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                 viewModel.resumeLastLiveChannelIfNeeded()
             }
             if (!isFullscreen) {
-                val newestItems = (homeCatalog.movies + homeCatalog.series).shuffled().take(10)
-                HomeScreen(
+                TvHomeScreen(
                     playerManager = viewModel.playerManager,
                     liveChannels = uiState.liveChannels,
-                    newestItems = newestItems,
-                    onItemClick = { item -> viewModel.pausePreviewPlayer(); handleItemSelected(item) },
                     onChannelSelected = { viewModel.playChannel(it) },
-                    onCategoryClick = { category ->
+                    onMovieClick = {
                         viewModel.pausePreviewPlayer()
-                        navController.navigate("categoryPicker/$category")
+                        navController.navigate("categoryPicker/MOVIE")
                     },
-                    onLiveClick = { viewModel.enterFullscreenPlayer() },
-                    onSearchClick = {
+                    onSeriesClick = {
                         viewModel.pausePreviewPlayer()
-                        navController.navigate("search")
-                    },
-                    onFavoritesClick = {
-                        viewModel.pausePreviewPlayer()
-                        navController.navigate("favorites")
+                        navController.navigate("categoryPicker/SERIES")
                     },
                     onContinueWatchingClick = {
                         viewModel.pausePreviewPlayer()
@@ -299,6 +292,10 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                     onSettingsClick = {
                         viewModel.pausePreviewPlayer()
                         navController.navigate("settings")
+                    },
+                    onSearchClick = {
+                        viewModel.pausePreviewPlayer()
+                        navController.navigate("search")
                     },
                     isFullscreen = isFullscreen
                 )
