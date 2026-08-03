@@ -72,6 +72,7 @@ fun HomeScreen(
             // ---- Fila superior: reproductor + carrusel de contenido nuevo (misma altura) ----
             HeightMatchedPlayerRow(
                 modifier = Modifier.fillMaxWidth().weight(1f),
+                sideAspectRatio = 2f / 3f,
                 playerContent = {
                     PlayerPanel(
                         playerManager = playerManager,
@@ -83,7 +84,7 @@ fun HomeScreen(
                     NewestContentCarousel(
                         items = newestItems,
                         onItemClick = onItemClick,
-                        modifier = Modifier.fillMaxHeight().aspectRatio(2f / 3f)
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             )
