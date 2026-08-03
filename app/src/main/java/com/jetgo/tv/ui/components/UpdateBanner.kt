@@ -67,10 +67,8 @@ fun UpdateBanner(updateInfo: UpdateInfo, onUpdateStarted: () -> Unit = {}) {
                             UpdateInstaller.downloadWithProgress(
                                 context = context,
                                 apkUrl = updateInfo.apkDownloadUrl,
-                                onProgress = { percent ->
-                                    downloadProgress = percent
-                                    if (percent >= 100) onUpdateStarted()
-                                },
+                                onProgress = { percent -> downloadProgress = percent },
+                                onInstallLaunched = { onUpdateStarted() },
                                 onError = { message ->
                                     errorMessage = message
                                     downloadProgress = null

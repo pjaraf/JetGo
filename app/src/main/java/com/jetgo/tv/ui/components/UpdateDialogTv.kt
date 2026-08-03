@@ -101,12 +101,10 @@ fun UpdateDialogTv(updateInfo: UpdateInfo, onDismiss: () -> Unit, onUpdateStarte
                                 UpdateInstaller.downloadWithProgress(
                                     context = context,
                                     apkUrl = updateInfo.apkDownloadUrl,
-                                    onProgress = { percent ->
-                                        downloadProgress = percent
-                                        if (percent >= 100) {
-                                            // Recién ahora (terminó de verdad) se oculta el aviso
-                                            onUpdateStarted()
-                                        }
+                                    onProgress = { percent -> downloadProgress = percent },
+                                    onInstallLaunched = {
+                                        // Recién ahora (el instalador de verdad se abrió) se oculta el aviso
+                                        onUpdateStarted()
                                     },
                                     onError = { message ->
                                         errorMessage = message

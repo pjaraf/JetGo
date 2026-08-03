@@ -51,6 +51,7 @@ object UpdateInstaller {
         context: Context,
         apkUrl: String,
         onProgress: (Int) -> Unit,
+        onInstallLaunched: () -> Unit,
         onError: (String) -> Unit
     ) {
         withContext(Dispatchers.IO) {
@@ -93,8 +94,13 @@ object UpdateInstaller {
                     }
 
                     withContext(Dispatchers.Main) {
-                        installDownloadedApk(context)
                         onProgress(100)
+                        val opened = installDownloadedApk(context)
+                        if (opened) {
+                            onInstallLaunched()
+                        } else {
+                            onError("La descarga terminó pero no se pudo abrir el instalador. Busca el archivo \"jetgo-update.apk\" con un explorador de archivos y ábrelo manualmente.")
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -103,16 +109,21 @@ object UpdateInstaller {
         }
     }
 
-    private fun installDownloadedApk(context: Context) {
-        val file = File(context.getExternalFilesDir(SUB_DIR), FILE_NAME)
-        if (!file.exists()) return
+    private fun installDownloadedApk(context: Context): Boolean {
+        return try {
+            val file = File(context.getExternalFilesDir(SUB_DIR), FILE_NAME)
+            if (!file.exists()) return false
 
-        val apkUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val apkUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
 
-        val installIntent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(apkUri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(apkUri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(installIntent)
+            true
+        } catch (e: Exception) {
+            false
         }
-        context.startActivity(installIntent)
     }
 }
