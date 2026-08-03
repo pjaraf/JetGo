@@ -124,20 +124,29 @@ interface XtreamApi {
          */
         private val lenientGson: com.google.gson.Gson by lazy {
             // Gson "normal", SIN el adaptador especial: se usa solo para el parseo interno,
-            // para no llamarse a sí mismo sin parar (eso causaba que la app se cerrara siempre
-            // al abrir una película o serie).
+            // para no llamarse a sí mismo sin parar.
             val plainGson = com.google.gson.Gson()
 
-            val safeInfoAdapter = com.google.gson.JsonDeserializer<Any?> { json, typeOfT, _ ->
+            // OJO: cada adaptador debe tener su tipo específico (no uno genérico compartido tipo
+            // Any?), porque mezclado con Kotlin causaba un ClassCastException al comparar tipos.
+            val vodInfoAdapter = com.google.gson.JsonDeserializer<VodInfoDetailsDto?> { json, _, _ ->
                 if (json != null && json.isJsonObject) {
-                    plainGson.fromJson(json, typeOfT)
+                    plainGson.fromJson(json, VodInfoDetailsDto::class.java)
                 } else {
-                    null // era una lista vacía (u otra cosa rara): no hay info real
+                    null
                 }
             }
+            val seriesInfoAdapter = com.google.gson.JsonDeserializer<SeriesInfoDetailsDto?> { json, _, _ ->
+                if (json != null && json.isJsonObject) {
+                    plainGson.fromJson(json, SeriesInfoDetailsDto::class.java)
+                } else {
+                    null
+                }
+            }
+
             com.google.gson.GsonBuilder()
-                .registerTypeAdapter(VodInfoDetailsDto::class.java, safeInfoAdapter)
-                .registerTypeAdapter(SeriesInfoDetailsDto::class.java, safeInfoAdapter)
+                .registerTypeAdapter(VodInfoDetailsDto::class.java, vodInfoAdapter)
+                .registerTypeAdapter(SeriesInfoDetailsDto::class.java, seriesInfoAdapter)
                 .create()
         }
 
