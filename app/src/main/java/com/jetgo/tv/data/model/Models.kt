@@ -67,7 +67,8 @@ data class ContentItem(
     val imageUrl: String?,
     val type: ContentType,
     val streamUrl: String?,
-    val rating: String? = null
+    val rating: String? = null,
+    val categoryName: String? = null
 )
 
 data class SeriesEpisode(

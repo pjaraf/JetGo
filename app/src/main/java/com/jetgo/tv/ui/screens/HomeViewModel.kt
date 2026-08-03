@@ -718,21 +718,29 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
         _homeCatalog.value = _homeCatalog.value.copy(isLoading = true)
         viewModelScope.launch {
+            val vodCategoryNames = try {
+                repository.getVodCategories(config).associate { it.id to it.name }
+            } catch (e: Exception) { emptyMap() }
+
+            val seriesCategoryNames = try {
+                repository.getSeriesCategories(config).associate { it.id to it.name }
+            } catch (e: Exception) { emptyMap() }
+
             val movies = try {
                 repository.getMovies(config, categoryId = null).map {
-                    ContentItem(it.streamId, it.name, it.coverUrl, ContentType.MOVIE, it.streamUrl)
+                    ContentItem(it.streamId, it.name, it.coverUrl, ContentType.MOVIE, it.streamUrl, categoryName = vodCategoryNames[it.categoryId])
                 }
             } catch (e: Exception) { emptyList() }
 
             val series = try {
                 repository.getSeries(config, categoryId = null).map {
-                    ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null)
+                    ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null, categoryName = seriesCategoryNames[it.categoryId])
                 }
             } catch (e: Exception) { emptyList() }
 
             val anime = try {
                 repository.getMoviesByCategoryKeyword(config, "anime").map {
-                    ContentItem(it.streamId, it.name, it.coverUrl, ContentType.ANIME, it.streamUrl)
+                    ContentItem(it.streamId, it.name, it.coverUrl, ContentType.ANIME, it.streamUrl, categoryName = vodCategoryNames[it.categoryId])
                 }
             } catch (e: Exception) { emptyList() }
 

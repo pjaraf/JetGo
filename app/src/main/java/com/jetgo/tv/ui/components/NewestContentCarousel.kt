@@ -78,17 +78,16 @@ fun NewestContentCarousel(
 
     Box(
         modifier = modifier
+            .scale(scale)
             .clip(RoundedCornerShape(6.dp))
             .border(width = 3.dp, color = FocusOrange, shape = RoundedCornerShape(6.dp))
             .background(SurfaceDark)
+            .focusable()
+            .onFocusChanged { isFocused = it.isFocused }
     ) {
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier
-                .fillMaxSize()
-                .scale(scale)
-                .focusable()
-                .onFocusChanged { isFocused = it.isFocused }
+            modifier = Modifier.fillMaxSize()
         ) { page ->
             val item = validItems[page]
             Box(
@@ -103,7 +102,7 @@ fun NewestContentCarousel(
                     modifier = Modifier.fillMaxSize().background(SurfaceDark)
                 )
 
-                // Etiqueta arriba: "Película" o "Serie"
+                // Etiqueta arriba: la categoría real del servidor (con respaldo por tipo)
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -112,10 +111,12 @@ fun NewestContentCarousel(
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
                     Text(
-                        text = if (item.type == ContentType.SERIES) "Serie" else "Película",
+                        text = item.categoryName?.takeIf { it.isNotBlank() }
+                            ?: if (item.type == ContentType.SERIES) "Serie" else "Película",
                         color = Color.White,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
                     )
                 }
 

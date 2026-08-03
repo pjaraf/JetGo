@@ -2,6 +2,7 @@ package com.jetgo.tv.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -82,7 +83,7 @@ fun HomeScreen(
                     NewestContentCarousel(
                         items = newestItems,
                         onItemClick = onItemClick,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxHeight().aspectRatio(2f / 3f)
                     )
                 }
             )
