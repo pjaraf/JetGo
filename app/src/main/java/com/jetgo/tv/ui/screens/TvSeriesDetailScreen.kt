@@ -133,6 +133,28 @@ private fun TvSeriesDetailContent(
     var showLanguageDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
+        // ---- Fondo: la carátula ajustada a 16:9, completa y sin recortes ----
+        if (!detail.coverUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = detail.coverUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .align(Alignment.TopCenter)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(BackgroundDark.copy(alpha = 0.55f), BackgroundDark.copy(alpha = 0.97f))
+                        )
+                    )
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
