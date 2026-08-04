@@ -38,7 +38,6 @@ import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.player.PlayerManager
 import com.jetgo.tv.ui.components.CategoryCard
 import com.jetgo.tv.ui.components.HeightMatchedPlayerRow
-import com.jetgo.tv.ui.components.HomeNavButton
 import com.jetgo.tv.ui.components.NewestContentCarousel
 import com.jetgo.tv.ui.components.PlayerPanel
 import com.jetgo.tv.ui.theme.BackgroundDark
@@ -72,7 +71,7 @@ fun HomeScreen(
 
             // ---- Fila superior: reproductor + carrusel de contenido nuevo (misma altura) ----
             HeightMatchedPlayerRow(
-                modifier = Modifier.fillMaxWidth().weight(1.3f),
+                modifier = Modifier.fillMaxWidth().weight(1f),
                 sideAspectRatio = 2f / 3f,
                 playerContent = {
                     PlayerPanel(
@@ -92,35 +91,40 @@ fun HomeScreen(
 
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(20.dp))
 
-            // ---- Fila inferior: categorías, alineadas a la izquierda y transparentes ----
+            // ---- Fila inferior: categorías (Vivo, Serie, Película, Anime, Especial) ----
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                HomeNavButton(
+                CategoryCard(
                     label = "VIVO", icon = Icons.Default.PlayCircle,
                     gradientStart = Color(0xFFFF6B5B), gradientEnd = Color(0xFFE5493B),
+                    modifier = Modifier.weight(1f),
                     focusRequester = vivoFocusRequester
                 ) { onLiveClick() }
 
-                HomeNavButton(
+                CategoryCard(
                     label = "SERIE", icon = Icons.Default.Tv,
-                    gradientStart = Color(0xFF5BC8FF), gradientEnd = Color(0xFF2E8FE0)
+                    gradientStart = Color(0xFF5BC8FF), gradientEnd = Color(0xFF2E8FE0),
+                    modifier = Modifier.weight(1f)
                 ) { onCategoryClick("SERIES") }
 
-                HomeNavButton(
+                CategoryCard(
                     label = "PELÍCULA", icon = Icons.Default.Movie,
-                    gradientStart = Color(0xFF4FE0B0), gradientEnd = Color(0xFF22B88C)
+                    gradientStart = Color(0xFF4FE0B0), gradientEnd = Color(0xFF22B88C),
+                    modifier = Modifier.weight(1f)
                 ) { onCategoryClick("MOVIE") }
 
-                HomeNavButton(
+                CategoryCard(
                     label = "SEGUIR VIENDO", icon = Icons.Default.History,
-                    gradientStart = Color(0xFF8E8CFF), gradientEnd = Color(0xFF5B57E0)
+                    gradientStart = Color(0xFF8E8CFF), gradientEnd = Color(0xFF5B57E0),
+                    modifier = Modifier.weight(1f)
                 ) { onContinueWatchingClick() }
 
-                HomeNavButton(
+                CategoryCard(
                     label = "AJUSTES", icon = Icons.Default.Settings,
-                    gradientStart = Color(0xFFFFA24E), gradientEnd = Color(0xFFE77A1F)
+                    gradientStart = Color(0xFFFFA24E), gradientEnd = Color(0xFFE77A1F),
+                    modifier = Modifier.weight(1f)
                 ) { onSettingsClick() }
             }
         }
