@@ -57,37 +57,6 @@ fun AccessCodeScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
-        // ---- Encabezado: logo + nombre de la app, con fondo colorido ----
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Brush.horizontalGradient(listOf(Color(0xFFFF7A2E), Color(0xFF5B57E0))))
-                .padding(vertical = 26.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color.White.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "J",
-                    color = Color.White,
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Text(
-                text = "JetGo",
-                color = Color.White,
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 14.dp)
-            )
-        }
 
         // ---- Cuerpo centrado: código + teclado numérico ----
         Column(

@@ -47,6 +47,7 @@ import com.jetgo.tv.ui.screens.SearchScreen
 import com.jetgo.tv.ui.screens.TvCategoryGridScreen
 import com.jetgo.tv.ui.screens.TvMovieDetailScreen
 import com.jetgo.tv.ui.screens.TvSeriesDetailScreen
+import com.jetgo.tv.ui.screens.SplashLoadingScreen
 import com.jetgo.tv.ui.screens.TvSettingsScreen
 import com.jetgo.tv.ui.screens.phone.PhoneInicioScreen
 import com.jetgo.tv.ui.screens.phone.PhoneProfileScreen
@@ -131,7 +132,7 @@ private fun AppRoot(viewModel: HomeViewModel) {
             Box(modifier = Modifier.weight(1f)) {
                 when {
                     accessState.isChecking -> {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                        SplashLoadingScreen()
                     }
                     !accessState.isGranted -> {
                         // ---- Filtro de código de acceso: se muestra ANTES que todo lo demás ----
@@ -142,7 +143,7 @@ private fun AppRoot(viewModel: HomeViewModel) {
                         )
                     }
                     uiState.isLoading -> {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                        SplashLoadingScreen()
                     }
                     !uiState.isConfigured -> {
                         // El código es válido, pero no se pudo conectar (credenciales del panel
