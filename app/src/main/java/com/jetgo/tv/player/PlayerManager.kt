@@ -66,7 +66,16 @@ class PlayerManager(context: Context) {
         })
     }
 
+    private var currentUrl: String? = null
+
     fun playChannel(url: String, name: String) {
+        if (url == currentUrl && exoPlayer.playbackState != Player.STATE_IDLE && exoPlayer.playbackState != Player.STATE_ENDED) {
+            // Ya está reproduciendo justo esta URL: no la recarga de nuevo
+            exoPlayer.playWhenReady = true
+            return
+        }
+        currentUrl = url
+
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
             .setConnectTimeoutMs(15000)

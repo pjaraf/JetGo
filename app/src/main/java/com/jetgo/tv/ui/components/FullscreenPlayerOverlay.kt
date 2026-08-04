@@ -102,7 +102,12 @@ fun FullscreenPlayerOverlay(
     }
 
     /** Cambia de canal directo, como el botón CH+/CH- de un control de TV normal */
+    var lastChannelChangeAt by remember { mutableStateOf(0L) }
     fun changeChannelDirect(step: Int) {
+        val now = System.currentTimeMillis()
+        if (now - lastChannelChangeAt < 400) return // evita procesar el mismo cambio dos veces
+        lastChannelChangeAt = now
+
         if (allLiveChannels.isEmpty()) return
         val currentIndex = allLiveChannels.indexOfFirst { it.streamId == liveChannelInfo?.channelId }
         val nextIndex = if (currentIndex == -1) 0
