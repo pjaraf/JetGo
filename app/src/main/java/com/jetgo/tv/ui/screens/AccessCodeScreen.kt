@@ -1,6 +1,5 @@
 package com.jetgo.tv.ui.screens
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,11 +30,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.jetgo.tv.R
 import com.jetgo.tv.ui.theme.BackgroundDark
 import com.jetgo.tv.ui.theme.FocusOrange
 import com.jetgo.tv.ui.theme.SurfaceDark
@@ -69,13 +66,20 @@ fun AccessCodeScreen(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Image(
-                painter = painterResource(id = R.mipmap.ic_launcher),
-                contentDescription = "JetGo",
+            Box(
                 modifier = Modifier
                     .size(56.dp)
                     .clip(RoundedCornerShape(14.dp))
-            )
+                    .background(Color.White.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "J",
+                    color = Color.White,
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
             Text(
                 text = "JetGo",
                 color = Color.White,
