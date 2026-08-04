@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -82,11 +82,20 @@ fun TvCategoryGridScreen(
     var selectedCategoryName by remember { mutableStateOf("") }
     var sidebarVisible by remember { mutableStateOf(false) }
     var sidebarIndex by remember { mutableStateOf(0) }
-    val focusRequester = remember { FocusRequester() }
+    val keyInterceptFocusRequester = remember { FocusRequester() }
+    val firstItemFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
         onLoadCategories()
-        try { focusRequester.requestFocus() } catch (e: Exception) { /* ignorar */ }
+    }
+    // Apenas hay algo en la grilla, el foco va directo a la primera carátula (no al
+    // contenedor general): así el control remoto puede resaltarla de una con el borde naranjo.
+    LaunchedEffect(items) {
+        if (items.isNotEmpty()) {
+            try { firstItemFocusRequester.requestFocus() } catch (e: Exception) { /* ignorar */ }
+        } else {
+            try { keyInterceptFocusRequester.requestFocus() } catch (e: Exception) { /* ignorar */ }
+        }
     }
     LaunchedEffect(categories) {
         if (selectedCategoryId == null && categories.isNotEmpty()) {
@@ -128,7 +137,7 @@ fun TvCategoryGridScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .focusRequester(focusRequester)
+                .focusRequester(keyInterceptFocusRequester)
                 .focusable()
                 .onPreviewKeyEvent { event ->
                     if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -177,7 +186,8 @@ fun TvCategoryGridScreen(
         ) {
             // ---- Grilla de pósters (ocupa toda la pantalla) ----
             when {
-                itemsLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                itemsLoading || (selectedCategoryId == null && categories.isEmpty()) ->
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 items.isEmpty() -> Text(
                     text = "Sin contenido en esta categoría",
                     color = Color.Gray,
@@ -187,12 +197,13 @@ fun TvCategoryGridScreen(
                     columns = GridCells.Adaptive(minSize = 150.dp),
                     modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)
                 ) {
-                    gridItems(items) { item ->
+                    itemsIndexed(items) { index, item ->
                         TvPosterCard(
                             item = item,
                             isFavorite = isFavorite(item),
                             onToggleFavorite = { onToggleFavorite(item) },
-                            onClick = { onItemSelected(item) }
+                            onClick = { onItemSelected(item) },
+                            focusRequester = if (index == 0) firstItemFocusRequester else null
                         )
                     }
                 }
@@ -253,7 +264,8 @@ private fun TvPosterCard(
     item: ContentItem,
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    focusRequester: FocusRequester? = null
 ) {
     var focused by remember { mutableStateOf(false) }
 
@@ -264,6 +276,7 @@ private fun TvPosterCard(
                 .aspectRatio(2f / 3f)
                 .clip(RoundedCornerShape(10.dp))
                 .background(SurfaceDark)
+                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
                 .border(
                     width = if (focused) 3.dp else 0.dp,
                     color = if (focused) FocusOrange else Color.Transparent,
