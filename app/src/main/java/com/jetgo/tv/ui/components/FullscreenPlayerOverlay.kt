@@ -200,7 +200,7 @@ fun FullscreenPlayerOverlay(
                 onOpenLanguageMenu = { showLanguageDialog = true },
                 onToggleAspectRatio = {
                     resizeMode = if (resizeMode == androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT) {
-                        androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                        androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
                     } else {
                         androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                     }
