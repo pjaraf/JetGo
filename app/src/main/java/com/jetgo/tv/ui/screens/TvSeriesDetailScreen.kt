@@ -34,6 +34,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
@@ -41,6 +42,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -281,13 +285,8 @@ private fun TvSeriesDetailContent(
             ActionChip(
                 icon = Icons.Default.Fullscreen,
                 label = "Pantalla completa",
-                onClick = onEnterFullscreen
-            )
-            ActionChip(
-                icon = if (isFavorite) Icons.Default.Star else Icons.Outlined.StarBorder,
-                label = "Favorito",
-                highlighted = isFavorite,
-                onClick = onToggleFavorite
+                onClick = onEnterFullscreen,
+                requestInitialFocus = true
             )
             ActionChip(
                 icon = Icons.Default.Language,
@@ -359,12 +358,24 @@ private fun ActionChip(
     icon: ImageVector,
     label: String,
     highlighted: Boolean = false,
+    requestInitialFocus: Boolean = false,
     onClick: () -> Unit
 ) {
+    var focused by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+
+    if (requestInitialFocus) {
+        LaunchedEffect(Unit) {
+            try { focusRequester.requestFocus() } catch (e: Exception) { /* ignorar */ }
+        }
+    }
+
     Row(
         modifier = Modifier
+            .focusRequester(focusRequester)
+            .onFocusChanged { focused = it.isFocused }
             .clip(RoundedCornerShape(8.dp))
-            .background(if (highlighted) FocusOrange else SurfaceDark)
+            .background(if (highlighted || focused) FocusOrange else SurfaceDark)
             .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -376,11 +387,13 @@ private fun ActionChip(
 
 @Composable
 private fun TvEpisodeChip(episode: SeriesEpisode, isPlaying: Boolean, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier
             .size(56.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(if (isPlaying) FocusOrange else SurfaceDark)
+            .background(if (isPlaying || focused) FocusOrange else SurfaceDark)
+            .onFocusChanged { focused = it.isFocused }
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {

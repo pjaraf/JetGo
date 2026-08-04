@@ -329,29 +329,6 @@ private fun TvPosterCard(
                     )
                 }
             }
-
-            // Favorito (esquina superior-derecha)
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(6.dp)
-                    .size(26.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.5f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onToggleFavorite
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                    contentDescription = "Favorito",
-                    tint = if (isFavorite) FocusOrange else Color.White,
-                    modifier = Modifier.size(15.dp)
-                )
-            }
         }
         Text(
             text = item.name,
