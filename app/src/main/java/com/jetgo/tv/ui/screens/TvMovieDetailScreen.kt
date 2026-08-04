@@ -85,14 +85,6 @@ fun TvMovieDetailScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(text = state.errorMessage, color = Color.Red)
-                if (!state.debugDetail.isNullOrBlank()) {
-                    Text(
-                        text = state.debugDetail,
-                        color = Color.Gray,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 12.dp)
-                    )
-                }
             }
             state.detail != null -> TvMovieDetailContent(
                 detail = state.detail,

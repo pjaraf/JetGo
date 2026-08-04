@@ -54,13 +54,5 @@ fun ConnectionIssueScreen(
         ) {
             Text("Reintentar")
         }
-        if (!debugDetail.isNullOrBlank()) {
-            Text(
-                text = debugDetail,
-                color = Color(0xFF555555),
-                fontSize = 11.sp,
-                modifier = Modifier.padding(top = 24.dp)
-            )
-        }
     }
 }
