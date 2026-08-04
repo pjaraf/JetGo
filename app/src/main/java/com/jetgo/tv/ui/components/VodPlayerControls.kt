@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Language
@@ -74,6 +75,7 @@ fun VodPlayerControls(
     title: String,
     onExit: (() -> Unit)?,
     onOpenLanguageMenu: () -> Unit,
+    onToggleAspectRatio: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var controlsVisible by remember { mutableStateOf(true) }
@@ -85,7 +87,7 @@ fun VodPlayerControls(
     val focusRequester = remember { FocusRequester() }
 
     // Botones disponibles en la barra (el de "Salir" solo existe en pantalla completa)
-    val buttonCount = if (onExit != null) 5 else 4
+    val buttonCount = if (onExit != null) 6 else 5
     var selectedIndex by remember { mutableStateOf(if (onExit != null) 2 else 1) } // arranca en play/pause
 
     fun activateSelected() {
@@ -95,6 +97,7 @@ fun VodPlayerControls(
             add { playerManager.togglePlayPause() }
             add { playerManager.seekForward() }
             add { onOpenLanguageMenu() }
+            add { onToggleAspectRatio() }
         }
         actions.getOrNull(selectedIndex)?.invoke()
     }
@@ -303,6 +306,13 @@ fun VodPlayerControls(
                             description = "Idioma y subtítulos",
                             selected = selectedIndex == idx,
                             onClick = onOpenLanguageMenu
+                        )
+                        idx++
+                        VodControlButton(
+                            icon = Icons.Default.AspectRatio,
+                            description = "Ajustar pantalla 16:9",
+                            selected = selectedIndex == idx,
+                            onClick = onToggleAspectRatio
                         )
                     }
                 }

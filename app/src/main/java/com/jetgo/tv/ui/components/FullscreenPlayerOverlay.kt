@@ -178,6 +178,8 @@ fun FullscreenPlayerOverlay(
                 } else Modifier
             )
     ) {
+        var resizeMode by remember { mutableStateOf(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT) }
+
         AndroidView(
             factory = { context ->
                 PlayerView(context).apply {
@@ -185,6 +187,7 @@ fun FullscreenPlayerOverlay(
                     useController = false
                 }
             },
+            update = { view -> view.resizeMode = resizeMode },
             modifier = Modifier.fillMaxSize()
         )
 
@@ -194,7 +197,14 @@ fun FullscreenPlayerOverlay(
                 posterUrl = posterUrl,
                 title = title,
                 onExit = onExitFullscreen,
-                onOpenLanguageMenu = { showLanguageDialog = true }
+                onOpenLanguageMenu = { showLanguageDialog = true },
+                onToggleAspectRatio = {
+                    resizeMode = if (resizeMode == androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT) {
+                        androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                    } else {
+                        androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    }
+                }
             )
             if (showNextEpisodeMessage) {
                 Box(
