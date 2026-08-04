@@ -82,6 +82,8 @@ fun TvCategoryGridScreen(
     var selectedCategoryName by remember { mutableStateOf("") }
     var sidebarVisible by remember { mutableStateOf(false) }
     var sidebarIndex by remember { mutableStateOf(0) }
+    var focusedIndex by remember { mutableStateOf(0) }
+    val gridColumns = 6
     val keyInterceptFocusRequester = remember { FocusRequester() }
     val firstItemFocusRequester = remember { FocusRequester() }
 
@@ -143,8 +145,15 @@ fun TvCategoryGridScreen(
                     if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                     when (event.key) {
                         Key.DirectionLeft -> {
-                            sidebarVisible = !sidebarVisible
-                            true
+                            if (sidebarVisible) {
+                                sidebarVisible = false
+                                true
+                            } else if (focusedIndex % gridColumns == 0) {
+                                sidebarVisible = true
+                                true
+                            } else {
+                                false // deja que el foco se mueva normal hacia la carátula de la izquierda
+                            }
                         }
                         Key.DirectionUp -> {
                             if (sidebarVisible) {
@@ -194,7 +203,7 @@ fun TvCategoryGridScreen(
                     modifier = Modifier.align(Alignment.Center).padding(24.dp)
                 )
                 else -> LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 150.dp),
+                    columns = GridCells.Fixed(gridColumns),
                     modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)
                 ) {
                     itemsIndexed(items) { index, item ->
@@ -203,7 +212,8 @@ fun TvCategoryGridScreen(
                             isFavorite = isFavorite(item),
                             onToggleFavorite = { onToggleFavorite(item) },
                             onClick = { onItemSelected(item) },
-                            focusRequester = if (index == 0) firstItemFocusRequester else null
+                            focusRequester = if (index == 0) firstItemFocusRequester else null,
+                            onFocused = { focusedIndex = index }
                         )
                     }
                 }
@@ -265,7 +275,8 @@ private fun TvPosterCard(
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
     onClick: () -> Unit,
-    focusRequester: FocusRequester? = null
+    focusRequester: FocusRequester? = null,
+    onFocused: () -> Unit = {}
 ) {
     var focused by remember { mutableStateOf(false) }
 
@@ -282,7 +293,10 @@ private fun TvPosterCard(
                     color = if (focused) FocusOrange else Color.Transparent,
                     shape = RoundedCornerShape(10.dp)
                 )
-                .onFocusChanged { focused = it.isFocused }
+                .onFocusChanged {
+                    focused = it.isFocused
+                    if (it.isFocused) onFocused()
+                }
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
