@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -67,6 +70,7 @@ fun TvSettingsScreen(
 
         SettingsRow("Nombre del cliente", settingsInfo.clientName ?: "Sin nombre")
         SettingsRow("Código del cliente", settingsInfo.accessCode ?: "-")
+        SettingsRow("Vencimiento de la cuenta", settingsInfo.expirationDate ?: "No disponible")
         SettingsRow("Conexiones máximas", "${settingsInfo.maxDevices}")
         SettingsRow("Dispositivos conectados", "${settingsInfo.deviceCount} / ${settingsInfo.maxDevices}")
 
@@ -97,14 +101,20 @@ fun TvSettingsScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        val clearCacheInteraction = remember { MutableInteractionSource() }
+        val clearCacheFocused by clearCacheInteraction.collectIsFocusedAsState()
         Button(
             onClick = {
                 onClearCache()
                 cacheMessage = "Caché borrada"
             },
+            interactionSource = clearCacheInteraction,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (clearCacheFocused) FocusOrange else SurfaceDark
+            ),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Borrar caché")
+            Text("Borrar caché", color = Color.White)
         }
         cacheMessage?.let {
             Text(it, color = Color(0xFF4FE0B0), fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
@@ -112,11 +122,17 @@ fun TvSettingsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        val logoutInteraction = remember { MutableInteractionSource() }
+        val logoutFocused by logoutInteraction.collectIsFocusedAsState()
         OutlinedButton(
             onClick = { showLogoutConfirm = true },
+            interactionSource = logoutInteraction,
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = if (logoutFocused) FocusOrange else Color.Transparent
+            ),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Cerrar sesión")
+            Text("Cerrar sesión", color = Color.White)
         }
     }
 

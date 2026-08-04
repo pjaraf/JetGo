@@ -581,7 +581,19 @@ private fun PhoneApp(viewModel: HomeViewModel) {
                     )
                 }
                 PhoneMainTab.PERFIL -> {
-                    PhoneProfileScreen(onDisconnect = { viewModel.disconnect() })
+                    val settingsInfo by viewModel.settingsInfo.collectAsState()
+                    val parentalState by viewModel.parentalState.collectAsState()
+                    TvSettingsScreen(
+                        settingsInfo = settingsInfo,
+                        parentalState = parentalState,
+                        onEnterScreen = { viewModel.refreshParentalState() },
+                        onEnableParental = { pin -> viewModel.enableParentalControl(pin) },
+                        onDisableParental = { viewModel.disableParentalControl() },
+                        onCheckPin = { pin -> viewModel.checkParentalPin(pin) },
+                        onClearCache = { viewModel.clearCache() },
+                        onLogout = { viewModel.logout() },
+                        onBack = {}
+                    )
                 }
             }
         }

@@ -131,7 +131,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val clientName: String? = null,
         val accessCode: String? = null,
         val deviceCount: Int = 0,
-        val maxDevices: Int = 3
+        val maxDevices: Int = 3,
+        val expirationDate: String? = null
     )
 
     private val _settingsInfo = MutableStateFlow(SettingsInfo())
@@ -408,11 +409,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             currentConfig = config
             currentMode = "xtream"
             try {
-                val ok = repository.login(config)
-                if (!ok) {
+                val userInfo = repository.login(config)
+                if (userInfo == null) {
                     _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "No se pudo autenticar con el servidor")
                     return@launch
                 }
+                val expirationText = userInfo.expDate?.toLongOrNull()?.let { unixSeconds ->
+                    try {
+                        java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+                            .format(java.util.Date(unixSeconds * 1000))
+                    } catch (e: Exception) { null }
+                }
+                _settingsInfo.value = _settingsInfo.value.copy(expirationDate = expirationText)
                 val channels = repository.getLiveChannels(config, categoryId = null)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,

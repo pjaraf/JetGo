@@ -11,14 +11,15 @@ import com.jetgo.tv.data.model.SeriesEpisode
 import com.jetgo.tv.data.model.SeriesItem
 import com.jetgo.tv.data.model.ServerConfig
 import com.jetgo.tv.data.remote.M3uParser
+import com.jetgo.tv.data.remote.UserInfoDto
 import com.jetgo.tv.data.remote.XtreamApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class StreamRepository {
 
-    /** Verifica credenciales contra el servidor Xtream Codes */
-    suspend fun login(config: ServerConfig): Boolean = withContext(Dispatchers.IO) {
+    /** Verifica credenciales contra el servidor Xtream Codes. Devuelve la info de la cuenta si es válida. */
+    suspend fun login(config: ServerConfig): UserInfoDto? = withContext(Dispatchers.IO) {
         val api = XtreamApi.create(config.host.ensureTrailingSlash())
         val resp = api.login(config.username, config.password)
         val requestUrl = resp.raw().request.url.toString()
@@ -33,7 +34,7 @@ class StreamRepository {
                 "auth=${userInfo?.auth}, status=${userInfo?.status ?: "sin dato"} — URL: $requestUrl"
             )
         }
-        true
+        userInfo
     }
 
     suspend fun getLiveCategories(config: ServerConfig): List<Category> = withContext(Dispatchers.IO) {
