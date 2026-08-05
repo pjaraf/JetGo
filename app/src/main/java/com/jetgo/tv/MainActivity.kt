@@ -49,6 +49,7 @@ import com.jetgo.tv.ui.screens.TvMovieDetailScreen
 import com.jetgo.tv.ui.screens.TvSeriesDetailScreen
 import com.jetgo.tv.ui.screens.SplashLoadingScreen
 import com.jetgo.tv.ui.screens.TvSettingsScreen
+import com.jetgo.tv.ui.screens.phone.PhoneCategoryScreen
 import com.jetgo.tv.ui.screens.phone.PhoneInicioScreen
 import com.jetgo.tv.ui.screens.phone.PhoneProfileScreen
 import com.jetgo.tv.ui.screens.phone.PhoneTvScreen
@@ -555,14 +556,6 @@ private fun PhoneApp(viewModel: HomeViewModel) {
     Column(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.weight(1f)) {
             when (selectedTab) {
-                PhoneMainTab.INICIO -> {
-                    PhoneInicioScreen(
-                        catalog = homeCatalog,
-                        onEnterScreen = { viewModel.ensureHomeCatalogLoaded() },
-                        onItemClick = handleItemClick,
-                        onSearchClick = { showSearch = true }
-                    )
-                }
                 PhoneMainTab.TV -> {
                     PhoneTvScreen(
                         playerManager = viewModel.playerManager,
@@ -582,7 +575,7 @@ private fun PhoneApp(viewModel: HomeViewModel) {
                     )
                 }
                 PhoneMainTab.SERIES -> {
-                    TvCategoryGridScreen(
+                    PhoneCategoryScreen(
                         typeLabel = "Series",
                         categories = categoryPickerState.categories,
                         categoriesLoading = categoryPickerState.isLoading,
@@ -592,13 +585,11 @@ private fun PhoneApp(viewModel: HomeViewModel) {
                         onCategorySelected = { categoryId ->
                             viewModel.loadCategoryContent(ContentType.SERIES, categoryId)
                         },
-                        onItemSelected = handleItemClick,
-                        isFavorite = { viewModel.isFavorite(it) },
-                        onToggleFavorite = { viewModel.toggleFavorite(it) }
+                        onItemSelected = handleItemClick
                     )
                 }
                 PhoneMainTab.PELICULAS -> {
-                    TvCategoryGridScreen(
+                    PhoneCategoryScreen(
                         typeLabel = "Películas",
                         categories = categoryPickerState.categories,
                         categoriesLoading = categoryPickerState.isLoading,
@@ -608,9 +599,7 @@ private fun PhoneApp(viewModel: HomeViewModel) {
                         onCategorySelected = { categoryId ->
                             viewModel.loadCategoryContent(ContentType.MOVIE, categoryId)
                         },
-                        onItemSelected = handleItemClick,
-                        isFavorite = { viewModel.isFavorite(it) },
-                        onToggleFavorite = { viewModel.toggleFavorite(it) }
+                        onItemSelected = handleItemClick
                     )
                 }
                 PhoneMainTab.PERFIL -> {

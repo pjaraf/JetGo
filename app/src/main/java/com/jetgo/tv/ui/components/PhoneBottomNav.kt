@@ -23,7 +23,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-enum class PhoneMainTab { INICIO, TV, SERIES, PELICULAS, PERFIL }
+enum class PhoneMainTab { TV, SERIES, PELICULAS, PERFIL }
 
 @Composable
 fun PhoneBottomNav(
@@ -36,13 +36,6 @@ fun PhoneBottomNav(
             .height(64.dp)
             .background(Color(0xFF15171D)),
     ) {
-        NavItem(
-            label = "Inicio",
-            icon = Icons.Default.Home,
-            selected = selected == PhoneMainTab.INICIO,
-            modifier = Modifier.weight(1f)
-        ) { onSelect(PhoneMainTab.INICIO) }
-
         NavItem(
             label = "TV",
             icon = Icons.Default.LiveTv,
