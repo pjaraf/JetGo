@@ -32,6 +32,12 @@ class JetGoApplication : Application(), ImageLoaderFactory {
             .crossfade(200)
             .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
             .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+            .memoryCache {
+                coil.memory.MemoryCache.Builder(this)
+                    .maxSizePercent(0.12) // más bajo que el 25% por defecto: deja más memoria libre para el video
+                    .build()
+            }
+            .bitmapConfig(android.graphics.Bitmap.Config.RGB_565) // carátulas livianas, la mitad de memoria que el formato normal
             .build()
     }
 }
