@@ -28,6 +28,7 @@ import com.jetgo.tv.util.getDeviceId
 import com.jetgo.tv.util.UpdateChecker
 import com.jetgo.tv.util.UpdateInfo
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -746,31 +747,37 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
         _homeCatalog.value = _homeCatalog.value.copy(isLoading = true)
         viewModelScope.launch {
-            val vodCategoryNames = try {
-                repository.getVodCategories(config).associate { it.id to it.name }
-            } catch (e: Exception) { emptyMap() }
+            // Las 5 consultas son independientes entre sí: se piden todas al mismo tiempo
+            // en vez de esperar una por una (mucho más rápido para cargar todo de una vez).
+            val vodCategoryNamesDeferred = async {
+                try { repository.getVodCategories(config).associate { it.id to it.name } }
+                catch (e: Exception) { emptyMap() }
+            }
+            val seriesCategoryNamesDeferred = async {
+                try { repository.getSeriesCategories(config).associate { it.id to it.name } }
+                catch (e: Exception) { emptyMap() }
+            }
+            val moviesDeferred = async {
+                try { repository.getMovies(config, categoryId = null) } catch (e: Exception) { emptyList() }
+            }
+            val seriesDeferred = async {
+                try { repository.getSeries(config, categoryId = null) } catch (e: Exception) { emptyList() }
+            }
+            val animeDeferred = async {
+                try { repository.getMoviesByCategoryKeyword(config, "anime") } catch (e: Exception) { emptyList() }
+            }
 
-            val seriesCategoryNames = try {
-                repository.getSeriesCategories(config).associate { it.id to it.name }
-            } catch (e: Exception) { emptyMap() }
-
-            val movies = try {
-                repository.getMovies(config, categoryId = null).map {
-                    ContentItem(it.streamId, it.name, it.coverUrl, ContentType.MOVIE, it.streamUrl, categoryName = vodCategoryNames[it.categoryId])
-                }
-            } catch (e: Exception) { emptyList() }
-
-            val series = try {
-                repository.getSeries(config, categoryId = null).map {
-                    ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null, categoryName = seriesCategoryNames[it.categoryId])
-                }
-            } catch (e: Exception) { emptyList() }
-
-            val anime = try {
-                repository.getMoviesByCategoryKeyword(config, "anime").map {
-                    ContentItem(it.streamId, it.name, it.coverUrl, ContentType.ANIME, it.streamUrl, categoryName = vodCategoryNames[it.categoryId])
-                }
-            } catch (e: Exception) { emptyList() }
+            val vodCategoryNames = vodCategoryNamesDeferred.await()
+            val seriesCategoryNames = seriesCategoryNamesDeferred.await()
+            val movies = moviesDeferred.await().map {
+                ContentItem(it.streamId, it.name, it.coverUrl, ContentType.MOVIE, it.streamUrl, categoryName = vodCategoryNames[it.categoryId])
+            }
+            val series = seriesDeferred.await().map {
+                ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null, categoryName = seriesCategoryNames[it.categoryId])
+            }
+            val anime = animeDeferred.await().map {
+                ContentItem(it.streamId, it.name, it.coverUrl, ContentType.ANIME, it.streamUrl, categoryName = vodCategoryNames[it.categoryId])
+            }
 
             val parentalOn = _parentalState.value.enabled
             val cleanMovies = if (parentalOn) movies.filterNot { AdultContentFilter.isAdult(it.name) } else movies

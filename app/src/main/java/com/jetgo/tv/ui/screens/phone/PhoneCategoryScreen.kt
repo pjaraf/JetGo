@@ -124,7 +124,7 @@ fun PhoneCategoryScreen(
                     columns = GridCells.Adaptive(minSize = 120.dp),
                     modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)
                 ) {
-                    items(items) { item ->
+                    items(items, key = { item -> "${item.type}_${item.id}" }) { item ->
                         PhoneCategoryPosterCard(item = item, onClick = { onItemSelected(item) })
                     }
                 }

@@ -76,7 +76,7 @@ fun ContinueWatchingScreen(
                 columns = GridCells.Adaptive(minSize = 150.dp),
                 modifier = Modifier.fillMaxSize().padding(top = 72.dp, start = 16.dp, end = 16.dp)
             ) {
-                itemsIndexed(items) { index, item ->
+                itemsIndexed(items, key = { _, item -> "${item.type}_${item.id}" }) { index, item ->
                     ContinueWatchingCard(
                         item = item,
                         onClick = { onItemClick(item) },

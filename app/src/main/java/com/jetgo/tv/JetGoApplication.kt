@@ -28,6 +28,10 @@ class JetGoApplication : Application(), ImageLoaderFactory {
 
         return ImageLoader.Builder(this)
             .okHttpClient(client)
+            .crossfade(true)
+            .crossfade(200)
+            .memoryCachePolicy(coil.decode.CachePolicy.ENABLED)
+            .diskCachePolicy(coil.decode.CachePolicy.ENABLED)
             .build()
     }
 }

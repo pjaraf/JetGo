@@ -206,7 +206,7 @@ fun TvCategoryGridScreen(
                     columns = GridCells.Fixed(gridColumns),
                     modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)
                 ) {
-                    itemsIndexed(items) { index, item ->
+                    itemsIndexed(items, key = { _, item -> "${item.type}_${item.id}" }) { index, item ->
                         TvPosterCard(
                             item = item,
                             isFavorite = isFavorite(item),
@@ -250,7 +250,7 @@ private fun CategorySidebar(
             .background(Color.Black.copy(alpha = 0.80f))
             .padding(vertical = 8.dp)
     ) {
-        itemsIndexed(categories) { index, category ->
+        itemsIndexed(categories, key = { _, category -> category.id }) { index, category ->
             val selected = index == selectedIndex
             Box(
                 modifier = Modifier
