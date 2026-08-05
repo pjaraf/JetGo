@@ -30,8 +30,8 @@ class JetGoApplication : Application(), ImageLoaderFactory {
             .okHttpClient(client)
             .crossfade(true)
             .crossfade(200)
-            .memoryCachePolicy(coil.decode.CachePolicy.ENABLED)
-            .diskCachePolicy(coil.decode.CachePolicy.ENABLED)
+            .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+            .diskCachePolicy(coil.request.CachePolicy.ENABLED)
             .build()
     }
 }
