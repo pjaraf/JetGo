@@ -38,6 +38,7 @@ import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.player.PlayerManager
 import com.jetgo.tv.ui.components.CategoryCard
 import com.jetgo.tv.ui.components.HeightMatchedPlayerRow
+import com.jetgo.tv.ui.components.HomeTabButton
 import com.jetgo.tv.ui.components.NewestContentCarousel
 import com.jetgo.tv.ui.components.PlayerPanel
 import com.jetgo.tv.ui.theme.BackgroundDark
@@ -69,7 +70,41 @@ fun HomeScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
 
-            // ---- Fila superior: reproductor + carrusel de contenido nuevo (misma altura) ----
+            // ---- Barra de pestañas (arriba): Vivo, Serie, Película, Seguir viendo, Ajustes ----
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                HomeTabButton(
+                    label = "VIVO",
+                    modifier = Modifier.weight(1f),
+                    focusRequester = vivoFocusRequester
+                ) { onLiveClick() }
+
+                HomeTabButton(
+                    label = "SERIE",
+                    modifier = Modifier.weight(1f)
+                ) { onCategoryClick("SERIES") }
+
+                HomeTabButton(
+                    label = "PELÍCULA",
+                    modifier = Modifier.weight(1f)
+                ) { onCategoryClick("MOVIE") }
+
+                HomeTabButton(
+                    label = "SEGUIR VIENDO",
+                    modifier = Modifier.weight(1f)
+                ) { onContinueWatchingClick() }
+
+                HomeTabButton(
+                    label = "AJUSTES",
+                    modifier = Modifier.weight(1f)
+                ) { onSettingsClick() }
+            }
+
+            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(16.dp))
+
+            // ---- Reproductor + carrusel de contenido nuevo (misma altura) ----
             HeightMatchedPlayerRow(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 sideAspectRatio = 2f / 3f,
@@ -88,45 +123,6 @@ fun HomeScreen(
                     )
                 }
             )
-
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(20.dp))
-
-            // ---- Fila inferior: categorías (Vivo, Serie, Película, Anime, Especial) ----
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                CategoryCard(
-                    label = "VIVO", icon = Icons.Default.PlayCircle,
-                    gradientStart = Color(0xFFFF6B5B), gradientEnd = Color(0xFFE5493B),
-                    modifier = Modifier.weight(1f),
-                    focusRequester = vivoFocusRequester
-                ) { onLiveClick() }
-
-                CategoryCard(
-                    label = "SERIE", icon = Icons.Default.Tv,
-                    gradientStart = Color(0xFF5BC8FF), gradientEnd = Color(0xFF2E8FE0),
-                    modifier = Modifier.weight(1f)
-                ) { onCategoryClick("SERIES") }
-
-                CategoryCard(
-                    label = "PELÍCULA", icon = Icons.Default.Movie,
-                    gradientStart = Color(0xFF4FE0B0), gradientEnd = Color(0xFF22B88C),
-                    modifier = Modifier.weight(1f)
-                ) { onCategoryClick("MOVIE") }
-
-                CategoryCard(
-                    label = "SEGUIR VIENDO", icon = Icons.Default.History,
-                    gradientStart = Color(0xFF8E8CFF), gradientEnd = Color(0xFF5B57E0),
-                    modifier = Modifier.weight(1f)
-                ) { onContinueWatchingClick() }
-
-                CategoryCard(
-                    label = "AJUSTES", icon = Icons.Default.Settings,
-                    gradientStart = Color(0xFFFFA24E), gradientEnd = Color(0xFFE77A1F),
-                    modifier = Modifier.weight(1f)
-                ) { onSettingsClick() }
-            }
         }
     }
 }
