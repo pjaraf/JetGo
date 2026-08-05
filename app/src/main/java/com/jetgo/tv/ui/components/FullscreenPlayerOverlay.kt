@@ -116,7 +116,10 @@ fun FullscreenPlayerOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isVod) Color.Black else Brush.verticalGradient(listOf(MidnightTop, MidnightBottom)))
+            .then(
+                if (isVod) Modifier.background(Color.Black)
+                else Modifier.background(Brush.verticalGradient(listOf(MidnightTop, MidnightBottom)))
+            )
             .then(
                 if (!isVod) {
                     Modifier
