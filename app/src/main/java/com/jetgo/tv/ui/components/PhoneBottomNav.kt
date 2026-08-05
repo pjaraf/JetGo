@@ -11,6 +11,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,7 +23,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-enum class PhoneMainTab { INICIO, TV, PERFIL }
+enum class PhoneMainTab { INICIO, TV, SERIES, PELICULAS, PERFIL }
 
 @Composable
 fun PhoneBottomNav(
@@ -47,6 +49,20 @@ fun PhoneBottomNav(
             selected = selected == PhoneMainTab.TV,
             modifier = Modifier.weight(1f)
         ) { onSelect(PhoneMainTab.TV) }
+
+        NavItem(
+            label = "Series",
+            icon = Icons.Default.Tv,
+            selected = selected == PhoneMainTab.SERIES,
+            modifier = Modifier.weight(1f)
+        ) { onSelect(PhoneMainTab.SERIES) }
+
+        NavItem(
+            label = "Películas",
+            icon = Icons.Default.Movie,
+            selected = selected == PhoneMainTab.PELICULAS,
+            modifier = Modifier.weight(1f)
+        ) { onSelect(PhoneMainTab.PELICULAS) }
 
         NavItem(
             label = "Perfil",

@@ -71,6 +71,13 @@ fun PlayerPanel(
                         resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
                     }
                 },
+                update = { view ->
+                    // Vuelve a conectar el video cada vez (por si venía de pantalla completa):
+                    // sin esto a veces se queda solo el audio con la imagen congelada.
+                    if (view.player !== playerManager.exoPlayer) {
+                        view.player = playerManager.exoPlayer
+                    }
+                },
                 modifier = Modifier.fillMaxSize()
             )
         }

@@ -581,6 +581,38 @@ private fun PhoneApp(viewModel: HomeViewModel) {
                         onEnterFullscreen = { viewModel.enterFullscreenPlayer() }
                     )
                 }
+                PhoneMainTab.SERIES -> {
+                    TvCategoryGridScreen(
+                        typeLabel = "Series",
+                        categories = categoryPickerState.categories,
+                        categoriesLoading = categoryPickerState.isLoading,
+                        items = categoryContentState.items,
+                        itemsLoading = categoryContentState.isLoading,
+                        onLoadCategories = { viewModel.loadCategoriesForType(ContentType.SERIES) },
+                        onCategorySelected = { categoryId ->
+                            viewModel.loadCategoryContent(ContentType.SERIES, categoryId)
+                        },
+                        onItemSelected = handleItemClick,
+                        isFavorite = { viewModel.isFavorite(it) },
+                        onToggleFavorite = { viewModel.toggleFavorite(it) }
+                    )
+                }
+                PhoneMainTab.PELICULAS -> {
+                    TvCategoryGridScreen(
+                        typeLabel = "Películas",
+                        categories = categoryPickerState.categories,
+                        categoriesLoading = categoryPickerState.isLoading,
+                        items = categoryContentState.items,
+                        itemsLoading = categoryContentState.isLoading,
+                        onLoadCategories = { viewModel.loadCategoriesForType(ContentType.MOVIE) },
+                        onCategorySelected = { categoryId ->
+                            viewModel.loadCategoryContent(ContentType.MOVIE, categoryId)
+                        },
+                        onItemSelected = handleItemClick,
+                        isFavorite = { viewModel.isFavorite(it) },
+                        onToggleFavorite = { viewModel.toggleFavorite(it) }
+                    )
+                }
                 PhoneMainTab.PERFIL -> {
                     val settingsInfo by viewModel.settingsInfo.collectAsState()
                     val parentalState by viewModel.parentalState.collectAsState()

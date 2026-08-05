@@ -192,7 +192,12 @@ fun FullscreenPlayerOverlay(
                     useController = false
                 }
             },
-            update = { view -> view.resizeMode = resizeMode },
+            update = { view ->
+                view.resizeMode = resizeMode
+                if (view.player !== playerManager.exoPlayer) {
+                    view.player = playerManager.exoPlayer
+                }
+            },
             modifier = Modifier.fillMaxSize()
         )
 
