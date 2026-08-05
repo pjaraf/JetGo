@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,11 +21,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jetgo.tv.R
 import com.jetgo.tv.ui.theme.BackgroundDark
 
 /**
@@ -44,8 +46,8 @@ fun SplashLoadingScreen() {
         label = "logoScale"
     )
     val glowAlpha by transition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.85f,
+        initialValue = 0.5f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(900, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
@@ -58,28 +60,15 @@ fun SplashLoadingScreen() {
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(
+            Image(
+                painter = painterResource(id = R.drawable.logo_splash),
+                contentDescription = "JetGo",
                 modifier = Modifier
-                    .size(96.dp)
+                    .size(110.dp)
                     .scale(scale)
                     .clip(RoundedCornerShape(24.dp))
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                Color(0xFFFF7A2E).copy(alpha = glowAlpha),
-                                Color(0xFF5B57E0).copy(alpha = glowAlpha)
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "J",
-                    color = Color.White,
-                    fontSize = 46.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+                    .background(Color.White.copy(alpha = glowAlpha * 0.12f))
+            )
             Text(
                 text = "JetGo",
                 color = Color.White,
