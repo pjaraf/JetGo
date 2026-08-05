@@ -68,6 +68,7 @@ fun PlayerPanel(
                     PlayerView(context).apply {
                         player = playerManager.exoPlayer
                         useController = false
+                        resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
                     }
                 },
                 modifier = Modifier.fillMaxSize()

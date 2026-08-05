@@ -183,7 +183,7 @@ fun FullscreenPlayerOverlay(
                 } else Modifier
             )
     ) {
-        var resizeMode by remember { mutableStateOf(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT) }
+        var resizeMode by remember { mutableStateOf(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL) }
 
         AndroidView(
             factory = { context ->
