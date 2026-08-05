@@ -117,6 +117,11 @@ private fun SeriesDetailContent(
                         useController = true
                     }
                 },
+                update = { view ->
+                    if (view.player !== playerManager.exoPlayer) {
+                        view.player = playerManager.exoPlayer
+                    }
+                },
                 modifier = Modifier.fillMaxSize()
             )
             IconButton(onClick = onBack, modifier = Modifier.align(Alignment.TopStart).padding(4.dp)) {

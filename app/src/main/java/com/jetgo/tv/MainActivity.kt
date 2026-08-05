@@ -496,6 +496,16 @@ private fun PhoneApp(viewModel: HomeViewModel) {
     var seriesDetailItem by remember { mutableStateOf<ContentItem?>(null) }
     var movieDetailItem by remember { mutableStateOf<ContentItem?>(null) }
 
+    // Al salir de la pestaña TV (a Series/Películas/Perfil) se pausa el canal en vivo; al
+    // volver a TV, retoma justo el canal donde había quedado.
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == PhoneMainTab.TV) {
+            viewModel.resumeLastLiveChannelIfNeeded()
+        } else {
+            viewModel.pausePreviewPlayer()
+        }
+    }
+
     val categoryPickerState by viewModel.categoryPickerState.collectAsState()
     val categoryContentState by viewModel.categoryContentState.collectAsState()
     val favorites by viewModel.favorites.collectAsState()
