@@ -37,6 +37,10 @@ class PlayerManager(context: Context) {
     private val _isPlaying = mutableStateOf(true)
     val isPlaying: State<Boolean> get() = _isPlaying
 
+    /** Calidad real del video que se está reproduciendo AHORA MISMO (según su resolución real) */
+    private val _videoQuality = mutableStateOf<String?>(null)
+    val videoQuality: State<String?> get() = _videoQuality
+
     /** Se dispara cuando el contenido actual termina de reproducirse por completo (fin de capítulo/película) */
     var onPlaybackEnded: (() -> Unit)? = null
 
@@ -63,6 +67,16 @@ class PlayerManager(context: Context) {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _isPlaying.value = isPlaying
             }
+
+            override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                _videoQuality.value = when {
+                    videoSize.height <= 0 -> null
+                    videoSize.height >= 2000 -> "4K"
+                    videoSize.height >= 1000 -> "FHD"
+                    videoSize.height >= 700 -> "HD"
+                    else -> "SD"
+                }
+            }
         })
     }
 
@@ -75,6 +89,7 @@ class PlayerManager(context: Context) {
             return
         }
         currentUrl = url
+        _videoQuality.value = null
 
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")

@@ -245,6 +245,7 @@ fun FullscreenPlayerOverlay(
             liveChannelInfo?.let { info ->
                 LiveChannelInfoBanner(
                     info = info,
+                    videoQuality = playerManager.videoQuality.value,
                     modifier = Modifier.align(Alignment.BottomCenter)
                 )
             }
