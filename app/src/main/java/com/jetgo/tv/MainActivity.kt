@@ -49,6 +49,7 @@ import com.jetgo.tv.ui.screens.TvMovieDetailScreen
 import com.jetgo.tv.ui.screens.TvSeriesDetailScreen
 import com.jetgo.tv.ui.screens.SplashLoadingScreen
 import com.jetgo.tv.ui.screens.TvSettingsScreen
+import com.jetgo.tv.ui.screens.phone.MovieDetailScreen
 import com.jetgo.tv.ui.screens.phone.PhoneCategoryScreen
 import com.jetgo.tv.ui.screens.phone.PhoneInicioScreen
 import com.jetgo.tv.ui.screens.phone.PhoneProfileScreen
@@ -493,6 +494,7 @@ private fun PhoneApp(viewModel: HomeViewModel) {
     var selectedTab by remember { mutableStateOf(PhoneMainTab.TV) }
     var showSearch by remember { mutableStateOf(false) }
     var seriesDetailItem by remember { mutableStateOf<ContentItem?>(null) }
+    var movieDetailItem by remember { mutableStateOf<ContentItem?>(null) }
 
     val categoryPickerState by viewModel.categoryPickerState.collectAsState()
     val categoryContentState by viewModel.categoryContentState.collectAsState()
@@ -500,14 +502,23 @@ private fun PhoneApp(viewModel: HomeViewModel) {
     val searchState by viewModel.searchState.collectAsState()
     val homeCatalog by viewModel.homeCatalog.collectAsState()
     val seriesDetailState by viewModel.seriesDetailState.collectAsState()
+    val movieDetailState by viewModel.movieDetailState.collectAsState()
 
-    // Cualquier ítem: si es serie, abre la ficha con temporadas/capítulos; si no, reproduce directo
+    // Serie: abre la ficha con temporadas/capítulos. Película: abre su propia ficha, mismo
+    // estilo que la de serie. Cualquier otra cosa (canal en vivo, etc.): reproduce directo.
     val handleItemClick: (ContentItem) -> Unit = { item ->
-        if (item.type == ContentType.SERIES) {
-            seriesDetailItem = item
-            viewModel.loadSeriesDetail(item)
-        } else {
-            viewModel.selectContentItem(item) { viewModel.enterFullscreenPlayer() }
+        when (item.type) {
+            ContentType.SERIES -> {
+                seriesDetailItem = item
+                viewModel.loadSeriesDetail(item)
+            }
+            ContentType.MOVIE -> {
+                movieDetailItem = item
+                viewModel.loadMovieDetail(item)
+            }
+            else -> {
+                viewModel.selectContentItem(item) { viewModel.enterFullscreenPlayer() }
+            }
         }
     }
 
@@ -515,6 +526,27 @@ private fun PhoneApp(viewModel: HomeViewModel) {
     BackHandler(enabled = seriesDetailItem != null) {
         viewModel.clearSeriesDetail()
         seriesDetailItem = null
+    }
+    BackHandler(enabled = movieDetailItem != null) {
+        viewModel.clearMovieDetail()
+        movieDetailItem = null
+    }
+
+    if (movieDetailItem != null) {
+        val recommendations = (homeCatalog.movies + homeCatalog.series)
+            .filter { it.id != movieDetailItem?.id }
+            .shuffled()
+            .take(10)
+
+        MovieDetailScreen(
+            state = movieDetailState,
+            playerManager = viewModel.playerManager,
+            recommendations = recommendations,
+            onBack = { viewModel.clearMovieDetail(); movieDetailItem = null },
+            onEnterFullscreen = { viewModel.enterFullscreenPlayer() },
+            onRecommendationClick = { item -> handleItemClick(item) }
+        )
+        return
     }
 
     if (seriesDetailItem != null) {
