@@ -337,6 +337,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
+            // Camino rápido: si ya había credenciales del servidor guardadas de antes, se
+            // conecta de una sin esperar a Firestore — así una reconexión (por ejemplo si el
+            // sistema recreó la app) es casi instantánea, sin mostrar el logo de carga.
+            val savedMode = configStore.mode.first()
+            val savedConfig = configStore.config.first()
+            val savedM3u = configStore.m3uUrl.first()
+            if (savedMode == "xtream" && savedConfig != null) {
+                _accessState.value = AccessUiState(isChecking = false, isGranted = true)
+                connectXtream(savedConfig)
+            } else if (savedMode == "m3u" && !savedM3u.isNullOrBlank()) {
+                _accessState.value = AccessUiState(isChecking = false, isGranted = true)
+                connectM3u(savedM3u)
+            }
+
+            // Validación real contra Firestore, en segundo plano y en silencio: si el código
+            // ya no es válido (revocado, etc.), ahí sí se cierra la sesión.
             val result = withContext(Dispatchers.IO) {
                 AccessCodeChecker.checkCodeAndRegisterDevice(projectId, savedCode, deviceId)
             }
