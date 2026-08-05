@@ -304,6 +304,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private var searchCatalog: List<ContentItem>? = null
 
     init {
+        android.util.Log.e("JetGo_DIAG", "HomeViewModel se está creando de nuevo", Exception("rastro de diagnóstico"))
         checkStoredAccess()
 
         viewModelScope.launch {

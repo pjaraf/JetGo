@@ -64,6 +64,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        android.util.Log.e(
+            "JetGo_DIAG",
+            "MainActivity.onCreate() — savedInstanceState es " +
+                if (savedInstanceState == null) "NULO (arranque limpio)" else "NO nulo (esto es una RECREACIÓN)",
+            Exception("rastro de diagnóstico")
+        )
 
         // No queremos que la pantalla (TV o teléfono) se apague sola mientras se usa la app.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
