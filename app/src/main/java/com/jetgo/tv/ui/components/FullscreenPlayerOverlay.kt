@@ -225,23 +225,6 @@ fun FullscreenPlayerOverlay(
                 }
             }
         } else {
-            IconButton(
-                onClick = onExitFullscreen,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(16.dp)
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.5f))
-                    .focusProperties { canFocus = false }
-            ) {
-                Icon(
-                    imageVector = Icons.Default.FullscreenExit,
-                    contentDescription = "Salir de pantalla completa",
-                    tint = Color.White
-                )
-            }
-
             liveChannelInfo?.let { info ->
                 LiveChannelInfoBanner(
                     info = info,
