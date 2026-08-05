@@ -557,6 +557,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     categories.filterNot { AdultContentFilter.isAdult(it.name) }
                 } else categories
                 _categoryPickerState.value = CategoryPickerUiState(categories = filtered)
+
+                // Para Vivo: siempre se queda mostrando la categoría que quedó por defecto
+                // (la última elegida), y no la primera de la lista cada vez.
+                if (type == ContentType.LIVE && filtered.isNotEmpty()) {
+                    val target = _phoneLiveCategoryId.value?.takeIf { id -> filtered.any { it.id == id } }
+                        ?: filtered.first().id
+                    loadCategoryContent(ContentType.LIVE, target)
+                }
             } catch (e: Exception) {
                 _categoryPickerState.value = CategoryPickerUiState(errorMessage = "Error al cargar categorías: ${e.message}")
             }
@@ -565,6 +573,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Paso 2: dentro de la subcategoría elegida, trae solo el contenido de esa categoría */
     fun loadCategoryContent(type: ContentType, categoryId: String) {
+        if (type == ContentType.LIVE) {
+            _phoneLiveCategoryId.value = categoryId
+        }
         _categoryContentState.value = CategoryContentUiState(isLoading = true)
 
         if (currentMode == "m3u") {
