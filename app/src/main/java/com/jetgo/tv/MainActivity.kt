@@ -599,6 +599,8 @@ private fun PhoneApp(viewModel: HomeViewModel) {
         Box(modifier = Modifier.weight(1f)) {
             when (selectedTab) {
                 PhoneMainTab.TV -> {
+                    val liveChannelInfo by viewModel.liveChannelInfo.collectAsState()
+                    val persistedCategoryId by viewModel.phoneLiveCategoryId.collectAsState()
                     PhoneTvScreen(
                         playerManager = viewModel.playerManager,
                         categories = categoryPickerState.categories,
@@ -606,8 +608,11 @@ private fun PhoneApp(viewModel: HomeViewModel) {
                         channelsInCategory = categoryContentState.items,
                         channelsLoading = categoryContentState.isLoading,
                         favorites = favorites,
+                        activeChannelId = liveChannelInfo?.channelId,
+                        persistedCategoryId = persistedCategoryId,
                         onLoadCategories = { viewModel.loadCategoriesForType(ContentType.LIVE) },
                         onLoadChannelsForCategory = { categoryId ->
+                            viewModel.setPhoneLiveCategoryId(categoryId)
                             viewModel.loadCategoryContent(ContentType.LIVE, categoryId)
                         },
                         onChannelTap = { item -> viewModel.selectContentItem(item) {} },

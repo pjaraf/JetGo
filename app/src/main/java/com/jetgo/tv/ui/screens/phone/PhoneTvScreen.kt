@@ -59,6 +59,8 @@ fun PhoneTvScreen(
     channelsInCategory: List<ContentItem>,
     channelsLoading: Boolean,
     favorites: List<ContentItem>,
+    activeChannelId: String?,
+    persistedCategoryId: String?,
     onLoadCategories: () -> Unit,
     onLoadChannelsForCategory: (String) -> Unit,
     onChannelTap: (ContentItem) -> Unit,
@@ -67,15 +69,17 @@ fun PhoneTvScreen(
     onEnterFullscreen: () -> Unit
 ) {
     var tab by remember { mutableStateOf(PhoneTvTab.CATEGORIA) }
-    var selectedCategoryId by remember { mutableStateOf<String?>(null) }
+    var selectedCategoryId by remember { mutableStateOf(persistedCategoryId) }
 
     LaunchedEffect(Unit) { onLoadCategories() }
 
-    // En cuanto llegan las categorías, selecciona la primera automáticamente
+    // Si ya había una categoría elegida antes (guardada en el ViewModel), se recupera esa;
+    // si no, recién ahí se elige la primera de la lista por defecto.
     LaunchedEffect(categories) {
         if (selectedCategoryId == null && categories.isNotEmpty()) {
-            selectedCategoryId = categories.first().id
-            onLoadChannelsForCategory(categories.first().id)
+            val restored = persistedCategoryId?.takeIf { id -> categories.any { it.id == id } }
+            selectedCategoryId = restored ?: categories.first().id
+            onLoadChannelsForCategory(selectedCategoryId!!)
         }
     }
 
@@ -163,7 +167,12 @@ fun PhoneTvScreen(
                         )
                         else -> LazyColumn {
                             itemsIndexed(channelsInCategory) { index, item ->
-                                ChannelRow(index = index, item = item, onClick = { onChannelTap(item) })
+                                ChannelRow(
+                                    index = index,
+                                    item = item,
+                                    isActive = item.id == activeChannelId,
+                                    onClick = { onChannelTap(item) }
+                                )
                             }
                         }
                     }
@@ -180,7 +189,12 @@ fun PhoneTvScreen(
                 } else {
                     LazyColumn {
                         itemsIndexed(favorites) { index, item ->
-                            ChannelRow(index = index, item = item, onClick = { onFavoriteTap(item) })
+                            ChannelRow(
+                                index = index,
+                                item = item,
+                                isActive = item.id == activeChannelId,
+                                onClick = { onFavoriteTap(item) }
+                            )
                         }
                     }
                 }
@@ -214,10 +228,11 @@ private fun PhoneTvTabLabel(label: String, selected: Boolean, onClick: () -> Uni
 }
 
 @Composable
-private fun ChannelRow(index: Int, item: ContentItem, onClick: () -> Unit) {
+private fun ChannelRow(index: Int, item: ContentItem, isActive: Boolean = false, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .background(if (isActive) FocusOrange.copy(alpha = 0.16f) else Color.Transparent)
             .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -253,7 +268,8 @@ private fun ChannelRow(index: Int, item: ContentItem, onClick: () -> Unit) {
 
         Text(
             text = item.name,
-            color = Color.White,
+            color = if (isActive) FocusOrange else Color.White,
+            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
             fontSize = 15.sp,
             maxLines = 1,
             modifier = Modifier.weight(1f).padding(start = 4.dp)

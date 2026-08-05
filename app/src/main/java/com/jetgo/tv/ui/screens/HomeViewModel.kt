@@ -224,6 +224,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _continueWatching = MutableStateFlow<List<ContentItem>>(emptyList())
     val continueWatching: StateFlow<List<ContentItem>> = _continueWatching.asStateFlow()
 
+    /** Categoría de "Vivo" elegida por última vez en el teléfono — vive acá (no en la pantalla)
+     *  para que no se pierda al cambiar de pestaña o volver a entrar a la app. */
+    private val _phoneLiveCategoryId = MutableStateFlow<String?>(null)
+    val phoneLiveCategoryId: StateFlow<String?> = _phoneLiveCategoryId.asStateFlow()
+
+    fun setPhoneLiveCategoryId(categoryId: String) {
+        _phoneLiveCategoryId.value = categoryId
+    }
+
     private val _showNextEpisodeMessage = MutableStateFlow(false)
     val showNextEpisodeMessage: StateFlow<Boolean> = _showNextEpisodeMessage.asStateFlow()
 
