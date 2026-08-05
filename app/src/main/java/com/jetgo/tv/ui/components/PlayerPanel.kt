@@ -73,23 +73,5 @@ fun PlayerPanel(
                 modifier = Modifier.fillMaxSize()
             )
         }
-
-        if (showFullscreenHint) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.5f))
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Fullscreen,
-                    contentDescription = "Pantalla completa",
-                    tint = Color.White,
-                    modifier = Modifier.padding(4.dp)
-                )
-            }
-        }
     }
 }
