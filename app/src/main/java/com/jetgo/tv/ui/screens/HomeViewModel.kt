@@ -345,10 +345,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val savedM3u = configStore.m3uUrl.first()
             if (savedMode == "xtream" && savedConfig != null) {
                 _accessState.value = AccessUiState(isChecking = false, isGranted = true)
-                connectXtream(savedConfig)
+                connectXtream(savedConfig, silent = true)
             } else if (savedMode == "m3u" && !savedM3u.isNullOrBlank()) {
                 _accessState.value = AccessUiState(isChecking = false, isGranted = true)
-                connectM3u(savedM3u)
+                connectM3u(savedM3u, silent = true)
             }
 
             // Validación real contra Firestore, en segundo plano y en silencio: si el código
@@ -358,7 +358,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             if (result.valid) {
-                applyAccessCodeResult(result, savedCode)
+                applyAccessCodeResult(result, savedCode, silent = true)
                 _accessState.value = AccessUiState(isChecking = false, isGranted = true)
             } else {
                 accessStore.clear()
@@ -397,7 +397,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Conecta automáticamente al servidor cargado por el administrador para ese código,
      *  sin que el cliente tenga que ver ni escribir host/usuario/contraseña. */
-    private fun applyAccessCodeResult(result: AccessCodeResult, code: String) {
+    private fun applyAccessCodeResult(result: AccessCodeResult, code: String, silent: Boolean = false) {
         _settingsInfo.value = SettingsInfo(
             clientName = result.clientName,
             accessCode = code.trim().uppercase(),
@@ -405,9 +405,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             maxDevices = result.maxDevices
         )
         if (result.mode == "m3u" && !result.m3uUrl.isNullOrBlank()) {
-            connectM3u(result.m3uUrl)
+            connectM3u(result.m3uUrl, silent = silent)
         } else if (!result.host.isNullOrBlank() && !result.username.isNullOrBlank() && !result.password.isNullOrBlank()) {
-            connectXtream(ServerConfig(result.host, result.username, result.password))
+            connectXtream(ServerConfig(result.host, result.username, result.password), silent = silent)
         }
         // Si el código es válido pero el administrador no cargó credenciales todavía,
         // simplemente no se auto-conecta nada (uiState.isConfigured queda en false).
@@ -429,9 +429,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
 
-    fun connectXtream(config: ServerConfig) {
+    fun connectXtream(config: ServerConfig, silent: Boolean = false) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            if (!silent) {
+                _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            }
             configStore.saveXtream(config.host, config.username, config.password)
             currentConfig = config
             currentMode = "xtream"
@@ -454,9 +456,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     isConfigured = true,
                     liveChannels = channels
                 )
-                val lastId = try { configStore.getLastChannelId() } catch (e: Exception) { null }
-                val startingChannel = channels.firstOrNull { it.streamId == lastId } ?: channels.firstOrNull()
-                startingChannel?.let { playChannel(it) }
+                // En una reconexión silenciosa, si YA está reproduciendo algo (por ejemplo el
+                // canal que el usuario acaba de tocar), no lo interrumpe volviendo a poner el
+                // primer canal de la lista.
+                if (!silent || !isCurrentlyShowingLive) {
+                    val lastId = try { configStore.getLastChannelId() } catch (e: Exception) { null }
+                    val startingChannel = channels.firstOrNull { it.streamId == lastId } ?: channels.firstOrNull()
+                    startingChannel?.let { playChannel(it) }
+                }
                 ensureHomeCatalogLoaded()
                 refreshContinueWatching()
                 refreshParentalState()
@@ -470,9 +477,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun connectM3u(url: String) {
+    fun connectM3u(url: String, silent: Boolean = false) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            if (!silent) {
+                _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            }
             configStore.saveM3u(url)
             currentMode = "m3u"
             try {
@@ -489,9 +498,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     isConfigured = true,
                     liveChannels = result.channels
                 )
-                val lastId = try { configStore.getLastChannelId() } catch (e: Exception) { null }
-                val startingChannel = result.channels.firstOrNull { it.streamId == lastId } ?: result.channels.firstOrNull()
-                startingChannel?.let { playChannel(it) }
+                if (!silent || !isCurrentlyShowingLive) {
+                    val lastId = try { configStore.getLastChannelId() } catch (e: Exception) { null }
+                    val startingChannel = result.channels.firstOrNull { it.streamId == lastId } ?: result.channels.firstOrNull()
+                    startingChannel?.let { playChannel(it) }
+                }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
