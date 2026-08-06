@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jetgo.tv.ui.components.SpaceBackground
 import com.jetgo.tv.ui.theme.BackgroundDark
 import com.jetgo.tv.ui.theme.FocusOrange
 import com.jetgo.tv.ui.theme.SurfaceDark
@@ -56,7 +57,10 @@ fun AccessCodeScreen(
         if (errorMessage != null) code = ""
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        SpaceBackground(modifier = Modifier.fillMaxSize())
+
+        Column(modifier = Modifier.fillMaxSize()) {
 
         // ---- Cuerpo centrado: código + teclado numérico ----
         Column(
@@ -138,6 +142,7 @@ fun AccessCodeScreen(
                     modifier = Modifier.padding(top = 18.dp)
                 )
             }
+        }
         }
     }
 }

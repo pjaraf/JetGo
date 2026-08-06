@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jetgo.tv.R
+import com.jetgo.tv.ui.components.SpaceBackground
 import com.jetgo.tv.ui.theme.BackgroundDark
 
 /**
@@ -59,6 +60,8 @@ fun SplashLoadingScreen() {
         modifier = Modifier.fillMaxSize().background(BackgroundDark),
         contentAlignment = Alignment.Center
     ) {
+        SpaceBackground(modifier = Modifier.fillMaxSize())
+
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Image(
                 painter = painterResource(id = R.drawable.logo_splash),
