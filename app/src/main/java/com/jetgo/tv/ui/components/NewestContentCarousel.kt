@@ -99,42 +99,6 @@ fun NewestContentCarousel(
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize().background(SurfaceDark)
                 )
-
-                // Etiqueta arriba: la categoría real del servidor (con respaldo por tipo)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(10.dp)
-                        .background(FocusOrange, RoundedCornerShape(4.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = item.categoryName?.takeIf { it.isNotBlank() }
-                            ?: if (item.type == ContentType.SERIES) "Serie" else "Película",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .background(
-                            Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)))
-                        )
-                        .padding(12.dp)
-                ) {
-                    Text(
-                        text = item.name,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        maxLines = 1
-                    )
-                }
             }
         }
     }

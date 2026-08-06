@@ -49,11 +49,14 @@ fun ChannelLogoCarousel(
             val listState = rememberLazyListState()
 
             LaunchedEffect(loopedChannels) {
-                var index = 0
+                // Desplazamiento continuo y fluido (como una cinta de video), en vez de saltar
+                // de a un canal por vez.
                 while (true) {
-                    delay(1800)
-                    index = (index + 1) % (loopedChannels.size - 5)
-                    listState.animateScrollToItem(index)
+                    listState.scrollBy(1.2f)
+                    if (listState.firstVisibleItemIndex > loopedChannels.size - 6) {
+                        listState.scrollToItem(0)
+                    }
+                    delay(16)
                 }
             }
 

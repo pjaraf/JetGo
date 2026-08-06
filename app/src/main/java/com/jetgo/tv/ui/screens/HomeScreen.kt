@@ -135,7 +135,6 @@ fun HomeScreen(
                 Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
                     HeightMatchedPlayerRow(
                         modifier = Modifier.weight(1f).fillMaxHeight(),
-                        sideFixedWidth = buttonWidth,
                         playerContent = {
                             PlayerPanel(
                                 playerManager = playerManager,
