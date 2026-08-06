@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import androidx.activity.compose.BackHandler
 import coil.compose.AsyncImage
 import com.jetgo.tv.data.model.ContentItem
+import com.jetgo.tv.ui.components.SpaceBackground
 import com.jetgo.tv.ui.theme.BackgroundDark
 import com.jetgo.tv.ui.theme.FocusOrange
 import com.jetgo.tv.ui.theme.SurfaceDark
@@ -57,6 +58,8 @@ fun ContinueWatchingScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
+        SpaceBackground(modifier = Modifier.fillMaxSize())
+
         Text(
             text = "Seguir viendo",
             color = Color.White,

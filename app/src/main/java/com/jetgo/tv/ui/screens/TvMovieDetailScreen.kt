@@ -56,6 +56,7 @@ import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.data.model.MovieDetail
 import com.jetgo.tv.player.PlayerManager
 import com.jetgo.tv.ui.components.LanguageTracksDialog
+import com.jetgo.tv.ui.components.SpaceBackground
 import com.jetgo.tv.ui.theme.BackgroundDark
 import com.jetgo.tv.ui.theme.FocusOrange
 import com.jetgo.tv.ui.theme.SurfaceDark
@@ -77,7 +78,8 @@ fun TvMovieDetailScreen(
     // BackHandler de FullscreenPlayerEffect, que cierra la pantalla completa primero).
     androidx.activity.compose.BackHandler(enabled = !isFullscreen) { onBack() }
 
-    Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        SpaceBackground(modifier = Modifier.fillMaxSize())
         when {
             state.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             state.errorMessage != null -> Column(
@@ -116,7 +118,9 @@ private fun TvMovieDetailContent(
     var sinopsisExpanded by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
 
-    Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        SpaceBackground(modifier = Modifier.fillMaxSize())
+
         // ---- Fondo: la carátula ajustada a 16:9, completa y sin recortes ----
         if (!detail.coverUrl.isNullOrBlank()) {
             AsyncImage(

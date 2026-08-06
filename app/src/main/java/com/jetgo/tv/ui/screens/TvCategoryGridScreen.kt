@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.jetgo.tv.data.model.Category
 import com.jetgo.tv.data.model.ContentItem
+import com.jetgo.tv.ui.components.SpaceBackground
 import com.jetgo.tv.ui.theme.BackgroundDark
 import com.jetgo.tv.ui.theme.FocusOrange
 import com.jetgo.tv.ui.theme.SurfaceDark
@@ -108,11 +109,13 @@ fun TvCategoryGridScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundDark)
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        SpaceBackground(modifier = Modifier.fillMaxSize())
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+        ) {
         // ---- Encabezado: "Películas > Categoría" + total de títulos ----
         Row(
             modifier = Modifier
@@ -227,6 +230,7 @@ fun TvCategoryGridScreen(
                     modifier = Modifier.align(Alignment.CenterStart)
                 )
             }
+        }
         }
     }
 }

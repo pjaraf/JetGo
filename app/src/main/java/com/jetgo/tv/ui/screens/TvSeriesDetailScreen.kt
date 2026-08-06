@@ -60,6 +60,7 @@ import com.jetgo.tv.data.model.SeriesDetail
 import com.jetgo.tv.data.model.SeriesEpisode
 import com.jetgo.tv.player.PlayerManager
 import com.jetgo.tv.ui.components.LanguageTracksDialog
+import com.jetgo.tv.ui.components.SpaceBackground
 import com.jetgo.tv.ui.theme.BackgroundDark
 import com.jetgo.tv.ui.theme.FocusOrange
 import com.jetgo.tv.ui.theme.SurfaceDark
@@ -82,7 +83,8 @@ fun TvSeriesDetailScreen(
     // Misma lógica que en la ficha de película: "Atrás" vuelve a la grilla de series.
     androidx.activity.compose.BackHandler(enabled = !isFullscreen) { onBack() }
 
-    Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        SpaceBackground(modifier = Modifier.fillMaxSize())
         when {
             state.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             state.errorMessage != null -> Text(
@@ -132,7 +134,9 @@ private fun TvSeriesDetailContent(
     var sinopsisExpanded by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
 
-    Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        SpaceBackground(modifier = Modifier.fillMaxSize())
+
         // ---- Fondo: la carátula ajustada a 16:9, completa y sin recortes ----
         if (!detail.coverUrl.isNullOrBlank()) {
             AsyncImage(
