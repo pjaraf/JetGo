@@ -197,14 +197,15 @@ private fun HomeActionButton(
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    val actualFocusRequester = focusRequester ?: remember { FocusRequester() }
 
     Column(
         modifier = Modifier
             .width(width)
             .clip(RoundedCornerShape(14.dp))
             .background(if (isFocused) SelectedRed else SurfaceDark.copy(alpha = 0.85f))
-            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-            .onFocusChanged { isFocused = it.isFocused }
+            .focusRequester(actualFocusRequester)
+            .onFocusChanged { focusState -> isFocused = focusState.isFocused }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
