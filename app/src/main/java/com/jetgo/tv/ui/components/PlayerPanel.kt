@@ -49,13 +49,8 @@ fun PlayerPanel(
     Box(
         modifier = modifier
             .aspectRatio(16f / 9f)
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(14.dp))
             .background(Color.Black)
-            .border(
-                width = if (isFocused) 3.dp else 0.dp,
-                color = if (isFocused) FocusOrange else Color.Transparent,
-                shape = RoundedCornerShape(6.dp)
-            )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,

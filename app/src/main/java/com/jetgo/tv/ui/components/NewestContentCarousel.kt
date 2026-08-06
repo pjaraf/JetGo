@@ -55,9 +55,8 @@ fun NewestContentCarousel(
     if (validItems.isEmpty()) {
         Box(
             modifier = modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(SurfaceDark)
-                .border(width = 3.dp, color = FocusOrange, shape = RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(14.dp))
+                .background(SurfaceDark.copy(alpha = 0.85f))
         )
         return
     }
@@ -79,9 +78,8 @@ fun NewestContentCarousel(
     Box(
         modifier = modifier
             .scale(scale)
-            .clip(RoundedCornerShape(6.dp))
-            .border(width = 3.dp, color = FocusOrange, shape = RoundedCornerShape(6.dp))
-            .background(SurfaceDark)
+            .clip(RoundedCornerShape(14.dp))
+            .background(SurfaceDark.copy(alpha = 0.85f))
             .focusable()
             .onFocusChanged { isFocused = it.isFocused }
     ) {

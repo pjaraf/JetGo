@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import com.jetgo.tv.data.model.Channel
 import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.player.PlayerManager
+import com.jetgo.tv.ui.components.ChannelLogoCarousel
 import com.jetgo.tv.ui.components.HeightMatchedPlayerRow
 import com.jetgo.tv.ui.components.NewestContentCarousel
 import com.jetgo.tv.ui.components.PlayerPanel
@@ -131,24 +132,33 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // ---- Reproductor + carrusel: el carrusel calza exacto con el ancho de un botón ----
-                HeightMatchedPlayerRow(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    sideFixedWidth = buttonWidth,
-                    playerContent = {
-                        PlayerPanel(
-                            playerManager = playerManager,
-                            showVideo = !isFullscreen,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    },
-                    sideContent = {
-                        NewestContentCarousel(
-                            items = newestItems,
-                            onItemClick = onItemClick,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                )
+                Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    HeightMatchedPlayerRow(
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        sideFixedWidth = buttonWidth,
+                        playerContent = {
+                            PlayerPanel(
+                                playerManager = playerManager,
+                                showVideo = !isFullscreen,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        },
+                        sideContent = {
+                            NewestContentCarousel(
+                                items = newestItems,
+                                onItemClick = onItemClick,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    ChannelLogoCarousel(
+                        channels = liveChannels,
+                        modifier = Modifier.width(64.dp).fillMaxHeight()
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
