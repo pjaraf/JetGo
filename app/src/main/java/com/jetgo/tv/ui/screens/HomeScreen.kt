@@ -1,46 +1,61 @@
 package com.jetgo.tv.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayCircle
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tv
-import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.jetgo.tv.data.model.Channel
 import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.player.PlayerManager
-import com.jetgo.tv.ui.components.CategoryCard
 import com.jetgo.tv.ui.components.HeightMatchedPlayerRow
 import com.jetgo.tv.ui.components.NewestContentCarousel
 import com.jetgo.tv.ui.components.PlayerPanel
-import com.jetgo.tv.ui.theme.BackgroundDark
+import com.jetgo.tv.ui.components.SpaceBackground
+import com.jetgo.tv.ui.theme.SurfaceDark
+import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+private val SelectedRed = Color(0xFFE53935)
 
 @Composable
 fun HomeScreen(
@@ -57,76 +72,157 @@ fun HomeScreen(
     onSettingsClick: () -> Unit = {},
     isFullscreen: Boolean = false
 ) {
-    val vivoFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    val vivoFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
         try { vivoFocusRequester.requestFocus() } catch (e: Exception) { /* ignorar si aún no está listo */ }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundDark)
-    ) {
-        Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+    var currentTime by remember { mutableStateOf(formatNow()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            currentTime = formatNow()
+            delay(30_000)
+        }
+    }
 
-            // ---- Fila superior: reproductor + carrusel de contenido nuevo (misma altura) ----
-            HeightMatchedPlayerRow(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                sideAspectRatio = 2f / 3f,
-                playerContent = {
-                    PlayerPanel(
-                        playerManager = playerManager,
-                        showVideo = !isFullscreen,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                },
-                sideContent = {
-                    NewestContentCarousel(
-                        items = newestItems,
-                        onItemClick = onItemClick,
-                        modifier = Modifier.fillMaxSize()
+    Box(modifier = Modifier.fillMaxSize()) {
+        SpaceBackground(modifier = Modifier.fillMaxSize())
+
+        BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+            val spacing = 14.dp
+            val buttonCount = 5
+            val buttonWidth = ((maxWidth - spacing * (buttonCount - 1)) / buttonCount).coerceAtLeast(0.dp)
+
+            Column(modifier = Modifier.fillMaxSize()) {
+
+                // ---- Cabecera: logo + nombre a la izquierda, hora/fecha a la derecha ----
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(Color.White.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("J", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Text(
+                            text = "JetGo",
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(start = 10.dp)
+                        )
+                    }
+                    Text(
+                        text = currentTime,
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
-            )
 
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            // ---- Fila inferior: categorías (Vivo, Serie, Película, Anime, Especial) ----
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                CategoryCard(
-                    label = "VIVO", icon = Icons.Default.PlayCircle,
-                    gradientStart = Color(0xFFFF6B5B), gradientEnd = Color(0xFFE5493B),
-                    modifier = Modifier.weight(1f),
-                    focusRequester = vivoFocusRequester
-                ) { onLiveClick() }
+                // ---- Reproductor + carrusel: el carrusel calza exacto con el ancho de un botón ----
+                HeightMatchedPlayerRow(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    sideFixedWidth = buttonWidth,
+                    playerContent = {
+                        PlayerPanel(
+                            playerManager = playerManager,
+                            showVideo = !isFullscreen,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    sideContent = {
+                        NewestContentCarousel(
+                            items = newestItems,
+                            onItemClick = onItemClick,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                )
 
-                CategoryCard(
-                    label = "SERIE", icon = Icons.Default.Tv,
-                    gradientStart = Color(0xFF5BC8FF), gradientEnd = Color(0xFF2E8FE0),
-                    modifier = Modifier.weight(1f)
-                ) { onCategoryClick("SERIES") }
+                Spacer(modifier = Modifier.height(20.dp))
 
-                CategoryCard(
-                    label = "PELÍCULA", icon = Icons.Default.Movie,
-                    gradientStart = Color(0xFF4FE0B0), gradientEnd = Color(0xFF22B88C),
-                    modifier = Modifier.weight(1f)
-                ) { onCategoryClick("MOVIE") }
+                // ---- Botones inferiores: neutros por defecto, rojo el que está seleccionado ----
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing)
+                ) {
+                    HomeActionButton(
+                        label = "VIVO", icon = Icons.Default.PlayCircle,
+                        width = buttonWidth,
+                        focusRequester = vivoFocusRequester
+                    ) { onLiveClick() }
 
-                CategoryCard(
-                    label = "SEGUIR VIENDO", icon = Icons.Default.History,
-                    gradientStart = Color(0xFF8E8CFF), gradientEnd = Color(0xFF5B57E0),
-                    modifier = Modifier.weight(1f)
-                ) { onContinueWatchingClick() }
+                    HomeActionButton(
+                        label = "SERIE", icon = Icons.Default.Tv,
+                        width = buttonWidth
+                    ) { onCategoryClick("SERIES") }
 
-                CategoryCard(
-                    label = "AJUSTES", icon = Icons.Default.Settings,
-                    gradientStart = Color(0xFFFFA24E), gradientEnd = Color(0xFFE77A1F),
-                    modifier = Modifier.weight(1f)
-                ) { onSettingsClick() }
+                    HomeActionButton(
+                        label = "PELÍCULA", icon = Icons.Default.Movie,
+                        width = buttonWidth
+                    ) { onCategoryClick("MOVIE") }
+
+                    HomeActionButton(
+                        label = "SEGUIR VIENDO", icon = Icons.Default.History,
+                        width = buttonWidth
+                    ) { onContinueWatchingClick() }
+
+                    HomeActionButton(
+                        label = "AJUSTES", icon = Icons.Default.Settings,
+                        width = buttonWidth
+                    ) { onSettingsClick() }
+                }
             }
         }
     }
 }
+
+/** Botón inferior del Inicio: color neutro en reposo, ROJO cuando el control lo enfoca */
+@Composable
+private fun HomeActionButton(
+    label: String,
+    icon: ImageVector,
+    width: Dp,
+    focusRequester: FocusRequester? = null,
+    onClick: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .width(width)
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (isFocused) SelectedRed else SurfaceDark.copy(alpha = 0.85f))
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .onFocusChanged { isFocused = it.isFocused }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+            .padding(vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(24.dp))
+        Text(
+            text = label,
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(top = 6.dp)
+        )
+    }
+}
+
+private fun formatNow(): String =
+    SimpleDateFormat("HH:mm  ·  dd/MM/yyyy", Locale.getDefault()).format(Date())

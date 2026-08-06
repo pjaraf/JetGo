@@ -24,6 +24,9 @@ fun HeightMatchedPlayerRow(
     /** Si se da, el panel lateral usa ESTE ancho/alto exacto (ej. 2f/3f para una carátula
      *  vertical) en vez de ocupar todo el espacio que le tocaría por [sideWeight]. */
     sideAspectRatio: Float? = null,
+    /** Si se da, el panel lateral usa EXACTAMENTE este ancho en dp (por ejemplo, para que
+     *  calce igual que otro botón/elemento de la pantalla). Tiene prioridad sobre [sideAspectRatio]. */
+    sideFixedWidth: Dp? = null,
     spacing: Dp = 16.dp,
     playerContent: @Composable () -> Unit,
     sideContent: @Composable () -> Unit
@@ -47,12 +50,12 @@ fun HeightMatchedPlayerRow(
         }
         val playerHeight = (playerPlaceables.maxOfOrNull { it.height } ?: 0).coerceAtMost(constraints.maxHeight)
 
-        // Ancho real del panel lateral: si se pidió una proporción específica, se calcula a
-        // partir de la altura del reproductor (nunca más ancho que el espacio disponible).
-        val sideWidth = if (sideAspectRatio != null) {
-            (playerHeight * sideAspectRatio).toInt().coerceIn(0, maxSideWidth)
-        } else {
-            maxSideWidth
+        // Ancho real del panel lateral: ancho fijo explícito > proporción calculada > todo
+        // el espacio disponible (en ese orden de prioridad).
+        val sideWidth = when {
+            sideFixedWidth != null -> sideFixedWidth.roundToPx().coerceIn(0, maxSideWidth)
+            sideAspectRatio != null -> (playerHeight * sideAspectRatio).toInt().coerceIn(0, maxSideWidth)
+            else -> maxSideWidth
         }
 
         val sidePlaceables = subcompose("side", sideContent).map { measurable ->
