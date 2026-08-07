@@ -43,10 +43,16 @@ service cloud.firestore {
         && resource.data.active == true
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deviceActivity']);
 
-      // Un administrador o sub administrador con sesión iniciada (y no revocado) puede
-      // listar, crear, editar libremente o borrar códigos.
-      allow list, create, delete: if isSignedIn() && !isRevoked();
-      allow update: if isSignedIn() && !isRevoked();
+      // El administrador principal ve y administra TODOS los códigos. Un sub administrador
+      // solo ve, edita y borra los códigos que ÉL MISMO creó (ownerId == su propio uid).
+      allow list: if isSignedIn() && !isRevoked()
+        && (isPrincipalAdmin() || resource.data.get('ownerId', '') == request.auth.uid);
+
+      allow create: if isSignedIn() && !isRevoked()
+        && request.resource.data.ownerId == request.auth.uid;
+
+      allow update, delete: if isSignedIn() && !isRevoked()
+        && (isPrincipalAdmin() || resource.data.get('ownerId', '') == request.auth.uid);
     }
 
     // Colección "admins": guarda el rol de cada cuenta que puede entrar al panel

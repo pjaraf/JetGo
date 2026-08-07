@@ -547,6 +547,8 @@
 
       document.getElementById('subadminCreateBox').style.display = currentUserRole === 'admin' ? 'block' : 'none';
       document.getElementById('subadminBlockedMessage').style.display = currentUserRole === 'admin' ? 'none' : 'block';
+      // Un sub administrador ni siquiera ve esta opción en el menú
+      document.getElementById('nav-subadmins').style.display = currentUserRole === 'admin' ? 'flex' : 'none';
 
       loginScreen.style.display = 'none';
       appShell.style.display = 'flex';
@@ -652,6 +654,7 @@
       deviceIds: [],
       expirationDate: expirationDate,
       isDemo: isDemo,
+      ownerId: auth.currentUser.uid,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
@@ -690,10 +693,22 @@
   let lastSnapshotDocs = [];
 
   function listenToCodes() {
-    db.collection('access_codes').orderBy('createdAt', 'desc')
-      .onSnapshot(snapshot => {
+    // El principal ve todos los códigos; un sub administrador solo ve los que él mismo creó.
+    let query = db.collection('access_codes');
+    if (currentUserRole !== 'admin') {
+      query = query.where('ownerId', '==', auth.currentUser.uid);
+    } else {
+      query = query.orderBy('createdAt', 'desc');
+    }
+
+    query.onSnapshot(snapshot => {
         lastSnapshotDocs = [];
         snapshot.forEach(doc => lastSnapshotDocs.push({ id: doc.id, data: doc.data() }));
+        if (currentUserRole !== 'admin') {
+          // Como esta consulta filtrada no puede además pedir orden por fecha sin un índice
+          // extra en Firestore, se ordena acá mismo del lado del panel.
+          lastSnapshotDocs.sort((a, b) => (b.data.createdAt?.seconds || 0) - (a.data.createdAt?.seconds || 0));
+        }
         renderCodes();
       });
 
