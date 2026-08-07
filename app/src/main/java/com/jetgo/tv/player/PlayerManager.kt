@@ -159,15 +159,13 @@ class PlayerManager(context: Context) {
             .setAllowCrossProtocolRedirects(true)
 
         val mediaItem = MediaItem.fromUri(url)
-        val isHls = url.contains(".m3u8")
 
-        val mediaSource = if (isHls) {
-            HlsMediaSource.Factory(httpDataSourceFactory).createMediaSource(mediaItem)
-        } else {
-            androidx.media3.exoplayer.source.ProgressiveMediaSource
-                .Factory(httpDataSourceFactory)
-                .createMediaSource(mediaItem)
-        }
+        // Antes se elegía a mano entre HLS/progresivo mirando si la URL tenía ".m3u8" — pero
+        // las películas/series vienen en formatos variados (.mp4, .mkv, .ts, etc.) que ese
+        // chequeo simple no cubre bien en todos los casos. DefaultMediaSourceFactory detecta
+        // el tipo correcto de forma más confiable, sea cual sea el formato del archivo.
+        val mediaSource = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(httpDataSourceFactory)
+            .createMediaSource(mediaItem)
 
         _stats.value = _stats.value.copy(channelName = name, isLive = true)
         exoPlayer.setMediaSource(mediaSource)
