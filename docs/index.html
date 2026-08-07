@@ -299,6 +299,28 @@
     </div>
 
     <div class="content">
+      <!-- ---------- Generar código: SIEMPRE visible, sin importar la pestaña ---------- -->
+      <div class="card">
+        <h2>Generar nuevo código</h2>
+        <input id="clientName" type="text" placeholder="Nombre del cliente (opcional)" />
+
+        <div class="mode-row">
+          <button type="button" id="modeXtreamBtn" class="mode-btn active" onclick="setMode('xtream')">Xtream Codes</button>
+          <button type="button" id="modeM3uBtn" class="mode-btn" onclick="setMode('m3u')">Lista M3U</button>
+        </div>
+
+        <div id="xtreamFields">
+          <input id="host" type="text" placeholder="Host del servidor (http://servidor.com:8080)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          <input id="username" type="text" placeholder="Usuario Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          <input id="xtreamPassword" type="text" placeholder="Contraseña Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+        </div>
+        <div id="m3uFields" style="display:none;">
+          <input id="m3uUrl" type="text" placeholder="URL de la lista M3U" />
+        </div>
+
+        <button id="generateBtn" class="full">Generar nuevo código</button>
+      </div>
+
       <!-- ---------- SECCIÓN: Dashboard ---------- -->
       <div id="dashboardSection">
         <div class="stats-grid">
@@ -335,29 +357,8 @@
         </div>
       </div>
 
-      <!-- ---------- SECCIÓN: Códigos (generar + tabla completa) ---------- -->
+      <!-- ---------- SECCIÓN: Códigos (tabla completa con búsqueda) ---------- -->
       <div id="codesSection" style="display:none;">
-        <div class="card">
-          <h2>Generar nuevo código</h2>
-          <input id="clientName" type="text" placeholder="Nombre del cliente (opcional)" />
-
-          <div class="mode-row">
-            <button type="button" id="modeXtreamBtn" class="mode-btn active" onclick="setMode('xtream')">Xtream Codes</button>
-            <button type="button" id="modeM3uBtn" class="mode-btn" onclick="setMode('m3u')">Lista M3U</button>
-          </div>
-
-          <div id="xtreamFields">
-            <input id="host" type="text" placeholder="Host del servidor (http://servidor.com:8080)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
-            <input id="username" type="text" placeholder="Usuario Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
-            <input id="xtreamPassword" type="text" placeholder="Contraseña Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
-          </div>
-          <div id="m3uFields" style="display:none;">
-            <input id="m3uUrl" type="text" placeholder="URL de la lista M3U" />
-          </div>
-
-          <button id="generateBtn" class="full">Generar nuevo código</button>
-        </div>
-
         <!-- ---------- Tabla de códigos ---------- -->
         <div class="card">
           <h2>Todos los códigos</h2>
