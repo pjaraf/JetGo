@@ -1,6 +1,7 @@
 package com.jetgo.tv.player
 
 import android.content.Context
+import android.util.Log
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -110,6 +111,15 @@ class PlayerManager(context: Context) {
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                // Antes el error real se perdía en silencio (solo se mostraba un mensaje
+                // genérico al usuario) — se loggea acá para poder diagnosticar con logcat
+                // por qué falla la reproducción en un servidor/contenido puntual.
+                Log.e(
+                    "PlayerManager",
+                    "onPlayerError url=$lastUrl errorCode=${error.errorCode} " +
+                        "errorCodeName=${error.errorCodeName} retryCount=$retryCount",
+                    error
+                )
                 val url = lastUrl
                 if (url != null && retryCount < 2) {
                     // Reintenta un par de veces solo (cortes momentáneos de red/servidor),
