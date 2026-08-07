@@ -44,6 +44,15 @@ class PlayerManager(context: Context) {
     /** Se dispara cuando el contenido actual termina de reproducirse por completo (fin de capítulo/película) */
     var onPlaybackEnded: (() -> Unit)? = null
 
+    /** Mensaje de error si la reproducción falló (canal caído, URL rota, etc.) — antes esto
+     *  se perdía en silencio y solo se veía una pantalla negra sin ninguna explicación. */
+    private val _playbackError = mutableStateOf<String?>(null)
+    val playbackError: State<String?> get() = _playbackError
+
+    private var retryCount = 0
+    private var lastUrl: String? = null
+    private var lastName: String = ""
+
     init {
         exoPlayer.addAnalyticsListener(object : AnalyticsListener {
             override fun onBandwidthEstimate(
@@ -62,10 +71,30 @@ class PlayerManager(context: Context) {
                 if (playbackState == Player.STATE_ENDED) {
                     onPlaybackEnded?.invoke()
                 }
+                if (playbackState == Player.STATE_READY) {
+                    // Volvió a andar bien: limpia cualquier error anterior y resetea los reintentos
+                    _playbackError.value = null
+                    retryCount = 0
+                }
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _isPlaying.value = isPlaying
+            }
+
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                val url = lastUrl
+                if (url != null && retryCount < 2) {
+                    // Reintenta un par de veces solo (cortes momentáneos de red/servidor),
+                    // antes de mostrarle un error al usuario.
+                    retryCount++
+                    try {
+                        exoPlayer.prepare()
+                        exoPlayer.playWhenReady = true
+                    } catch (e: Exception) { /* ignorar, se maneja abajo si vuelve a fallar */ }
+                } else {
+                    _playbackError.value = "No se pudo reproducir \"$lastName\". Verifica tu conexión o el canal en el servidor."
+                }
             }
 
             override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
@@ -89,6 +118,10 @@ class PlayerManager(context: Context) {
             return
         }
         currentUrl = url
+        lastUrl = url
+        lastName = name
+        retryCount = 0
+        _playbackError.value = null
         _videoQuality.value = null
 
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()

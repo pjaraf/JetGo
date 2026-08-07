@@ -116,4 +116,43 @@ object AccessCodeChecker {
             // Si falla el registro del dispositivo, no bloqueamos el acceso de este intento
         }
     }
+
+    /**
+     * Avisa "este dispositivo está usando la app AHORA MISMO", guardando la hora actual en
+     * Firestore (deviceActivity.{deviceId}). El panel admin usa esto para mostrar qué
+     * dispositivos están en línea en tiempo real. Se llama a esto cada cierto tiempo mientras
+     * la app está abierta; si falla, no afecta nada de la reproducción (es solo informativo).
+     */
+    fun sendHeartbeat(projectId: String, code: String, deviceId: String) {
+        if (projectId.isBlank() || code.isBlank() || deviceId.isBlank()) return
+        try {
+            val normalizedCode = code.trim().uppercase()
+            val docPath = "projects/$projectId/databases/(default)/documents/access_codes/$normalizedCode"
+            val docUrl = "https://firestore.googleapis.com/v1/$docPath"
+
+            val payload = JSONObject().put(
+                "fields", JSONObject().put(
+                    "deviceActivity", JSONObject().put(
+                        "mapValue", JSONObject().put(
+                            "fields", JSONObject().put(
+                                deviceId, JSONObject().put("timestampValue", nowIsoUtc())
+                            )
+                        )
+                    )
+                )
+            )
+            val patchUrl = "$docUrl?updateMask.fieldPaths=deviceActivity.$deviceId"
+            val requestBody = payload.toString().toRequestBody("application/json".toMediaType())
+            val patchRequest = Request.Builder().url(patchUrl).patch(requestBody).build()
+            client.newCall(patchRequest).execute().close()
+        } catch (e: Exception) {
+            // Silencioso: si falla el aviso de "estoy en línea", no afecta nada más
+        }
+    }
+
+    private fun nowIsoUtc(): String {
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US)
+        sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+        return sdf.format(java.util.Date())
+    }
 }

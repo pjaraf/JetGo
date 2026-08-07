@@ -29,6 +29,7 @@ import com.jetgo.tv.util.UpdateChecker
 import com.jetgo.tv.util.UpdateInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -318,6 +319,26 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             favoritesStore.favorites.collect { _favorites.value = it }
+        }
+
+        // Cada cierto tiempo, mientras la app esté abierta y conectada, avisa "estoy en línea
+        // ahora mismo" — así el panel admin puede mostrar qué dispositivos están usando la
+        // app en tiempo real. Si falla (sin internet, etc.) no afecta nada más.
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            while (true) {
+                delay(45_000)
+                val code = try { accessStore.savedCode.first() } catch (e: Exception) { null }
+                if (!code.isNullOrBlank()) {
+                    withContext(Dispatchers.IO) {
+                        try {
+                            val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
+                            val deviceId = getDeviceId(context)
+                            AccessCodeChecker.sendHeartbeat(projectId, code, deviceId)
+                        } catch (e: Exception) { /* silencioso */ }
+                    }
+                }
+            }
         }
         checkForUpdate()
     }

@@ -254,6 +254,29 @@ fun FullscreenPlayerOverlay(
                 },
                 modifier = Modifier.align(Alignment.CenterStart)
             )
+
+            playerManager.playbackError.value?.let { errorMsg ->
+                Box(
+                    modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(32.dp)
+                    ) {
+                        Text(
+                            text = errorMsg,
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(16.dp))
+                        androidx.compose.material3.Button(onClick = { changeChannelDirect(0) }) {
+                            Text("Reintentar")
+                        }
+                    }
+                }
+            }
         }
     }
 
