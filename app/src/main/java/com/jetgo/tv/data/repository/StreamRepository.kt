@@ -100,7 +100,7 @@ class StreamRepository {
                 categoryId = it.categoryId,
                 streamUrl = XtreamApi.vodStreamUrl(
                     config.host, config.username, config.password, it.streamId,
-                    it.containerExtension?.takeIf { ext -> ext.isNotBlank() } ?: "mp4"
+                    it.containerExtension?.takeIf { ext -> ext.isNotBlank() } ?: "mkv"
                 ),
                 rating = it.rating
             )
@@ -161,7 +161,7 @@ class StreamRepository {
         val episodeIdInt = firstEpisode.id.toIntOrNull() ?: return@withContext null
         XtreamApi.seriesStreamUrl(
             config.host, config.username, config.password,
-            episodeIdInt, firstEpisode.containerExtension?.takeIf { it.isNotBlank() } ?: "mp4"
+            episodeIdInt, firstEpisode.containerExtension?.takeIf { it.isNotBlank() } ?: "mkv"
         )
     }
 
@@ -183,7 +183,7 @@ class StreamRepository {
                         season = seasonNum,
                         streamUrl = XtreamApi.seriesStreamUrl(
                             config.host, config.username, config.password,
-                            epIdInt, ep.containerExtension?.takeIf { it.isNotBlank() } ?: "mp4"
+                            epIdInt, ep.containerExtension?.takeIf { it.isNotBlank() } ?: "mkv"
                         )
                     )
                 }.sortedBy { it.episodeNum }
@@ -222,15 +222,16 @@ class StreamRepository {
         val streamUrl = if (streamIdInt != null) {
             XtreamApi.vodStreamUrl(
                 config.host, config.username, config.password,
-                streamIdInt, realExtension ?: "mp4"
+                streamIdInt, realExtension ?: "mkv"
             )
         } else fallbackStreamUrl
 
         // Si el servidor SÍ informó la extensión real, no hace falta adivinar nada más.
         // Si NO la informó (quedó vacía), se preparan otras extensiones comunes para
-        // probarlas automáticamente en caso de que "mp4" no sea la correcta.
+        // probarlas automáticamente en caso de que "mkv" no sea la correcta (varios paneles
+        // que no informan este dato en realidad usan mkv como formato real de las películas).
         val alternateUrls = if (realExtension == null && streamIdInt != null) {
-            listOf("mkv", "ts", "avi", "m3u8").map { ext ->
+            listOf("mp4", "ts", "avi", "m3u8").map { ext ->
                 XtreamApi.vodStreamUrl(config.host, config.username, config.password, streamIdInt, ext)
             }
         } else emptyList()
