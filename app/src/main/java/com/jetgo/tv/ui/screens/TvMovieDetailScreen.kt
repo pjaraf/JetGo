@@ -248,6 +248,11 @@ private fun TvMovieDetailContent(
                                 useController = false
                             }
                         },
+                        update = { view ->
+                            if (view.player !== playerManager.exoPlayer) {
+                                view.player = playerManager.exoPlayer
+                            }
+                        },
                         modifier = Modifier.fillMaxSize()
                     )
                 }

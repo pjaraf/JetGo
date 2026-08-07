@@ -145,6 +145,8 @@ class PlayerManager(context: Context) {
         exoPlayer.setMediaSource(mediaSource)
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
+        exoPlayer.play() // explícito además de playWhenReady: en algunos TV Box, solo con
+                          // la marca "listo para reproducir" no alcanza para que arranque solo
     }
 
     fun release() {
