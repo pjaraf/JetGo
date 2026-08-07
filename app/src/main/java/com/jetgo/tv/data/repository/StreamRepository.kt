@@ -218,12 +218,22 @@ class StreamRepository {
         val info = body.info
 
         val streamIdInt = body.movieData?.streamId ?: streamId.toIntOrNull()
+        val realExtension = body.movieData?.containerExtension?.takeIf { it.isNotBlank() }
         val streamUrl = if (streamIdInt != null) {
             XtreamApi.vodStreamUrl(
                 config.host, config.username, config.password,
-                streamIdInt, body.movieData?.containerExtension?.takeIf { it.isNotBlank() } ?: "mp4"
+                streamIdInt, realExtension ?: "mp4"
             )
         } else fallbackStreamUrl
+
+        // Si el servidor SÍ informó la extensión real, no hace falta adivinar nada más.
+        // Si NO la informó (quedó vacía), se preparan otras extensiones comunes para
+        // probarlas automáticamente en caso de que "mp4" no sea la correcta.
+        val alternateUrls = if (realExtension == null && streamIdInt != null) {
+            listOf("mkv", "ts", "avi", "m3u8").map { ext ->
+                XtreamApi.vodStreamUrl(config.host, config.username, config.password, streamIdInt, ext)
+            }
+        } else emptyList()
 
         MovieDetail(
             streamId = streamId,
@@ -236,7 +246,8 @@ class StreamRepository {
             country = info?.country,
             releaseDate = info?.releaseDate,
             rating = info?.rating,
-            streamUrl = streamUrl
+            streamUrl = streamUrl,
+            alternateStreamUrls = alternateUrls
         )
     }
 

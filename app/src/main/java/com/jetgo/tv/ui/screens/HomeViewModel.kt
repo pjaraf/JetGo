@@ -304,7 +304,25 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     // Caché en memoria del catálogo completo para búsqueda instantánea tras la primera carga
     private var searchCatalog: List<ContentItem>? = null
 
+    // Cuando el servidor no informa la extensión real del archivo, se van probando otras
+    // comunes en orden si la actual falla — sin que el usuario tenga que hacer nada.
+    private var pendingAlternateUrls: List<String> = emptyList()
+    private var pendingContentKey: String = ""
+    private var pendingTitle: String = ""
+    private var pendingOnCompleted: (() -> Unit)? = null
+
     init {
+        viewModelScope.launch {
+            androidx.compose.runtime.snapshotFlow { playerManager.playbackError.value }
+                .collect { error ->
+                    if (error != null && pendingAlternateUrls.isNotEmpty()) {
+                        val nextUrl = pendingAlternateUrls.first()
+                        pendingAlternateUrls = pendingAlternateUrls.drop(1)
+                        playWithResumeCheck(pendingContentKey, pendingTitle, nextUrl, pendingOnCompleted)
+                    }
+                }
+        }
+
         android.util.Log.e("JetGo_DIAG", "HomeViewModel se está creando de nuevo", Exception("rastro de diagnóstico"))
         checkStoredAccess()
 
@@ -672,6 +690,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Se llama al tocar un ítem final. Resuelve el episodio si es una serie. */
     fun selectContentItem(item: ContentItem, onReady: () -> Unit) {
+        pendingAlternateUrls = emptyList()
         if (item.streamUrl != null) {
             val isVod = item.type == ContentType.MOVIE || item.type == ContentType.ANIME || item.type == ContentType.SPECIAL
             if (isVod) {
@@ -1026,12 +1045,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
             _movieDetailState.value = MovieDetailUiState(detail = detail)
             playerManager.onPlaybackEnded = null
-            playWithResumeCheck("movie:${item.id}", detail.name, detail.streamUrl, onCompleted = {
+            pendingAlternateUrls = detail.alternateStreamUrls
+            pendingContentKey = "movie:${item.id}"
+            pendingTitle = detail.name
+            pendingOnCompleted = {
                 viewModelScope.launch {
                     watchHistoryStore.remove(item.id, "MOVIE")
                     refreshContinueWatching()
                 }
-            })
+            }
+            playWithResumeCheck("movie:${item.id}", detail.name, detail.streamUrl, onCompleted = pendingOnCompleted)
         }
     }
 

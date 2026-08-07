@@ -103,5 +103,9 @@ data class MovieDetail(
     val country: String?,
     val releaseDate: String?,
     val rating: String?,
-    val streamUrl: String
+    val streamUrl: String,
+    /** Si el servidor no mandó la extensión real del archivo (container_extension vacío), acá
+     *  quedan otras URLs con extensiones comunes para probar automáticamente si la primera
+     *  falla — algunos paneles Xtream de baja calidad no informan bien este dato. */
+    val alternateStreamUrls: List<String> = emptyList()
 )
