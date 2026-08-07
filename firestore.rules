@@ -2,6 +2,24 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Si la cuenta NO tiene documento en /admins, se trata como administrador principal
+    // (así la cuenta que ya usabas antes de este sistema sigue funcionando igual).
+    function isPrincipalAdmin() {
+      return !exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Un sub administrador al que se le revocó el acceso no puede hacer nada, aunque su
+    // sesión de Firebase siga técnicamente iniciada.
+    function isRevoked() {
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('revoked', false) == true;
+    }
+
     match /access_codes/{codeId} {
       // La app (sin iniciar sesión) puede CONSULTAR un código puntual si ya sabe cuál es
       // (para validarlo al ingresar), pero NO puede listar todos los códigos existentes.
@@ -18,10 +36,26 @@ service cloud.firestore {
         && resource.data.get('deviceIds', []).size() < 3
         && request.resource.data.deviceIds.size() <= 3;
 
-      // Solo un administrador con sesión iniciada (panel web) puede listar, crear,
-      // editar libremente o borrar códigos.
-      allow list, create, delete: if request.auth != null;
-      allow update: if request.auth != null;
+      // La app (sin iniciar sesión) puede avisar "estoy activo ahora mismo" actualizando
+      // solo su marca de tiempo dentro de deviceActivity, para que el panel pueda mostrar
+      // qué dispositivos están usando la app en tiempo real.
+      allow update: if request.auth == null
+        && resource.data.active == true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deviceActivity']);
+
+      // Un administrador o sub administrador con sesión iniciada (y no revocado) puede
+      // listar, crear, editar libremente o borrar códigos.
+      allow list, create, delete: if isSignedIn() && !isRevoked();
+      allow update: if isSignedIn() && !isRevoked();
+    }
+
+    // Colección "admins": guarda el rol de cada cuenta que puede entrar al panel
+    // ('admin' = principal, 'subadmin' = cuenta creada por el principal).
+    match /admins/{uid} {
+      allow get, list: if isSignedIn();
+
+      // Solo el administrador principal puede crear, editar o borrar sub administradores.
+      allow create, update, delete: if isSignedIn() && isPrincipalAdmin();
     }
   }
 }

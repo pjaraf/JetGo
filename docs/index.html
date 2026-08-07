@@ -452,22 +452,34 @@
       <!-- ---------- Vista: Paneles sub administrador ---------- -->
       <div class="card view-section" id="view-subadmins" style="display:none;">
         <h2>Paneles sub administrador</h2>
-        <p style="color:var(--muted); font-size:14px; line-height:1.6;">
-          Para agregar un sub administrador con su propio acceso a este panel, créalo directo
-          en Firebase (esto no se puede hacer desde acá por seguridad):
-        </p>
-        <ol style="color:var(--muted); font-size:14px; line-height:1.9; padding-left:20px;">
-          <li>Entra a la <a href="https://console.firebase.google.com/project/jetgo-f0127/authentication/users" target="_blank" style="color:var(--orange);">consola de Firebase → Authentication</a></li>
-          <li>Botón "Add user" → ingresa el correo y contraseña del sub administrador</li>
-          <li>Comparte con esa persona el link de este panel: <strong style="color:var(--text);">pjaraf.github.io/JetGo</strong></li>
-        </ol>
-        <p style="color:var(--muted); font-size:13px; margin-top:14px;">
-          Por ahora, cualquier cuenta que agregues ahí tiene el mismo acceso completo que tú
-          (crear, editar y borrar todos los códigos) — permisos separados por sub administrador
-          es una mejora más grande que podemos armar aparte si la necesitas.
+
+        <!-- Se muestra solo si eres el administrador principal -->
+        <div id="subadminCreateBox">
+          <input id="subadminEmail" type="email" placeholder="Correo del sub administrador" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          <input id="subadminPassword" type="text" placeholder="Contraseña (mínimo 6 caracteres)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          <button id="createSubadminBtn" class="full">Crear sub administrador</button>
+          <div id="subadminError" style="color:var(--red); font-size:13px; margin-top:10px;"></div>
+        </div>
+
+        <!-- Se muestra si NO eres el administrador principal -->
+        <p id="subadminBlockedMessage" style="display:none; color:var(--muted); font-size:14px; line-height:1.6;">
+          Solo el administrador principal puede crear otros sub administradores.
         </p>
       </div>
+
+      <div class="card view-section" id="view-subadmins-list" style="display:none;">
+        <h2>Sub administradores existentes</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Correo</th><th>Creado</th><th>Acciones</th></tr></thead>
+            <tbody id="subadminsTableBody">
+              <tr><td colspan="3" style="color:var(--muted)">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
+
   </div>
 </div>
 
@@ -511,8 +523,31 @@
 
   document.getElementById('logout').addEventListener('click', () => auth.signOut());
 
-  auth.onAuthStateChanged(user => {
+  let currentUserRole = 'admin'; // por defecto, hasta que se confirme contra Firestore
+
+  auth.onAuthStateChanged(async user => {
     if (user) {
+      // Revisa si esta cuenta tiene un rol asignado (sub administrador) o si fue revocada
+      try {
+        const adminDoc = await db.collection('admins').doc(user.uid).get();
+        if (adminDoc.exists) {
+          const adminData = adminDoc.data();
+          if (adminData.revoked === true) {
+            errorEl.textContent = 'Tu acceso a este panel fue revocado.';
+            await auth.signOut();
+            return;
+          }
+          currentUserRole = adminData.role || 'subadmin';
+        } else {
+          currentUserRole = 'admin'; // cuenta principal (sin documento propio)
+        }
+      } catch (e) {
+        currentUserRole = 'admin';
+      }
+
+      document.getElementById('subadminCreateBox').style.display = currentUserRole === 'admin' ? 'block' : 'none';
+      document.getElementById('subadminBlockedMessage').style.display = currentUserRole === 'admin' ? 'none' : 'block';
+
       loginScreen.style.display = 'none';
       appShell.style.display = 'flex';
       document.getElementById('adminEmail').textContent = user.email || '';
@@ -565,6 +600,8 @@
       document.getElementById('view-create').style.display = 'block';
     } else if (name === 'subadmins') {
       document.getElementById('view-subadmins').style.display = 'block';
+      document.getElementById('view-subadmins-list').style.display = 'block';
+      loadSubadmins();
     } else {
       document.getElementById('view-table').style.display = 'block';
       document.getElementById('tableCardTitle').textContent = VIEW_INFO[name].title;
@@ -806,6 +843,85 @@
   window.copyCode = (code) => {
     navigator.clipboard.writeText(code);
     showToast('Codigo copiado');
+  };
+
+  // ---------- Crear sub administrador (solo el principal ve este botón) ----------
+  document.getElementById('createSubadminBtn').addEventListener('click', async () => {
+    const email = document.getElementById('subadminEmail').value.trim();
+    const password = document.getElementById('subadminPassword').value;
+    const errEl = document.getElementById('subadminError');
+    errEl.textContent = '';
+
+    if (!email || !password || password.length < 6) {
+      errEl.textContent = 'Completa un correo válido y una contraseña de al menos 6 caracteres.';
+      return;
+    }
+
+    // Se usa una app secundaria de Firebase SOLO para crear la cuenta, así no se cierra
+    // tu sesión de administrador principal (crear un usuario con el SDK normalmente
+    // inicia sesión como ese usuario nuevo, que es justo lo que queremos evitar acá).
+    let secondaryApp;
+    try {
+      secondaryApp = firebase.initializeApp(firebaseConfig, 'SubadminCreation_' + Date.now());
+      const cred = await secondaryApp.auth().createUserWithEmailAndPassword(email, password);
+      const newUid = cred.user.uid;
+      await secondaryApp.auth().signOut();
+
+      await db.collection('admins').doc(newUid).set({
+        email: email,
+        role: 'subadmin',
+        revoked: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      document.getElementById('subadminEmail').value = '';
+      document.getElementById('subadminPassword').value = '';
+      showToast('Sub administrador creado');
+      loadSubadmins();
+    } catch (e) {
+      let msg = e.message;
+      if (e.code === 'auth/email-already-in-use') msg = 'Ese correo ya tiene una cuenta.';
+      if (e.code === 'auth/weak-password') msg = 'La contraseña es muy débil (mínimo 6 caracteres).';
+      errEl.textContent = msg;
+    } finally {
+      if (secondaryApp) await secondaryApp.delete();
+    }
+  });
+
+  // ---------- Listar sub administradores existentes ----------
+  async function loadSubadmins() {
+    const tbody = document.getElementById('subadminsTableBody');
+    try {
+      const snapshot = await db.collection('admins').orderBy('createdAt', 'desc').get();
+      if (snapshot.empty) {
+        tbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted)">Todavía no hay sub administradores.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = '';
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const revoked = data.revoked === true;
+        const createdText = formatDate(data.createdAt);
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + data.email + (revoked ? ' <span class="badge revoked">Revocado</span>' : ' <span class="badge active">Activo</span>') + '</td>' +
+          '<td style="color:var(--muted); font-size:12px;">' + createdText + '</td>' +
+          '<td class="actions-cell">' +
+            (currentUserRole === 'admin'
+              ? '<button class="' + (revoked ? 'secondary' : 'danger') + '" onclick="toggleSubadminRevoked(\'' + doc.id + '\', ' + revoked + ')">' + (revoked ? 'Reactivar' : 'Revocar acceso') + '</button>'
+              : '<span style="color:var(--muted); font-size:12px;">Solo el principal puede editar</span>') +
+          '</td>';
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="3" style="color:var(--red)">No se pudo cargar la lista.</td></tr>';
+    }
+  }
+
+  window.toggleSubadminRevoked = async (uid, currentlyRevoked) => {
+    await db.collection('admins').doc(uid).update({ revoked: !currentlyRevoked });
+    showToast(currentlyRevoked ? 'Acceso reactivado' : 'Acceso revocado');
+    loadSubadmins();
   };
 
   function showToast(msg) {
