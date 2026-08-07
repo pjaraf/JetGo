@@ -98,8 +98,10 @@
     font-size: 14px;
     font-weight: 600;
     margin-bottom: 4px;
-    cursor: default;
+    cursor: pointer;
+    transition: background 0.15s;
   }
+  .nav-item:hover { background: rgba(255,255,255,0.04); }
   .nav-item.active {
     background: var(--orange-dim);
     color: var(--orange);
@@ -279,7 +281,8 @@
       <div class="name">JetGo</div>
     </div>
     <nav>
-      <div class="nav-item active"><span class="dot"></span> Dashboard</div>
+      <div class="nav-item active" id="navDashboard" onclick="showSection('dashboard')"><span class="dot"></span> Dashboard</div>
+      <div class="nav-item" id="navCodes" onclick="showSection('codes')"><span class="dot"></span> Códigos</div>
     </nav>
     <div class="sidebar-footer">
       <div class="admin-email" id="adminEmail"></div>
@@ -296,61 +299,80 @@
     </div>
 
     <div class="content">
-      <!-- ---------- Tarjetas de estadísticas ---------- -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">Códigos totales</div>
-          <div class="stat-value" id="statTotal">0</div>
+      <!-- ---------- SECCIÓN: Dashboard ---------- -->
+      <div id="dashboardSection">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Códigos totales</div>
+            <div class="stat-value" id="statTotal">0</div>
+          </div>
+          <div class="stat-card accent-green">
+            <div class="stat-label">Activos</div>
+            <div class="stat-value" id="statActive">0</div>
+          </div>
+          <div class="stat-card accent-red">
+            <div class="stat-label">Revocados</div>
+            <div class="stat-value" id="statRevoked">0</div>
+          </div>
+          <div class="stat-card accent-blue">
+            <div class="stat-label">Dispositivos conectados</div>
+            <div class="stat-value" id="statDevices">0</div>
+          </div>
         </div>
-        <div class="stat-card accent-green">
-          <div class="stat-label">Activos</div>
-          <div class="stat-value" id="statActive">0</div>
-        </div>
-        <div class="stat-card accent-red">
-          <div class="stat-label">Revocados</div>
-          <div class="stat-value" id="statRevoked">0</div>
-        </div>
-        <div class="stat-card accent-blue">
-          <div class="stat-label">Dispositivos conectados</div>
-          <div class="stat-value" id="statDevices">0</div>
+
+        <div class="card">
+          <h2>Últimos códigos generados</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Código</th><th>Cliente</th><th>Estado</th><th>Creado</th></tr>
+              </thead>
+              <tbody id="recentCodesBody">
+                <tr><td colspan="4" style="color:var(--muted)">Cargando...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      <!-- ---------- Generar código ---------- -->
-      <div class="card">
-        <h2>Generar nuevo código</h2>
-        <input id="clientName" type="text" placeholder="Nombre del cliente (opcional)" />
+      <!-- ---------- SECCIÓN: Códigos (generar + tabla completa) ---------- -->
+      <div id="codesSection" style="display:none;">
+        <div class="card">
+          <h2>Generar nuevo código</h2>
+          <input id="clientName" type="text" placeholder="Nombre del cliente (opcional)" />
 
-        <div class="mode-row">
-          <button type="button" id="modeXtreamBtn" class="mode-btn active" onclick="setMode('xtream')">Xtream Codes</button>
-          <button type="button" id="modeM3uBtn" class="mode-btn" onclick="setMode('m3u')">Lista M3U</button>
+          <div class="mode-row">
+            <button type="button" id="modeXtreamBtn" class="mode-btn active" onclick="setMode('xtream')">Xtream Codes</button>
+            <button type="button" id="modeM3uBtn" class="mode-btn" onclick="setMode('m3u')">Lista M3U</button>
+          </div>
+
+          <div id="xtreamFields">
+            <input id="host" type="text" placeholder="Host del servidor (http://servidor.com:8080)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+            <input id="username" type="text" placeholder="Usuario Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+            <input id="xtreamPassword" type="text" placeholder="Contraseña Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          </div>
+          <div id="m3uFields" style="display:none;">
+            <input id="m3uUrl" type="text" placeholder="URL de la lista M3U" />
+          </div>
+
+          <button id="generateBtn" class="full">Generar nuevo código</button>
         </div>
 
-        <div id="xtreamFields">
-          <input id="host" type="text" placeholder="Host del servidor (http://servidor.com:8080)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
-          <input id="username" type="text" placeholder="Usuario Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
-          <input id="xtreamPassword" type="text" placeholder="Contraseña Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
-        </div>
-        <div id="m3uFields" style="display:none;">
-          <input id="m3uUrl" type="text" placeholder="URL de la lista M3U" />
-        </div>
-
-        <button id="generateBtn" class="full">Generar nuevo código</button>
+        <!-- ---------- Tabla de códigos ---------- -->
+        <div class="card">
+          <h2>Todos los códigos</h2>
+          <input id="searchInput" type="text" placeholder="Buscar por código o nombre de cliente..." oninput="filterCodes()" />
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Código</th><th>Cliente</th><th>Estado</th><th>Creado</th><th>Acciones</th></tr>
+              </thead>
+              <tbody id="codesTableBody">
+                <tr><td colspan="5" style="color:var(--muted)">Cargando códigos...</td></tr>
+              </tbody>
+            </table>
+          </div>
       </div>
-
-      <!-- ---------- Tabla de códigos ---------- -->
-      <div class="card">
-        <h2>Todos los códigos</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Código</th><th>Cliente</th><th>Estado</th><th>Acciones</th></tr>
-            </thead>
-            <tbody id="codesTableBody">
-              <tr><td colspan="4" style="color:var(--muted)">Cargando códigos...</td></tr>
-            </tbody>
-          </table>
-        </div>
       </div>
     </div>
   </div>
@@ -419,6 +441,33 @@
   }
   window.setMode = setMode;
 
+  // ---------- Navegación entre Dashboard y Códigos ----------
+  function showSection(name) {
+    document.getElementById('dashboardSection').style.display = name === 'dashboard' ? 'block' : 'none';
+    document.getElementById('codesSection').style.display = name === 'codes' ? 'block' : 'none';
+    document.getElementById('navDashboard').classList.toggle('active', name === 'dashboard');
+    document.getElementById('navCodes').classList.toggle('active', name === 'codes');
+  }
+  window.showSection = showSection;
+
+  // ---------- Buscar/filtrar en la tabla de códigos ----------
+  function filterCodes() {
+    const query = document.getElementById('searchInput').value.trim().toLowerCase();
+    document.querySelectorAll('#codesTableBody tr[data-code]').forEach(row => {
+      const matches = row.dataset.search.includes(query);
+      row.style.display = matches ? '' : 'none';
+    });
+  }
+  window.filterCodes = filterCodes;
+
+  // ---------- Formatear una fecha de Firestore de forma legible ----------
+  function formatDate(timestamp) {
+    if (!timestamp || !timestamp.toDate) return '-';
+    const d = timestamp.toDate();
+    return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+      ' ' + d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+  }
+
   // ---------- Generar un codigo nuevo (6 digitos numericos) ----------
   function generateRandomCode() {
     let code = '';
@@ -474,20 +523,26 @@
     db.collection('access_codes').orderBy('createdAt', 'desc')
       .onSnapshot(snapshot => {
         const tbody = document.getElementById('codesTableBody');
+        const recentBody = document.getElementById('recentCodesBody');
 
         let totalCount = 0, activeCount = 0, revokedCount = 0, deviceTotal = 0;
 
         if (snapshot.empty) {
-          tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Todavia no hay codigos generados.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">Todavia no hay codigos generados.</td></tr>';
+          recentBody.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Todavia no hay codigos generados.</td></tr>';
           updateStats(0, 0, 0, 0);
           return;
         }
         tbody.innerHTML = '';
+        recentBody.innerHTML = '';
+        let recentAdded = 0;
         snapshot.forEach(doc => {
           const data = doc.data();
           const code = doc.id;
           const active = data.active !== false;
           const deviceCount = Array.isArray(data.deviceIds) ? data.deviceIds.length : 0;
+          const createdText = formatDate(data.createdAt);
+          const clientName = data.clientName || '';
 
           totalCount++;
           if (active) activeCount++; else revokedCount++;
@@ -504,10 +559,13 @@
           credText += ' | Dispositivos: ' + deviceCount + '/3';
 
           const tr = document.createElement('tr');
+          tr.setAttribute('data-code', code);
+          tr.dataset.search = (code + ' ' + clientName).toLowerCase();
           tr.innerHTML =
             '<td class="code-cell">' + code + '</td>' +
             '<td>' + (data.clientName || '<span style="color:var(--muted)">-</span>') + '</td>' +
             '<td><span class="badge ' + (active ? 'active' : 'revoked') + '">' + (active ? 'Activo' : 'Revocado') + '</span><div class="device-count">' + deviceCount + '/3 disp.</div></td>' +
+            '<td style="color:var(--muted); font-size:12px;">' + createdText + '</td>' +
             '<td class="actions-cell">' +
               '<button class="secondary" onclick="copyCode(\'' + code + '\')">Copiar</button>' +
               '<button class="secondary" onclick="toggleCreds(this)">Ver datos</button>' +
@@ -517,6 +575,17 @@
               '<div class="credentials-box">' + credText + '</div>' +
             '</td>';
           tbody.appendChild(tr);
+
+          if (recentAdded < 5) {
+            const trRecent = document.createElement('tr');
+            trRecent.innerHTML =
+              '<td class="code-cell">' + code + '</td>' +
+              '<td>' + (data.clientName || '<span style="color:var(--muted)">-</span>') + '</td>' +
+              '<td><span class="badge ' + (active ? 'active' : 'revoked') + '">' + (active ? 'Activo' : 'Revocado') + '</span></td>' +
+              '<td style="color:var(--muted); font-size:12px;">' + createdText + '</td>';
+            recentBody.appendChild(trRecent);
+            recentAdded++;
+          }
         });
 
         updateStats(totalCount, activeCount, revokedCount, deviceTotal);
