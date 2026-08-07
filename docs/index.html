@@ -3,155 +3,356 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>JetGo · Panel de códigos de acceso</title>
+<title>JetGo · Panel de administración</title>
 <style>
   :root {
-    --bg: #0d0f14;
-    --surface: #1a1d24;
-    --surface2: #22262f;
+    --bg: #0b0d12;
+    --sidebar: #12141b;
+    --surface: #171a22;
+    --surface2: #1e222c;
+    --border: #262b36;
     --orange: #ff7a2e;
+    --orange-dim: rgba(255,122,46,0.15);
     --green: #3ddc84;
+    --green-dim: rgba(61,220,132,0.12);
     --red: #e5493b;
+    --red-dim: rgba(229,73,59,0.12);
+    --blue: #4f8dfd;
     --text: #ffffff;
-    --muted: #9aa0ab;
+    --muted: #8a90a0;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
-  .container { max-width: 720px; margin: 0 auto; padding: 24px 16px 80px; }
-  h1 { font-size: 22px; margin-bottom: 4px; }
-  p.subtitle { color: var(--muted); margin-top: 0; font-size: 14px; }
 
+  /* ---------- Login (pantalla completa, sin sidebar) ---------- */
+  #loginScreen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: radial-gradient(circle at 20% 20%, #1a1f2e 0%, var(--bg) 60%);
+  }
+  #loginScreen .login-card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px 28px;
+  }
+  .login-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 26px;
+  }
+  .login-logo .mark {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--orange), #e5493b);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 18px;
+  }
+  .login-logo .name { font-size: 19px; font-weight: 700; }
+  .login-logo .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* ---------- Layout general (sidebar + contenido) ---------- */
+  .app { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    padding: 22px 14px;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+  .sidebar .brand {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 8px 24px;
+  }
+  .sidebar .brand .mark {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--orange), #e5493b);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 15px;
+  }
+  .sidebar .brand .name { font-size: 16px; font-weight: 700; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 12px;
+    border-radius: 10px;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    cursor: default;
+  }
+  .nav-item.active {
+    background: var(--orange-dim);
+    color: var(--orange);
+  }
+  .nav-item .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 12px 8px 0;
+    border-top: 1px solid var(--border);
+  }
+  .sidebar-footer .admin-email {
+    font-size: 12px; color: var(--muted);
+    word-break: break-all;
+    margin-bottom: 10px;
+  }
+
+  .main { flex: 1; min-width: 0; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar h1 { font-size: 19px; margin: 0; }
+  .topbar p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+
+  .content { padding: 24px 28px 60px; max-width: 1100px; }
+
+  /* ---------- Tarjetas de estadísticas ---------- */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+  }
+  .stat-card .stat-label {
+    font-size: 12px; color: var(--muted); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .stat-card .stat-value {
+    font-size: 28px; font-weight: 800; margin-top: 6px;
+  }
+  .stat-card.accent-green .stat-value { color: var(--green); }
+  .stat-card.accent-red .stat-value { color: var(--red); }
+  .stat-card.accent-blue .stat-value { color: var(--blue); }
+
+  /* ---------- Tarjetas generales ---------- */
   .card {
     background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 14px;
-    padding: 20px;
+    padding: 22px;
     margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 15px; margin: 0 0 16px;
+    display: flex; align-items: center; gap: 8px;
   }
 
   input {
     width: 100%;
     padding: 12px 14px;
     border-radius: 10px;
-    border: 1px solid #333842;
+    border: 1px solid var(--border);
     background: var(--surface2);
     color: var(--text);
-    font-size: 15px;
+    font-size: 14px;
     margin-bottom: 12px;
   }
-  input:focus { outline: 2px solid var(--orange); }
+  input::placeholder { color: var(--muted); }
+  input:focus { outline: 2px solid var(--orange); outline-offset: 0; }
 
   button {
-    width: 100%;
-    padding: 13px 14px;
+    padding: 12px 16px;
     border-radius: 10px;
     border: none;
     background: var(--orange);
     color: #1a1200;
     font-weight: 700;
-    font-size: 15px;
+    font-size: 14px;
     cursor: pointer;
+    transition: filter 0.15s;
   }
+  button:hover { filter: brightness(1.08); }
   button:disabled { opacity: 0.5; cursor: default; }
-  button.secondary { background: var(--surface2); color: var(--text); }
-  button.danger { background: var(--red); color: white; }
+  button.full { width: 100%; }
+  button.secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  button.danger { background: var(--red-dim); color: var(--red); }
 
+  .mode-row { display: flex; gap: 10px; margin-bottom: 14px; }
   .mode-btn {
     flex: 1;
     padding: 10px;
     border-radius: 10px;
-    border: 1px solid #333842;
+    border: 1px solid var(--border);
     background: var(--surface2);
     color: var(--muted);
     font-weight: 600;
     font-size: 13px;
   }
-  .mode-btn.active { background: var(--orange); color: #1a1200; border-color: var(--orange); }
+  .mode-btn.active { background: var(--orange-dim); color: var(--orange); border-color: var(--orange); }
 
   .credentials-box {
     background: var(--surface2);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 10px;
     margin-top: 8px;
     font-size: 12px;
-    font-family: monospace;
+    font-family: ui-monospace, monospace;
     word-break: break-all;
     display: none;
   }
 
-  #error { color: var(--red); font-size: 14px; margin-top: 8px; }
-  #logout { display: none; }
+  #error { color: var(--red); font-size: 13px; margin-top: 10px; }
 
-  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-  th, td { text-align: left; padding: 10px 8px; font-size: 13px; border-bottom: 1px solid #262a33; }
-  th { color: var(--muted); font-weight: 600; }
-  .code-cell { font-family: monospace; font-size: 15px; letter-spacing: 1px; }
+  /* ---------- Tabla ---------- */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; margin-top: 4px; min-width: 640px; }
+  th, td { text-align: left; padding: 12px 10px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
+  .code-cell { font-family: ui-monospace, monospace; font-size: 15px; letter-spacing: 1px; font-weight: 700; }
   .badge {
-    display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700;
+    display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
   }
-  .badge.active { background: rgba(61,220,132,0.15); color: var(--green); }
-  .badge.revoked { background: rgba(229,73,59,0.15); color: var(--red); }
-  .actions-cell button { width: auto; padding: 6px 10px; font-size: 12px; margin-right: 6px; }
+  .badge.active { background: var(--green-dim); color: var(--green); }
+  .badge.revoked { background: var(--red-dim); color: var(--red); }
+  .device-count { color: var(--muted); font-size: 11px; margin-top: 3px; }
+  .actions-cell { display: flex; flex-wrap: wrap; gap: 6px; }
+  .actions-cell button { width: auto; padding: 7px 11px; font-size: 12px; }
+
   #copyToast {
-    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-    background: var(--green); color: #06210f; padding: 10px 18px; border-radius: 30px;
-    font-size: 14px; font-weight: 700; display: none;
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--green); color: #06210f; padding: 11px 20px; border-radius: 30px;
+    font-size: 14px; font-weight: 700; display: none; z-index: 50;
+  }
+
+  @media (max-width: 720px) {
+    .sidebar { display: none; }
+    .content { padding: 18px; }
+    .topbar { padding: 16px 18px; }
   }
 </style>
 </head>
 <body>
 
-<div class="container">
-  <h1>JetGo · Códigos de acceso</h1>
-  <p class="subtitle">Panel para generar y administrar los códigos de acceso de tus clientes.</p>
-
-  <!-- ---------- LOGIN ---------- -->
-  <div class="card" id="loginCard">
+<!-- ---------- LOGIN ---------- -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="mark">J</div>
+      <div>
+        <div class="name">JetGo</div>
+        <div class="sub">Panel de administración</div>
+      </div>
+    </div>
     <input id="email" type="email" placeholder="Correo de administrador" autocomplete="username" />
     <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" />
-    <button id="loginBtn">Iniciar sesión</button>
+    <button id="loginBtn" class="full">Iniciar sesión</button>
     <div id="error"></div>
   </div>
+</div>
 
-  <!-- ---------- PANEL (visible tras iniciar sesión) ---------- -->
-  <div id="panel" style="display:none;">
+<!-- ---------- APP (sidebar + panel), visible tras iniciar sesión ---------- -->
+<div class="app" id="appShell" style="display:none;">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark">J</div>
+      <div class="name">JetGo</div>
+    </div>
+    <nav>
+      <div class="nav-item active"><span class="dot"></span> Dashboard</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-email" id="adminEmail"></div>
+      <button class="secondary full" id="logout">Cerrar sesión</button>
+    </div>
+  </aside>
 
-    <div class="card">
-      <input id="clientName" type="text" placeholder="Nombre del cliente (opcional)" />
-
-      <div class="row" style="display:flex; gap:10px; margin-bottom:12px;">
-        <button type="button" id="modeXtreamBtn" class="mode-btn active" onclick="setMode('xtream')">Xtream Codes</button>
-        <button type="button" id="modeM3uBtn" class="mode-btn" onclick="setMode('m3u')">Lista M3U</button>
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <h1>Códigos de acceso</h1>
+        <p>Genera y administra los códigos de tus clientes</p>
       </div>
-
-      <div id="xtreamFields">
-        <input id="host" type="text" placeholder="Host del servidor (http://servidor.com:8080)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
-        <input id="username" type="text" placeholder="Usuario Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
-        <input id="xtreamPassword" type="text" placeholder="Contraseña Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
-      </div>
-      <div id="m3uFields" style="display:none;">
-        <input id="m3uUrl" type="text" placeholder="URL de la lista M3U" />
-      </div>
-
-      <button id="generateBtn">Generar nuevo código</button>
     </div>
 
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>Código</th><th>Cliente</th><th>Estado</th><th>Acciones</th></tr>
-        </thead>
-        <tbody id="codesTableBody">
-          <tr><td colspan="4" style="color:var(--muted)">Cargando códigos...</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <div class="content">
+      <!-- ---------- Tarjetas de estadísticas ---------- -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Códigos totales</div>
+          <div class="stat-value" id="statTotal">0</div>
+        </div>
+        <div class="stat-card accent-green">
+          <div class="stat-label">Activos</div>
+          <div class="stat-value" id="statActive">0</div>
+        </div>
+        <div class="stat-card accent-red">
+          <div class="stat-label">Revocados</div>
+          <div class="stat-value" id="statRevoked">0</div>
+        </div>
+        <div class="stat-card accent-blue">
+          <div class="stat-label">Dispositivos conectados</div>
+          <div class="stat-value" id="statDevices">0</div>
+        </div>
+      </div>
 
-    <button class="secondary" id="logout">Cerrar sesión</button>
+      <!-- ---------- Generar código ---------- -->
+      <div class="card">
+        <h2>Generar nuevo código</h2>
+        <input id="clientName" type="text" placeholder="Nombre del cliente (opcional)" />
+
+        <div class="mode-row">
+          <button type="button" id="modeXtreamBtn" class="mode-btn active" onclick="setMode('xtream')">Xtream Codes</button>
+          <button type="button" id="modeM3uBtn" class="mode-btn" onclick="setMode('m3u')">Lista M3U</button>
+        </div>
+
+        <div id="xtreamFields">
+          <input id="host" type="text" placeholder="Host del servidor (http://servidor.com:8080)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          <input id="username" type="text" placeholder="Usuario Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          <input id="xtreamPassword" type="text" placeholder="Contraseña Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+        </div>
+        <div id="m3uFields" style="display:none;">
+          <input id="m3uUrl" type="text" placeholder="URL de la lista M3U" />
+        </div>
+
+        <button id="generateBtn" class="full">Generar nuevo código</button>
+      </div>
+
+      <!-- ---------- Tabla de códigos ---------- -->
+      <div class="card">
+        <h2>Todos los códigos</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Código</th><th>Cliente</th><th>Estado</th><th>Acciones</th></tr>
+            </thead>
+            <tbody id="codesTableBody">
+              <tr><td colspan="4" style="color:var(--muted)">Cargando códigos...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -181,8 +382,8 @@
   const auth = firebase.auth();
   const db = firebase.firestore();
 
-  const loginCard = document.getElementById('loginCard');
-  const panel = document.getElementById('panel');
+  const loginScreen = document.getElementById('loginScreen');
+  const appShell = document.getElementById('appShell');
   const errorEl = document.getElementById('error');
 
   document.getElementById('loginBtn').addEventListener('click', () => {
@@ -197,14 +398,13 @@
 
   auth.onAuthStateChanged(user => {
     if (user) {
-      loginCard.style.display = 'none';
-      panel.style.display = 'block';
-      document.getElementById('logout').style.display = 'block';
+      loginScreen.style.display = 'none';
+      appShell.style.display = 'flex';
+      document.getElementById('adminEmail').textContent = user.email || '';
       listenToCodes();
     } else {
-      loginCard.style.display = 'block';
-      panel.style.display = 'none';
-      document.getElementById('logout').style.display = 'none';
+      loginScreen.style.display = 'flex';
+      appShell.style.display = 'none';
     }
   });
 
@@ -269,13 +469,17 @@
     showToast('Codigo generado: ' + code);
   });
 
-  // ---------- Listar codigos en tiempo real ----------
+  // ---------- Listar codigos en tiempo real + estadisticas ----------
   function listenToCodes() {
     db.collection('access_codes').orderBy('createdAt', 'desc')
       .onSnapshot(snapshot => {
         const tbody = document.getElementById('codesTableBody');
+
+        let totalCount = 0, activeCount = 0, revokedCount = 0, deviceTotal = 0;
+
         if (snapshot.empty) {
           tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Todavia no hay codigos generados.</td></tr>';
+          updateStats(0, 0, 0, 0);
           return;
         }
         tbody.innerHTML = '';
@@ -284,6 +488,10 @@
           const code = doc.id;
           const active = data.active !== false;
           const deviceCount = Array.isArray(data.deviceIds) ? data.deviceIds.length : 0;
+
+          totalCount++;
+          if (active) activeCount++; else revokedCount++;
+          deviceTotal += deviceCount;
 
           let credText = '';
           if (data.mode === 'm3u') {
@@ -299,7 +507,7 @@
           tr.innerHTML =
             '<td class="code-cell">' + code + '</td>' +
             '<td>' + (data.clientName || '<span style="color:var(--muted)">-</span>') + '</td>' +
-            '<td><span class="badge ' + (active ? 'active' : 'revoked') + '">' + (active ? 'Activo' : 'Revocado') + '</span><br><span style="color:var(--muted);font-size:11px;">' + deviceCount + '/3 disp.</span></td>' +
+            '<td><span class="badge ' + (active ? 'active' : 'revoked') + '">' + (active ? 'Activo' : 'Revocado') + '</span><div class="device-count">' + deviceCount + '/3 disp.</div></td>' +
             '<td class="actions-cell">' +
               '<button class="secondary" onclick="copyCode(\'' + code + '\')">Copiar</button>' +
               '<button class="secondary" onclick="toggleCreds(this)">Ver datos</button>' +
@@ -310,7 +518,16 @@
             '</td>';
           tbody.appendChild(tr);
         });
+
+        updateStats(totalCount, activeCount, revokedCount, deviceTotal);
       });
+  }
+
+  function updateStats(total, active, revoked, devices) {
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('statActive').textContent = active;
+    document.getElementById('statRevoked').textContent = revoked;
+    document.getElementById('statDevices').textContent = devices;
   }
 
   window.toggleCreds = (btn) => {
