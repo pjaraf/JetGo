@@ -155,6 +155,21 @@
   .stat-card.accent-red .stat-value { color: var(--red); }
   .stat-card.accent-blue .stat-value { color: var(--blue); }
 
+  .live-dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green); margin-right: 5px;
+    animation: livePulse 1.4s infinite;
+  }
+  @keyframes livePulse {
+    0% { box-shadow: 0 0 0 0 rgba(61,220,132,0.55); }
+    70% { box-shadow: 0 0 0 6px rgba(61,220,132,0); }
+    100% { box-shadow: 0 0 0 0 rgba(61,220,132,0); }
+  }
+  .online-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--green); font-weight: 700; margin-top: 3px;
+  }
+
   /* ---------- Tarjetas generales ---------- */
   .card {
     background: var(--surface);
@@ -337,8 +352,12 @@
             <div class="stat-value" id="statRevoked">0</div>
           </div>
           <div class="stat-card accent-blue">
-            <div class="stat-label">Dispositivos conectados</div>
+            <div class="stat-label">Dispositivos registrados</div>
             <div class="stat-value" id="statDevices">0</div>
+          </div>
+          <div class="stat-card accent-green">
+            <div class="stat-label"><span class="live-dot"></span> En línea ahora</div>
+            <div class="stat-value" id="statOnline">0</div>
           </div>
         </div>
 
@@ -520,84 +539,112 @@
   });
 
   // ---------- Listar codigos en tiempo real + estadisticas ----------
+  let lastSnapshotDocs = [];
+
   function listenToCodes() {
     db.collection('access_codes').orderBy('createdAt', 'desc')
       .onSnapshot(snapshot => {
-        const tbody = document.getElementById('codesTableBody');
-        const recentBody = document.getElementById('recentCodesBody');
-
-        let totalCount = 0, activeCount = 0, revokedCount = 0, deviceTotal = 0;
-
-        if (snapshot.empty) {
-          tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">Todavia no hay codigos generados.</td></tr>';
-          recentBody.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Todavia no hay codigos generados.</td></tr>';
-          updateStats(0, 0, 0, 0);
-          return;
-        }
-        tbody.innerHTML = '';
-        recentBody.innerHTML = '';
-        let recentAdded = 0;
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          const code = doc.id;
-          const active = data.active !== false;
-          const deviceCount = Array.isArray(data.deviceIds) ? data.deviceIds.length : 0;
-          const createdText = formatDate(data.createdAt);
-          const clientName = data.clientName || '';
-
-          totalCount++;
-          if (active) activeCount++; else revokedCount++;
-          deviceTotal += deviceCount;
-
-          let credText = '';
-          if (data.mode === 'm3u') {
-            credText = 'M3U: ' + (data.m3uUrl || '(sin cargar)');
-          } else {
-            credText = 'Host: ' + (data.host || '(sin cargar)') +
-              ' | Usuario: ' + (data.username || '-') +
-              ' | Clave: ' + (data.password || '-');
-          }
-          credText += ' | Dispositivos: ' + deviceCount + '/3';
-
-          const tr = document.createElement('tr');
-          tr.setAttribute('data-code', code);
-          tr.dataset.search = (code + ' ' + clientName).toLowerCase();
-          tr.innerHTML =
-            '<td class="code-cell">' + code + '</td>' +
-            '<td>' + (data.clientName || '<span style="color:var(--muted)">-</span>') + '</td>' +
-            '<td><span class="badge ' + (active ? 'active' : 'revoked') + '">' + (active ? 'Activo' : 'Revocado') + '</span><div class="device-count">' + deviceCount + '/3 disp.</div></td>' +
-            '<td style="color:var(--muted); font-size:12px;">' + createdText + '</td>' +
-            '<td class="actions-cell">' +
-              '<button class="secondary" onclick="copyCode(\'' + code + '\')">Copiar</button>' +
-              '<button class="secondary" onclick="toggleCreds(this)">Ver datos</button>' +
-              '<button class="secondary" onclick="resetDevices(\'' + code + '\')">Reiniciar disp.</button>' +
-              '<button class="' + (active ? 'danger' : 'secondary') + '" onclick="toggleActive(\'' + code + '\', ' + active + ')">' + (active ? 'Revocar' : 'Reactivar') + '</button>' +
-              '<button class="danger" onclick="deleteCode(\'' + code + '\')">Eliminar</button>' +
-              '<div class="credentials-box">' + credText + '</div>' +
-            '</td>';
-          tbody.appendChild(tr);
-
-          if (recentAdded < 5) {
-            const trRecent = document.createElement('tr');
-            trRecent.innerHTML =
-              '<td class="code-cell">' + code + '</td>' +
-              '<td>' + (data.clientName || '<span style="color:var(--muted)">-</span>') + '</td>' +
-              '<td><span class="badge ' + (active ? 'active' : 'revoked') + '">' + (active ? 'Activo' : 'Revocado') + '</span></td>' +
-              '<td style="color:var(--muted); font-size:12px;">' + createdText + '</td>';
-            recentBody.appendChild(trRecent);
-            recentAdded++;
-          }
-        });
-
-        updateStats(totalCount, activeCount, revokedCount, deviceTotal);
+        lastSnapshotDocs = [];
+        snapshot.forEach(doc => lastSnapshotDocs.push({ id: doc.id, data: doc.data() }));
+        renderCodes();
       });
+
+    // Vuelve a dibujar cada 15 segundos SIN volver a consultar Firestore, solo para que el
+    // "en línea ahora" se vaya poniendo gris solo cuando pasan más de 2 minutos sin aviso.
+    setInterval(renderCodes, 15000);
   }
 
-  function updateStats(total, active, revoked, devices) {
+  /** Un dispositivo se considera "en línea ahora" si avisó actividad en los últimos 2 minutos */
+  function isDeviceOnline(timestamp) {
+    if (!timestamp || !timestamp.toDate) return false;
+    return (Date.now() - timestamp.toDate().getTime()) < 2 * 60 * 1000;
+  }
+
+  function countOnline(deviceActivity) {
+    if (!deviceActivity) return 0;
+    return Object.values(deviceActivity).filter(isDeviceOnline).length;
+  }
+
+  function renderCodes() {
+    const tbody = document.getElementById('codesTableBody');
+    const recentBody = document.getElementById('recentCodesBody');
+
+    let totalCount = 0, activeCount = 0, revokedCount = 0, deviceTotal = 0, onlineTotal = 0;
+
+    if (lastSnapshotDocs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">Todavia no hay codigos generados.</td></tr>';
+      recentBody.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Todavia no hay codigos generados.</td></tr>';
+      updateStats(0, 0, 0, 0, 0);
+      return;
+    }
+    tbody.innerHTML = '';
+    recentBody.innerHTML = '';
+    let recentAdded = 0;
+    lastSnapshotDocs.forEach(({ id: code, data }) => {
+      const active = data.active !== false;
+      const deviceCount = Array.isArray(data.deviceIds) ? data.deviceIds.length : 0;
+      const createdText = formatDate(data.createdAt);
+      const clientName = data.clientName || '';
+      const onlineCount = countOnline(data.deviceActivity);
+
+      totalCount++;
+      if (active) activeCount++; else revokedCount++;
+      deviceTotal += deviceCount;
+      onlineTotal += onlineCount;
+
+      let credText = '';
+      if (data.mode === 'm3u') {
+        credText = 'M3U: ' + (data.m3uUrl || '(sin cargar)');
+      } else {
+        credText = 'Host: ' + (data.host || '(sin cargar)') +
+          ' | Usuario: ' + (data.username || '-') +
+          ' | Clave: ' + (data.password || '-');
+      }
+      credText += ' | Dispositivos: ' + deviceCount + '/3';
+
+      const onlineBadge = onlineCount > 0
+        ? '<div class="online-badge"><span class="live-dot"></span>' + onlineCount + ' en línea</div>'
+        : '';
+
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-code', code);
+      tr.dataset.search = (code + ' ' + clientName).toLowerCase();
+      tr.innerHTML =
+        '<td class="code-cell">' + code + '</td>' +
+        '<td>' + (data.clientName || '<span style="color:var(--muted)">-</span>') + '</td>' +
+        '<td><span class="badge ' + (active ? 'active' : 'revoked') + '">' + (active ? 'Activo' : 'Revocado') + '</span><div class="device-count">' + deviceCount + '/3 disp.</div>' + onlineBadge + '</td>' +
+        '<td style="color:var(--muted); font-size:12px;">' + createdText + '</td>' +
+        '<td class="actions-cell">' +
+          '<button class="secondary" onclick="copyCode(\'' + code + '\')">Copiar</button>' +
+          '<button class="secondary" onclick="toggleCreds(this)">Ver datos</button>' +
+          '<button class="secondary" onclick="resetDevices(\'' + code + '\')">Reiniciar disp.</button>' +
+          '<button class="' + (active ? 'danger' : 'secondary') + '" onclick="toggleActive(\'' + code + '\', ' + active + ')">' + (active ? 'Revocar' : 'Reactivar') + '</button>' +
+          '<button class="danger" onclick="deleteCode(\'' + code + '\')">Eliminar</button>' +
+          '<div class="credentials-box">' + credText + '</div>' +
+        '</td>';
+      tbody.appendChild(tr);
+
+      if (recentAdded < 5) {
+        const trRecent = document.createElement('tr');
+        trRecent.innerHTML =
+          '<td class="code-cell">' + code + '</td>' +
+          '<td>' + (data.clientName || '<span style="color:var(--muted)">-</span>') + '</td>' +
+          '<td><span class="badge ' + (active ? 'active' : 'revoked') + '">' + (active ? 'Activo' : 'Revocado') + '</span>' + onlineBadge + '</td>' +
+          '<td style="color:var(--muted); font-size:12px;">' + createdText + '</td>';
+        recentBody.appendChild(trRecent);
+        recentAdded++;
+      }
+    });
+
+    updateStats(totalCount, activeCount, revokedCount, deviceTotal, onlineTotal);
+  }
+
+  function updateStats(total, active, revoked, devices, online) {
     document.getElementById('statTotal').textContent = total;
     document.getElementById('statActive').textContent = active;
     document.getElementById('statRevoked').textContent = revoked;
     document.getElementById('statDevices').textContent = devices;
+    document.getElementById('statOnline').textContent = online;
   }
 
   window.toggleCreds = (btn) => {
