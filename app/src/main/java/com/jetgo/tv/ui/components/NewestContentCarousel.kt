@@ -40,8 +40,8 @@ import kotlinx.coroutines.delay
 
 /**
  * Carrusel automático (se va cambiando solo) con las películas/series más nuevas del catálogo.
- * Se usa al lado del reproductor en el Inicio de TV, ajustado a su misma altura, con el mismo
- * marco naranja que el reproductor en vivo.
+ * Puramente decorativo/informativo: no se puede seleccionar ni enfocar con el control remoto
+ * (en Inicio, solo los botones de abajo son funcionales).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -62,8 +62,6 @@ fun NewestContentCarousel(
     }
 
     val pagerState = rememberPagerState(pageCount = { validItems.size })
-    var isFocused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (isFocused) 1.05f else 1f, label = "carouselZoom")
 
     LaunchedEffect(validItems) {
         while (true) {
@@ -77,22 +75,16 @@ fun NewestContentCarousel(
 
     Box(
         modifier = modifier
-            .scale(scale)
             .clip(RoundedCornerShape(14.dp))
             .background(SurfaceDark.copy(alpha = 0.85f))
-            .focusable()
-            .onFocusChanged { isFocused = it.isFocused }
     ) {
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            userScrollEnabled = false
         ) { page ->
             val item = validItems[page]
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable { onItemClick(item) }
-            ) {
+            Box(modifier = Modifier.fillMaxSize()) {
                 AsyncImage(
                     model = item.imageUrl,
                     contentDescription = item.name,

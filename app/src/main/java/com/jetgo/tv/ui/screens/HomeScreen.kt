@@ -152,7 +152,7 @@ fun HomeScreen(
                         }
                     )
 
-                    Spacer(modifier = Modifier.width(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
 
                     ChannelLogoCarousel(
                         channels = liveChannels,
