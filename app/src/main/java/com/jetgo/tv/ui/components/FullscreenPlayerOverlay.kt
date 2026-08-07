@@ -231,6 +231,21 @@ fun FullscreenPlayerOverlay(
                     )
                 }
             }
+
+            playerManager.playbackError.value?.let { errorMsg ->
+                Box(
+                    modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = errorMsg,
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(32.dp)
+                    )
+                }
+            }
         } else {
             liveChannelInfo?.let { info ->
                 LiveChannelInfoBanner(

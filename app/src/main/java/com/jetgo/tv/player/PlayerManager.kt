@@ -53,6 +53,28 @@ class PlayerManager(context: Context) {
     private var lastUrl: String? = null
     private var lastName: String = ""
 
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var bufferingTimeoutRunnable: Runnable? = null
+
+    private fun cancelBufferingTimeout() {
+        bufferingTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+        bufferingTimeoutRunnable = null
+    }
+
+    private fun startBufferingTimeout() {
+        cancelBufferingTimeout()
+        val runnable = Runnable {
+            // Si después de 25 segundos SIGUE cargando (sin haber avanzado ni fallado con un
+            // error formal), se avisa igual — antes esto se quedaba pegado en silencio,
+            // mostrando el reproductor con la duración pero sin arrancar nunca.
+            if (exoPlayer.playbackState == Player.STATE_BUFFERING) {
+                _playbackError.value = "\"$lastName\" está tardando demasiado en cargar. Verifica tu conexión."
+            }
+        }
+        bufferingTimeoutRunnable = runnable
+        mainHandler.postDelayed(runnable, 25_000)
+    }
+
     init {
         exoPlayer.addAnalyticsListener(object : AnalyticsListener {
             override fun onBandwidthEstimate(
@@ -75,6 +97,11 @@ class PlayerManager(context: Context) {
                     // Volvió a andar bien: limpia cualquier error anterior y resetea los reintentos
                     _playbackError.value = null
                     retryCount = 0
+                    cancelBufferingTimeout()
+                } else if (playbackState == Player.STATE_BUFFERING) {
+                    startBufferingTimeout()
+                } else {
+                    cancelBufferingTimeout()
                 }
             }
 
@@ -123,6 +150,7 @@ class PlayerManager(context: Context) {
         retryCount = 0
         _playbackError.value = null
         _videoQuality.value = null
+        cancelBufferingTimeout()
 
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
