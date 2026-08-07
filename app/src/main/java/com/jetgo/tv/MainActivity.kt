@@ -262,12 +262,10 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
             ContentType.SERIES -> {
                 viewModel.loadSeriesDetail(item)
                 navController.navigate("seriesDetail")
-                viewModel.enterFullscreenPlayer()
             }
             ContentType.MOVIE, ContentType.ANIME, ContentType.SPECIAL -> {
                 viewModel.loadMovieDetail(item)
                 navController.navigate("movieDetail")
-                viewModel.enterFullscreenPlayer()
             }
             else -> {
                 viewModel.selectContentItem(item) {
