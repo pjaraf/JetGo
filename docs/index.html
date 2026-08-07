@@ -170,6 +170,64 @@
     font-size: 11px; color: var(--green); font-weight: 700; margin-top: 3px;
   }
 
+  /* ---------- Botón hamburguesa + menú desplegable ---------- */
+  .hamburger-btn {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .menu-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 40;
+  }
+  .menu-overlay.open { display: block; }
+  .menu-drawer {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    width: 270px;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    padding: 20px 14px;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    display: flex;
+    flex-direction: column;
+  }
+  .menu-drawer.open { transform: translateX(0); }
+  .menu-drawer .brand {
+    display: flex; align-items: center; gap: 10px;
+    padding: 4px 8px 20px;
+  }
+  .menu-drawer .brand .mark {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--orange), #e5493b);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 15px;
+  }
+  .menu-drawer .brand .name { font-size: 16px; font-weight: 700; }
+  .menu-drawer .sidebar-footer {
+    margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border);
+  }
+  .menu-drawer .admin-email { font-size: 12px; color: var(--muted); word-break: break-all; margin-bottom: 10px; }
+
+  .nav-badge {
+    margin-left: auto;
+    background: rgba(255,255,255,0.08);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+  .nav-item.active .nav-badge { background: rgba(255,122,46,0.2); color: var(--orange); }
+
   /* ---------- Tarjetas generales ---------- */
   .card {
     background: var(--surface);
@@ -288,34 +346,65 @@
   </div>
 </div>
 
-<!-- ---------- APP (sidebar + panel), visible tras iniciar sesión ---------- -->
+<!-- ---------- APP (menú hamburguesa + panel), visible tras iniciar sesión ---------- -->
 <div class="app" id="appShell" style="display:none;">
-  <aside class="sidebar">
+
+  <div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
+  <div class="menu-drawer" id="menuDrawer">
     <div class="brand">
       <div class="mark">J</div>
       <div class="name">JetGo</div>
     </div>
     <nav>
-      <div class="nav-item active" id="navDashboard" onclick="showSection('dashboard')"><span class="dot"></span> Dashboard</div>
-      <div class="nav-item" id="navCodes" onclick="showSection('codes')"><span class="dot"></span> Códigos</div>
+      <div class="nav-item" id="nav-create" onclick="selectView('create')"><span class="dot"></span> Crear cliente nuevo</div>
+      <div class="nav-item" id="nav-active" onclick="selectView('active')"><span class="dot"></span> Clientes activos<span class="nav-badge" id="badge-active">0</span></div>
+      <div class="nav-item" id="nav-expiring" onclick="selectView('expiring')"><span class="dot"></span> Clientes por vencer<span class="nav-badge" id="badge-expiring">0</span></div>
+      <div class="nav-item" id="nav-expired" onclick="selectView('expired')"><span class="dot"></span> Clientes vencidos<span class="nav-badge" id="badge-expired">0</span></div>
+      <div class="nav-item" id="nav-demos" onclick="selectView('demos')"><span class="dot"></span> Demos<span class="nav-badge" id="badge-demos">0</span></div>
+      <div class="nav-item" id="nav-subadmins" onclick="selectView('subadmins')"><span class="dot"></span> Paneles sub administrador</div>
     </nav>
     <div class="sidebar-footer">
       <div class="admin-email" id="adminEmail"></div>
       <button class="secondary full" id="logout">Cerrar sesión</button>
     </div>
-  </aside>
+  </div>
 
   <div class="main">
     <div class="topbar">
+      <button class="hamburger-btn" onclick="openMenu()">☰</button>
       <div>
-        <h1>Códigos de acceso</h1>
-        <p>Genera y administra los códigos de tus clientes</p>
+        <h1 id="viewTitle">Crear cliente nuevo</h1>
+        <p id="viewSubtitle">Genera un código de acceso para un cliente</p>
       </div>
     </div>
 
     <div class="content">
-      <!-- ---------- Generar código: SIEMPRE visible, sin importar la pestaña ---------- -->
-      <div class="card">
+      <!-- ---------- Estadísticas: siempre visibles arriba, sin importar la sección ---------- -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Códigos totales</div>
+          <div class="stat-value" id="statTotal">0</div>
+        </div>
+        <div class="stat-card accent-green">
+          <div class="stat-label">Activos</div>
+          <div class="stat-value" id="statActive">0</div>
+        </div>
+        <div class="stat-card accent-red">
+          <div class="stat-label">Revocados</div>
+          <div class="stat-value" id="statRevoked">0</div>
+        </div>
+        <div class="stat-card accent-blue">
+          <div class="stat-label">Dispositivos registrados</div>
+          <div class="stat-value" id="statDevices">0</div>
+        </div>
+        <div class="stat-card accent-green">
+          <div class="stat-label"><span class="live-dot"></span> En línea ahora</div>
+          <div class="stat-value" id="statOnline">0</div>
+        </div>
+      </div>
+
+      <!-- ---------- Vista: Crear cliente nuevo ---------- -->
+      <div class="card view-section" id="view-create">
         <h2>Generar nuevo código</h2>
         <input id="clientName" type="text" placeholder="Nombre del cliente (opcional)" />
 
@@ -333,66 +422,50 @@
           <input id="m3uUrl" type="text" placeholder="URL de la lista M3U" />
         </div>
 
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Fecha de vencimiento (opcional)</label>
+        <input id="expirationDate" type="date" />
+
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin: 4px 0 14px; cursor:pointer;">
+          <input type="checkbox" id="isDemo" style="width:auto; margin:0;" />
+          Marcar como cuenta demo
+        </label>
+
         <button id="generateBtn" class="full">Generar nuevo código</button>
       </div>
 
-      <!-- ---------- SECCIÓN: Dashboard ---------- -->
-      <div id="dashboardSection">
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-label">Códigos totales</div>
-            <div class="stat-value" id="statTotal">0</div>
-          </div>
-          <div class="stat-card accent-green">
-            <div class="stat-label">Activos</div>
-            <div class="stat-value" id="statActive">0</div>
-          </div>
-          <div class="stat-card accent-red">
-            <div class="stat-label">Revocados</div>
-            <div class="stat-value" id="statRevoked">0</div>
-          </div>
-          <div class="stat-card accent-blue">
-            <div class="stat-label">Dispositivos registrados</div>
-            <div class="stat-value" id="statDevices">0</div>
-          </div>
-          <div class="stat-card accent-green">
-            <div class="stat-label"><span class="live-dot"></span> En línea ahora</div>
-            <div class="stat-value" id="statOnline">0</div>
-          </div>
-        </div>
-
-        <div class="card">
-          <h2>Últimos códigos generados</h2>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>Código</th><th>Cliente</th><th>Estado</th><th>Creado</th></tr>
-              </thead>
-              <tbody id="recentCodesBody">
-                <tr><td colspan="4" style="color:var(--muted)">Cargando...</td></tr>
-              </tbody>
-            </table>
-          </div>
+      <!-- ---------- Vistas con tabla filtrada: activos / por vencer / vencidos / demos ---------- -->
+      <div class="card view-section" id="view-table" style="display:none;">
+        <h2 id="tableCardTitle">Clientes</h2>
+        <input id="searchInput" type="text" placeholder="Buscar por código o nombre de cliente..." oninput="renderCodes()" />
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Código</th><th>Cliente</th><th>Estado</th><th>Vence</th><th>Acciones</th></tr>
+            </thead>
+            <tbody id="codesTableBody">
+              <tr><td colspan="5" style="color:var(--muted)">Cargando códigos...</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
-      <!-- ---------- SECCIÓN: Códigos (tabla completa con búsqueda) ---------- -->
-      <div id="codesSection" style="display:none;">
-        <!-- ---------- Tabla de códigos ---------- -->
-        <div class="card">
-          <h2>Todos los códigos</h2>
-          <input id="searchInput" type="text" placeholder="Buscar por código o nombre de cliente..." oninput="filterCodes()" />
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>Código</th><th>Cliente</th><th>Estado</th><th>Creado</th><th>Acciones</th></tr>
-              </thead>
-              <tbody id="codesTableBody">
-                <tr><td colspan="5" style="color:var(--muted)">Cargando códigos...</td></tr>
-              </tbody>
-            </table>
-          </div>
-      </div>
+      <!-- ---------- Vista: Paneles sub administrador ---------- -->
+      <div class="card view-section" id="view-subadmins" style="display:none;">
+        <h2>Paneles sub administrador</h2>
+        <p style="color:var(--muted); font-size:14px; line-height:1.6;">
+          Para agregar un sub administrador con su propio acceso a este panel, créalo directo
+          en Firebase (esto no se puede hacer desde acá por seguridad):
+        </p>
+        <ol style="color:var(--muted); font-size:14px; line-height:1.9; padding-left:20px;">
+          <li>Entra a la <a href="https://console.firebase.google.com/project/jetgo-f0127/authentication/users" target="_blank" style="color:var(--orange);">consola de Firebase → Authentication</a></li>
+          <li>Botón "Add user" → ingresa el correo y contraseña del sub administrador</li>
+          <li>Comparte con esa persona el link de este panel: <strong style="color:var(--text);">pjaraf.github.io/JetGo</strong></li>
+        </ol>
+        <p style="color:var(--muted); font-size:13px; margin-top:14px;">
+          Por ahora, cualquier cuenta que agregues ahí tiene el mismo acceso completo que tú
+          (crear, editar y borrar todos los códigos) — permisos separados por sub administrador
+          es una mejora más grande que podemos armar aparte si la necesitas.
+        </p>
       </div>
     </div>
   </div>
@@ -443,6 +516,7 @@
       loginScreen.style.display = 'none';
       appShell.style.display = 'flex';
       document.getElementById('adminEmail').textContent = user.email || '';
+      selectView('create');
       listenToCodes();
     } else {
       loginScreen.style.display = 'flex';
@@ -461,24 +535,48 @@
   }
   window.setMode = setMode;
 
-  // ---------- Navegación entre Dashboard y Códigos ----------
-  function showSection(name) {
-    document.getElementById('dashboardSection').style.display = name === 'dashboard' ? 'block' : 'none';
-    document.getElementById('codesSection').style.display = name === 'codes' ? 'block' : 'none';
-    document.getElementById('navDashboard').classList.toggle('active', name === 'dashboard');
-    document.getElementById('navCodes').classList.toggle('active', name === 'codes');
+  // ---------- Menú hamburguesa: abrir/cerrar ----------
+  function openMenu() {
+    document.getElementById('menuDrawer').classList.add('open');
+    document.getElementById('menuOverlay').classList.add('open');
   }
-  window.showSection = showSection;
+  function closeMenu() {
+    document.getElementById('menuDrawer').classList.remove('open');
+    document.getElementById('menuOverlay').classList.remove('open');
+  }
+  window.openMenu = openMenu;
+  window.closeMenu = closeMenu;
 
-  // ---------- Buscar/filtrar en la tabla de códigos ----------
-  function filterCodes() {
-    const query = document.getElementById('searchInput').value.trim().toLowerCase();
-    document.querySelectorAll('#codesTableBody tr[data-code]').forEach(row => {
-      const matches = row.dataset.search.includes(query);
-      row.style.display = matches ? '' : 'none';
-    });
+  // ---------- Navegación entre las 6 secciones ----------
+  const VIEW_INFO = {
+    create: { title: 'Crear cliente nuevo', subtitle: 'Genera un código de acceso para un cliente' },
+    active: { title: 'Clientes activos', subtitle: 'Códigos que están funcionando ahora mismo' },
+    expiring: { title: 'Clientes por vencer', subtitle: 'Vencen dentro de los próximos 7 días' },
+    expired: { title: 'Clientes vencidos', subtitle: 'La fecha de vencimiento ya pasó' },
+    demos: { title: 'Demos', subtitle: 'Cuentas marcadas como demo' },
+    subadmins: { title: 'Paneles sub administrador', subtitle: 'Dar acceso a este panel a otra persona' }
+  };
+  let currentView = 'create';
+
+  function selectView(name) {
+    currentView = name;
+    document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
+    if (name === 'create') {
+      document.getElementById('view-create').style.display = 'block';
+    } else if (name === 'subadmins') {
+      document.getElementById('view-subadmins').style.display = 'block';
+    } else {
+      document.getElementById('view-table').style.display = 'block';
+      document.getElementById('tableCardTitle').textContent = VIEW_INFO[name].title;
+      renderCodes();
+    }
+    document.getElementById('viewTitle').textContent = VIEW_INFO[name].title;
+    document.getElementById('viewSubtitle').textContent = VIEW_INFO[name].subtitle;
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('nav-' + name).classList.add('active');
+    closeMenu();
   }
-  window.filterCodes = filterCodes;
+  window.selectView = selectView;
 
   // ---------- Formatear una fecha de Firestore de forma legible ----------
   function formatDate(timestamp) {
@@ -486,6 +584,13 @@
     const d = timestamp.toDate();
     return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
       ' ' + d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ---------- Formatear solo la fecha (sin hora), para el vencimiento ----------
+  function formatDateOnly(dateStr) {
+    if (!dateStr) return '<span style="color:var(--muted)">Sin vencimiento</span>';
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
 
   // ---------- Generar un codigo nuevo (6 digitos numericos) ----------
@@ -499,6 +604,8 @@
 
   document.getElementById('generateBtn').addEventListener('click', async () => {
     const clientName = document.getElementById('clientName').value.trim();
+    const expirationDate = document.getElementById('expirationDate').value || null;
+    const isDemo = document.getElementById('isDemo').checked;
     const code = generateRandomCode();
 
     const docData = {
@@ -506,6 +613,8 @@
       clientName: clientName || null,
       mode: currentMode,
       deviceIds: [],
+      expirationDate: expirationDate,
+      isDemo: isDemo,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
@@ -535,6 +644,8 @@
     document.getElementById('username').value = '';
     document.getElementById('xtreamPassword').value = '';
     document.getElementById('m3uUrl').value = '';
+    document.getElementById('expirationDate').value = '';
+    document.getElementById('isDemo').checked = false;
     showToast('Codigo generado: ' + code);
   });
 
@@ -565,77 +676,102 @@
     return Object.values(deviceActivity).filter(isDeviceOnline).length;
   }
 
+  /** true si la fecha de vencimiento (string "YYYY-MM-DD") ya pasó */
+  function isExpired(expirationDate) {
+    if (!expirationDate) return false;
+    return new Date(expirationDate + 'T23:59:59') < new Date();
+  }
+
+  /** true si vence dentro de los próximos 7 días (y todavía no venció) */
+  function isExpiringSoon(expirationDate) {
+    if (!expirationDate) return false;
+    const diffDays = (new Date(expirationDate + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24);
+    return diffDays >= 0 && diffDays <= 7;
+  }
+
   function renderCodes() {
     const tbody = document.getElementById('codesTableBody');
-    const recentBody = document.getElementById('recentCodesBody');
-
     let totalCount = 0, activeCount = 0, revokedCount = 0, deviceTotal = 0, onlineTotal = 0;
+    let activeNav = 0, expiringNav = 0, expiredNav = 0, demosNav = 0;
 
-    if (lastSnapshotDocs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">Todavia no hay codigos generados.</td></tr>';
-      recentBody.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Todavia no hay codigos generados.</td></tr>';
-      updateStats(0, 0, 0, 0, 0);
-      return;
-    }
-    tbody.innerHTML = '';
-    recentBody.innerHTML = '';
-    let recentAdded = 0;
-    lastSnapshotDocs.forEach(({ id: code, data }) => {
+    lastSnapshotDocs.forEach(({ data }) => {
       const active = data.active !== false;
-      const deviceCount = Array.isArray(data.deviceIds) ? data.deviceIds.length : 0;
-      const createdText = formatDate(data.createdAt);
-      const clientName = data.clientName || '';
-      const onlineCount = countOnline(data.deviceActivity);
+      if (active) activeNav++;
+      if (isExpiringSoon(data.expirationDate)) expiringNav++;
+      if (isExpired(data.expirationDate)) expiredNav++;
+      if (data.isDemo) demosNav++;
+    });
+    document.getElementById('badge-active').textContent = activeNav;
+    document.getElementById('badge-expiring').textContent = expiringNav;
+    document.getElementById('badge-expired').textContent = expiredNav;
+    document.getElementById('badge-demos').textContent = demosNav;
 
-      totalCount++;
-      if (active) activeCount++; else revokedCount++;
-      deviceTotal += deviceCount;
-      onlineTotal += onlineCount;
+    const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
 
-      let credText = '';
-      if (data.mode === 'm3u') {
-        credText = 'M3U: ' + (data.m3uUrl || '(sin cargar)');
-      } else {
-        credText = 'Host: ' + (data.host || '(sin cargar)') +
-          ' | Usuario: ' + (data.username || '-') +
-          ' | Clave: ' + (data.password || '-');
-      }
-      credText += ' | Dispositivos: ' + deviceCount + '/3';
-
-      const onlineBadge = onlineCount > 0
-        ? '<div class="online-badge"><span class="live-dot"></span>' + onlineCount + ' en línea</div>'
-        : '';
-
-      const tr = document.createElement('tr');
-      tr.setAttribute('data-code', code);
-      tr.dataset.search = (code + ' ' + clientName).toLowerCase();
-      tr.innerHTML =
-        '<td class="code-cell">' + code + '</td>' +
-        '<td>' + (data.clientName || '<span style="color:var(--muted)">-</span>') + '</td>' +
-        '<td><span class="badge ' + (active ? 'active' : 'revoked') + '">' + (active ? 'Activo' : 'Revocado') + '</span><div class="device-count">' + deviceCount + '/3 disp.</div>' + onlineBadge + '</td>' +
-        '<td style="color:var(--muted); font-size:12px;">' + createdText + '</td>' +
-        '<td class="actions-cell">' +
-          '<button class="secondary" onclick="copyCode(\'' + code + '\')">Copiar</button>' +
-          '<button class="secondary" onclick="toggleCreds(this)">Ver datos</button>' +
-          '<button class="secondary" onclick="resetDevices(\'' + code + '\')">Reiniciar disp.</button>' +
-          '<button class="' + (active ? 'danger' : 'secondary') + '" onclick="toggleActive(\'' + code + '\', ' + active + ')">' + (active ? 'Revocar' : 'Reactivar') + '</button>' +
-          '<button class="danger" onclick="deleteCode(\'' + code + '\')">Eliminar</button>' +
-          '<div class="credentials-box">' + credText + '</div>' +
-        '</td>';
-      tbody.appendChild(tr);
-
-      if (recentAdded < 5) {
-        const trRecent = document.createElement('tr');
-        trRecent.innerHTML =
-          '<td class="code-cell">' + code + '</td>' +
-          '<td>' + (data.clientName || '<span style="color:var(--muted)">-</span>') + '</td>' +
-          '<td><span class="badge ' + (active ? 'active' : 'revoked') + '">' + (active ? 'Activo' : 'Revocado') + '</span>' + onlineBadge + '</td>' +
-          '<td style="color:var(--muted); font-size:12px;">' + createdText + '</td>';
-        recentBody.appendChild(trRecent);
-        recentAdded++;
-      }
+    const filtered = lastSnapshotDocs.filter(({ id: code, data }) => {
+      const active = data.active !== false;
+      if (currentView === 'active' && !active) return false;
+      if (currentView === 'expiring' && !isExpiringSoon(data.expirationDate)) return false;
+      if (currentView === 'expired' && !isExpired(data.expirationDate)) return false;
+      if (currentView === 'demos' && !data.isDemo) return false;
+      if (query && !(code + ' ' + (data.clientName || '')).toLowerCase().includes(query)) return false;
+      return true;
     });
 
+    if (tbody) {
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">No hay códigos en esta sección.</td></tr>';
+      } else {
+        tbody.innerHTML = '';
+        filtered.forEach(({ id: code, data }) => {
+          const active = data.active !== false;
+          const deviceCount = Array.isArray(data.deviceIds) ? data.deviceIds.length : 0;
+          const onlineCount = countOnline(data.deviceActivity);
+          const expired = isExpired(data.expirationDate);
+          const expiringSoon = isExpiringSoon(data.expirationDate);
+
+          let credText = '';
+          if (data.mode === 'm3u') {
+            credText = 'M3U: ' + (data.m3uUrl || '(sin cargar)');
+          } else {
+            credText = 'Host: ' + (data.host || '(sin cargar)') +
+              ' | Usuario: ' + (data.username || '-') +
+              ' | Clave: ' + (data.password || '-');
+          }
+          credText += ' | Dispositivos: ' + deviceCount + '/3';
+
+          const onlineBadge = onlineCount > 0
+            ? '<div class="online-badge"><span class="live-dot"></span>' + onlineCount + ' en línea</div>'
+            : '';
+          const demoBadge = data.isDemo ? ' <span class="badge" style="background:rgba(79,141,253,0.15);color:var(--blue);">Demo</span>' : '';
+          const expireColor = expired ? 'var(--red)' : (expiringSoon ? 'var(--orange)' : 'var(--muted)');
+
+          const tr = document.createElement('tr');
+          tr.innerHTML =
+            '<td class="code-cell">' + code + '</td>' +
+            '<td>' + (data.clientName || '<span style="color:var(--muted)">-</span>') + demoBadge + '</td>' +
+            '<td><span class="badge ' + (active ? 'active' : 'revoked') + '">' + (active ? 'Activo' : 'Revocado') + '</span><div class="device-count">' + deviceCount + '/3 disp.</div>' + onlineBadge + '</td>' +
+            '<td style="color:' + expireColor + '; font-size:12px; font-weight:' + (expired || expiringSoon ? '700' : '400') + ';">' + formatDateOnly(data.expirationDate) + '</td>' +
+            '<td class="actions-cell">' +
+              '<button class="secondary" onclick="copyCode(\'' + code + '\')">Copiar</button>' +
+              '<button class="secondary" onclick="toggleCreds(this)">Ver datos</button>' +
+              '<button class="secondary" onclick="resetDevices(\'' + code + '\')">Reiniciar disp.</button>' +
+              '<button class="' + (active ? 'danger' : 'secondary') + '" onclick="toggleActive(\'' + code + '\', ' + active + ')">' + (active ? 'Revocar' : 'Reactivar') + '</button>' +
+              '<button class="danger" onclick="deleteCode(\'' + code + '\')">Eliminar</button>' +
+              '<div class="credentials-box">' + credText + '</div>' +
+            '</td>';
+          tbody.appendChild(tr);
+        });
+      }
+    }
+
+    // Las estadísticas de arriba siempre reflejan TODOS los códigos, sin importar la sección
+    lastSnapshotDocs.forEach(({ data }) => {
+      totalCount++;
+      if (data.active !== false) activeCount++; else revokedCount++;
+      deviceTotal += Array.isArray(data.deviceIds) ? data.deviceIds.length : 0;
+      onlineTotal += countOnline(data.deviceActivity);
+    });
     updateStats(totalCount, activeCount, revokedCount, deviceTotal, onlineTotal);
   }
 
