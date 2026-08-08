@@ -860,7 +860,7 @@
 
     lastSnapshotDocs.forEach(({ data }) => {
       const active = data.active !== false;
-      if (active) activeNav++;
+      if (active && !data.isDemo) activeNav++;
       if (isExpiringSoon(data.expirationDate)) expiringNav++;
       if (isExpired(data.expirationDate)) expiredNav++;
       if (data.isDemo) demosNav++;
@@ -874,7 +874,7 @@
 
     const filtered = lastSnapshotDocs.filter(({ id: code, data }) => {
       const active = data.active !== false;
-      if (currentView === 'active' && !active) return false;
+      if (currentView === 'active' && (!active || data.isDemo)) return false;
       if (currentView === 'expiring' && !isExpiringSoon(data.expirationDate)) return false;
       if (currentView === 'expired' && !isExpired(data.expirationDate)) return false;
       if (currentView === 'demos' && !data.isDemo) return false;
@@ -1005,7 +1005,7 @@
   // vencimiento correspondiente (hoy + los meses elegidos), quedando activa como cliente normal.
   window.upgradeToPlan = async (code, months) => {
     const labels = { 1: '1 mes', 3: '3 meses', 6: '6 meses', 12: '1 año' };
-    if (!confirm('¿Activar el plan de ' + labels[months] + ' para el código ' + code + '? Dejará de ser una cuenta demo.')) return;
+    if (!confirm('¿Activar el plan de ' + labels[months] + ' para el código ' + code + '? Dejará de ser una cuenta demo y la app del cliente se va a cerrar sola para aplicar el cambio.')) return;
     const expires = new Date();
     expires.setMonth(expires.getMonth() + months);
     const expirationDate = expires.toISOString().slice(0, 10);
@@ -1013,7 +1013,8 @@
       isDemo: false,
       demoExpiresAt: firebase.firestore.FieldValue.delete(),
       expirationDate: expirationDate,
-      active: true
+      active: true,
+      forceCloseSignal: firebase.firestore.FieldValue.serverTimestamp()
     });
     showToast('Plan de ' + labels[months] + ' activado');
   };
