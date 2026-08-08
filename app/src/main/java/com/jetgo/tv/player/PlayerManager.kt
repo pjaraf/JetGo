@@ -1,7 +1,6 @@
 package com.jetgo.tv.player
 
 import android.content.Context
-import android.util.Log
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -111,15 +110,6 @@ class PlayerManager(context: Context) {
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                // Antes el error real se perdía en silencio (solo se mostraba un mensaje
-                // genérico al usuario) — se loggea acá para poder diagnosticar con logcat
-                // por qué falla la reproducción en un servidor/contenido puntual.
-                Log.e(
-                    "PlayerManager",
-                    "onPlayerError url=$lastUrl errorCode=${error.errorCode} " +
-                        "errorCodeName=${error.errorCodeName} retryCount=$retryCount",
-                    error
-                )
                 val url = lastUrl
                 if (url != null && retryCount < 2) {
                     // Reintenta un par de veces solo (cortes momentáneos de red/servidor),
@@ -130,7 +120,12 @@ class PlayerManager(context: Context) {
                         exoPlayer.playWhenReady = true
                     } catch (e: Exception) { /* ignorar, se maneja abajo si vuelve a fallar */ }
                 } else {
-                    _playbackError.value = "No se pudo reproducir \"$lastName\". Verifica tu conexión o el canal en el servidor."
+                    val causaHttp = (error.cause as? androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException)?.responseCode
+                    val detalle = when {
+                        causaHttp != null -> "El servidor respondió con error HTTP $causaHttp"
+                        else -> "${error.errorCodeName} — ${error.cause?.message ?: error.message}"
+                    }
+                    _playbackError.value = "No se pudo reproducir \"$lastName\".\n$detalle"
                 }
             }
 

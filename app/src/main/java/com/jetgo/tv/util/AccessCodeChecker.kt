@@ -45,7 +45,7 @@ object AccessCodeChecker {
      * Valida el código y, si está activo, registra este dispositivo (hasta un máximo de
      * [MAX_DEVICES_PER_CODE]). Si el dispositivo ya estaba registrado, no hace nada extra.
      */
-    fun checkCodeAndRegisterDevice(projectId: String, code: String, deviceId: String): AccessCodeResult {
+    fun checkCodeAndRegisterDevice(projectId: String, code: String, deviceId: String, deviceName: String = ""): AccessCodeResult {
         if (projectId.isBlank() || code.isBlank()) return AccessCodeResult(valid = false)
         val normalizedCode = code.trim().uppercase()
         val docPath = "projects/$projectId/databases/(default)/documents/access_codes/$normalizedCode"
@@ -73,6 +73,7 @@ object AccessCodeChecker {
                     }
                     // Registra este dispositivo nuevo (no bloquea el acceso si falla la escritura)
                     registerDevice(docUrl, deviceIds + deviceId)
+                    if (deviceName.isNotBlank()) saveDeviceName(docUrl, deviceId, deviceName)
                 }
 
                 AccessCodeResult(
@@ -114,6 +115,30 @@ object AccessCodeChecker {
             client.newCall(patchRequest).execute().close()
         } catch (e: Exception) {
             // Si falla el registro del dispositivo, no bloqueamos el acceso de este intento
+        }
+    }
+
+    /** Guarda un nombre legible para este dispositivo (ej. "Samsung TV Box" o "Xiaomi Redmi 10"),
+     *  para que el panel admin pueda mostrar cuál es cuál en vez de solo un ID sin sentido. */
+    private fun saveDeviceName(docUrl: String, deviceId: String, deviceName: String) {
+        try {
+            val payload = JSONObject().put(
+                "fields", JSONObject().put(
+                    "deviceNames", JSONObject().put(
+                        "mapValue", JSONObject().put(
+                            "fields", JSONObject().put(
+                                deviceId, JSONObject().put("stringValue", deviceName)
+                            )
+                        )
+                    )
+                )
+            )
+            val patchUrl = "$docUrl?updateMask.fieldPaths=deviceNames.$deviceId"
+            val requestBody = payload.toString().toRequestBody("application/json".toMediaType())
+            val patchRequest = Request.Builder().url(patchUrl).patch(requestBody).build()
+            client.newCall(patchRequest).execute().close()
+        } catch (e: Exception) {
+            // Silencioso: si falla, el panel solo mostrará el ID sin nombre para este dispositivo
         }
     }
 

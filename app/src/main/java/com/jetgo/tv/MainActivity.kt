@@ -275,6 +275,18 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
         }
     }
 
+    // Si el sistema mató la app mientras el usuario veía una película/serie (común en TV Box
+    // con poca memoria), al reconectar se detecta y se retoma solo, sin que el usuario tenga
+    // que volver a buscarla desde cero.
+    val pendingAutoResume by viewModel.pendingAutoResume.collectAsState()
+    LaunchedEffect(pendingAutoResume) {
+        pendingAutoResume?.let { item ->
+            handleItemSelected(item)
+            viewModel.enterFullscreenPlayer()
+            viewModel.consumeAutoResume()
+        }
+    }
+
     NavHost(navController = navController, startDestination = "home") {
 
         composable("home") {

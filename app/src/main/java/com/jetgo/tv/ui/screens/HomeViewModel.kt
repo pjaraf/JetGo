@@ -7,6 +7,7 @@ import com.jetgo.tv.BuildConfig
 import com.jetgo.tv.data.local.AccessStore
 import com.jetgo.tv.data.local.ConfigStore
 import com.jetgo.tv.data.local.FavoritesStore
+import com.jetgo.tv.data.local.LastPlayingStore
 import com.jetgo.tv.data.local.ParentalControlStore
 import com.jetgo.tv.data.local.PlaybackPositionStore
 import com.jetgo.tv.data.local.WatchHistoryEntry
@@ -24,6 +25,7 @@ import com.jetgo.tv.player.PlayerManager
 import com.jetgo.tv.util.AccessCodeChecker
 import com.jetgo.tv.util.AccessCodeResult
 import com.jetgo.tv.util.AdultContentFilter
+import com.jetgo.tv.util.getDeviceDisplayName
 import com.jetgo.tv.util.getDeviceId
 import com.jetgo.tv.util.UpdateChecker
 import com.jetgo.tv.util.UpdateInfo
@@ -181,6 +183,37 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val movieDetailState: StateFlow<MovieDetailUiState> = _movieDetailState.asStateFlow()
 
     private val positionStore = PlaybackPositionStore(application)
+    private val lastPlayingStore = LastPlayingStore(application)
+
+    /** Si el sistema mató la app mientras reproducía algo hace poco, acá queda el ítem para
+     *  retomarlo automáticamente apenas la app termina de conectar de nuevo. */
+    private val _pendingAutoResume = MutableStateFlow<ContentItem?>(null)
+    val pendingAutoResume: StateFlow<ContentItem?> = _pendingAutoResume.asStateFlow()
+
+    fun consumeAutoResume() {
+        _pendingAutoResume.value = null
+    }
+
+    private fun checkForAutoResume() {
+        viewModelScope.launch {
+            val last = try { lastPlayingStore.get() } catch (e: Exception) { null } ?: return@launch
+            val minutesAgo = (System.currentTimeMillis() - last.savedAtMs) / 60_000
+            // Solo tiene sentido retomar solo si fue hace POCO (el sistema recién mató la app
+            // a mitad de la película) — si pasó más de media hora, mejor que el usuario elija
+            // desde "Seguir viendo" como siempre, no imponerle algo de hace rato.
+            if (minutesAgo <= 30) {
+                _pendingAutoResume.value = ContentItem(
+                    id = last.itemId,
+                    name = last.name,
+                    imageUrl = last.imageUrl,
+                    type = if (last.itemType == "SERIES") ContentType.SERIES else ContentType.MOVIE,
+                    streamUrl = null
+                )
+            } else {
+                lastPlayingStore.clear()
+            }
+        }
+    }
     private val watchHistoryStore = WatchHistoryStore(application)
     private val posterCacheStore = com.jetgo.tv.data.local.PosterCacheStore(application)
     private val tmdbApi = com.jetgo.tv.data.remote.TmdbApi.create()
@@ -393,7 +426,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             // Validación real contra Firestore, en segundo plano y en silencio: si el código
             // ya no es válido (revocado, etc.), ahí sí se cierra la sesión.
             val result = withContext(Dispatchers.IO) {
-                AccessCodeChecker.checkCodeAndRegisterDevice(projectId, savedCode, deviceId)
+                AccessCodeChecker.checkCodeAndRegisterDevice(projectId, savedCode, deviceId, getDeviceDisplayName(context))
             }
 
             if (result.valid) {
@@ -413,7 +446,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
             val deviceId = getDeviceId(context)
             val result = withContext(Dispatchers.IO) {
-                AccessCodeChecker.checkCodeAndRegisterDevice(projectId, code, deviceId)
+                AccessCodeChecker.checkCodeAndRegisterDevice(projectId, code, deviceId, getDeviceDisplayName(context))
             }
             if (result.valid) {
                 accessStore.saveCode(code.trim().uppercase())
@@ -506,6 +539,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 ensureHomeCatalogLoaded()
                 refreshContinueWatching()
                 refreshParentalState()
+                checkForAutoResume()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -542,6 +576,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     val startingChannel = result.channels.firstOrNull { it.streamId == lastId } ?: result.channels.firstOrNull()
                     startingChannel?.let { playChannel(it) }
                 }
+                checkForAutoResume()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -943,15 +978,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private fun playEpisodeDirect(episodeId: String) {
         val episode = currentEpisode(episodeId) ?: return
         val seriesId = _seriesDetailState.value.detail?.seriesId
+        val seriesDetail = _seriesDetailState.value.detail
         playerManager.playChannel(episode.streamUrl, "${_seriesDetailState.value.detail?.name} · ${episode.title}")
         startPositionTracking("series:$episodeId", onCompleted = {
             seriesId?.let { id ->
                 viewModelScope.launch {
                     watchHistoryStore.remove(id, "SERIES")
                     refreshContinueWatching()
+                    lastPlayingStore.clear()
                 }
             }
         })
+        if (seriesId != null && seriesDetail != null) {
+            viewModelScope.launch {
+                lastPlayingStore.save(seriesId, "SERIES", seriesDetail.name, seriesDetail.coverUrl)
+            }
+        }
         _seriesDetailState.value = _seriesDetailState.value.copy(
             currentEpisodeId = episodeId,
             selectedSeason = episode.season
@@ -1005,6 +1047,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         onSeriesFullyFinished = null
         stopPositionTracking()
         try { playerManager.exoPlayer.pause() } catch (e: Exception) { /* ignorar */ }
+        viewModelScope.launch { lastPlayingStore.clear() }
         _seriesDetailState.value = SeriesDetailUiState()
     }
 
@@ -1048,10 +1091,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             pendingAlternateUrls = detail.alternateStreamUrls
             pendingContentKey = "movie:${item.id}"
             pendingTitle = detail.name
+            viewModelScope.launch {
+                lastPlayingStore.save(item.id, "MOVIE", detail.name, detail.coverUrl)
+            }
             pendingOnCompleted = {
                 viewModelScope.launch {
                     watchHistoryStore.remove(item.id, "MOVIE")
                     refreshContinueWatching()
+                    lastPlayingStore.clear()
                 }
             }
             playWithResumeCheck("movie:${item.id}", detail.name, detail.streamUrl, onCompleted = pendingOnCompleted)
@@ -1063,6 +1110,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         stopPositionTracking()
         playerManager.onPlaybackEnded = null
         try { playerManager.exoPlayer.pause() } catch (e: Exception) { /* ignorar */ }
+        viewModelScope.launch { lastPlayingStore.clear() }
         _movieDetailState.value = MovieDetailUiState()
     }
 

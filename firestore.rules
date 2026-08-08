@@ -43,6 +43,12 @@ service cloud.firestore {
         && resource.data.active == true
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deviceActivity']);
 
+      // La app (sin iniciar sesión) puede guardar un nombre legible para su propio dispositivo
+      // (marca/modelo), para que el panel admin pueda mostrar cuál es cuál.
+      allow update: if request.auth == null
+        && resource.data.active == true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deviceNames']);
+
       // El administrador principal ve y administra TODOS los códigos. Un sub administrador
       // solo ve, edita y borra los códigos que ÉL MISMO creó (ownerId == su propio uid).
       allow list: if isSignedIn() && !isRevoked()
