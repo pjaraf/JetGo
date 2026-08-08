@@ -23,7 +23,11 @@ service cloud.firestore {
     match /access_codes/{codeId} {
       // La app (sin iniciar sesión) puede CONSULTAR un código puntual si ya sabe cuál es
       // (para validarlo al ingresar), pero NO puede listar todos los códigos existentes.
-      allow get: if true;
+      // Si es una cuenta demo y ya pasó su hora de vencimiento, la consulta se bloquea sola
+      // (sin que el administrador tenga que revocarla a mano).
+      allow get: if resource.data.get('isDemo', false) == false
+        || !('demoExpiresAt' in resource.data)
+        || resource.data.demoExpiresAt > request.time;
 
       // La app (sin iniciar sesión) puede registrar SU dispositivo en la lista "deviceIds"
       // de un código activo, siempre que:

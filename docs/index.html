@@ -420,13 +420,24 @@
           <input id="xtreamPassword" type="text" placeholder="Contraseña Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
         </div>
 
-        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Fecha de vencimiento (opcional)</label>
-        <input id="expirationDate" type="date" />
+        <div id="expirationDateBox">
+          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Fecha de vencimiento (opcional)</label>
+          <input id="expirationDate" type="date" />
+        </div>
 
-        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin: 4px 0 14px; cursor:pointer;">
-          <input type="checkbox" id="isDemo" style="width:auto; margin:0;" />
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin: 4px 0 8px; cursor:pointer;">
+          <input type="checkbox" id="isDemo" style="width:auto; margin:0;" onchange="onDemoCheckChange()" />
           Marcar como cuenta demo
         </label>
+
+        <div id="demoDurationBox" style="display:none;">
+          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Duración de la demo</label>
+          <div class="mode-row">
+            <button type="button" id="demo3hBtn" class="mode-btn active" onclick="setDemoHours(3)">3 horas</button>
+            <button type="button" id="demo5hBtn" class="mode-btn" onclick="setDemoHours(5)">5 horas</button>
+            <button type="button" id="demo12hBtn" class="mode-btn" onclick="setDemoHours(12)">12 horas</button>
+          </div>
+        </div>
 
         <button id="generateBtn" class="full">Generar nuevo código</button>
       </div>
@@ -618,6 +629,24 @@
   }
   window.setServerType = setServerType;
 
+  // ---------- Duración de la demo (3, 5 o 12 horas) ----------
+  let demoHours = 3;
+  function setDemoHours(hours) {
+    demoHours = hours;
+    document.getElementById('demo3hBtn').classList.toggle('active', hours === 3);
+    document.getElementById('demo5hBtn').classList.toggle('active', hours === 5);
+    document.getElementById('demo12hBtn').classList.toggle('active', hours === 12);
+  }
+  window.setDemoHours = setDemoHours;
+
+  function onDemoCheckChange() {
+    const isDemo = document.getElementById('isDemo').checked;
+    document.getElementById('demoDurationBox').style.display = isDemo ? 'block' : 'none';
+    // Una demo se vence por horas, no por fecha — se ocultan para no mezclar los dos sistemas
+    document.getElementById('expirationDateBox').style.display = isDemo ? 'none' : 'block';
+  }
+  window.onDemoCheckChange = onDemoCheckChange;
+
   // ---------- Menú hamburguesa: abrir/cerrar ----------
   function openMenu() {
     document.getElementById('menuDrawer').classList.add('open');
@@ -706,8 +735,8 @@
     }
     const isM3u = selectedServer.type === 'm3u';
 
-    const expirationDate = document.getElementById('expirationDate').value || null;
     const isDemo = document.getElementById('isDemo').checked;
+    const expirationDate = isDemo ? null : (document.getElementById('expirationDate').value || null);
     // Nota: no hay ningún límite acá que impida crear un segundo código para el mismo
     // cliente — si alguien quiere dos cuentas, ambos códigos quedan activos por separado,
     // sin que uno afecte al otro.
@@ -723,6 +752,11 @@
       ownerId: auth.currentUser.uid,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
+
+    if (isDemo) {
+      const expires = new Date(Date.now() + demoHours * 60 * 60 * 1000);
+      docData.demoExpiresAt = firebase.firestore.Timestamp.fromDate(expires);
+    }
 
     if (isM3u) {
       docData.m3uUrl = selectedHost;
@@ -746,6 +780,8 @@
     document.getElementById('xtreamPassword').value = '';
     document.getElementById('expirationDate').value = '';
     document.getElementById('isDemo').checked = false;
+    onDemoCheckChange();
+    setDemoHours(3);
     showToast('Codigo generado: ' + code);
   });
 
@@ -801,6 +837,22 @@
     return diffDays >= 0 && diffDays <= 7;
   }
 
+  /** true si una demo ya pasó su hora exacta de vencimiento */
+  function isDemoExpired(demoExpiresAt) {
+    if (!demoExpiresAt || !demoExpiresAt.toDate) return false;
+    return demoExpiresAt.toDate() < new Date();
+  }
+
+  /** Texto legible de cuánto le queda (o hace cuánto venció) a una demo */
+  function demoTimeLabel(demoExpiresAt) {
+    if (!demoExpiresAt || !demoExpiresAt.toDate) return '-';
+    const diffMs = demoExpiresAt.toDate().getTime() - Date.now();
+    if (diffMs <= 0) return 'Demo vencida';
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return hours > 0 ? ('Quedan ' + hours + 'h ' + mins + 'm') : ('Quedan ' + mins + ' min');
+  }
+
   function renderCodes() {
     const tbody = document.getElementById('codesTableBody');
     let totalCount = 0, activeCount = 0, revokedCount = 0, deviceTotal = 0, onlineTotal = 0;
@@ -839,8 +891,8 @@
           const active = data.active !== false;
           const deviceCount = Array.isArray(data.deviceIds) ? data.deviceIds.length : 0;
           const onlineCount = countOnline(data.deviceActivity);
-          const expired = isExpired(data.expirationDate);
-          const expiringSoon = isExpiringSoon(data.expirationDate);
+          const expired = data.isDemo ? isDemoExpired(data.demoExpiresAt) : isExpired(data.expirationDate);
+          const expiringSoon = !data.isDemo && isExpiringSoon(data.expirationDate);
 
           let credText = '';
           if (data.mode === 'm3u') {
@@ -872,21 +924,36 @@
             : '';
           const demoBadge = data.isDemo ? ' <span class="badge" style="background:rgba(79,141,253,0.15);color:var(--blue);">Demo</span>' : '';
           const expireColor = expired ? 'var(--red)' : (expiringSoon ? 'var(--orange)' : 'var(--muted)');
+          const expireText = data.isDemo ? demoTimeLabel(data.demoExpiresAt) : formatDateOnly(data.expirationDate);
+
+          const upgradeBox = data.isDemo ? (
+            '<div class="credentials-box upgrade-box">' +
+              '<div style="font-size:12px; color:var(--muted); margin-bottom:8px;">Elige el plan a activar:</div>' +
+              '<div style="display:flex; flex-wrap:wrap; gap:6px;">' +
+                '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 1)">1 mes</button>' +
+                '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 3)">3 meses</button>' +
+                '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 6)">6 meses</button>' +
+                '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 12)">1 año</button>' +
+              '</div>' +
+            '</div>'
+          ) : '';
 
           const tr = document.createElement('tr');
           tr.innerHTML =
             '<td class="code-cell">' + code + '</td>' +
             '<td>' + (data.clientName || '<span style="color:var(--muted)">-</span>') + demoBadge + '</td>' +
             '<td><span class="badge ' + (active ? 'active' : 'revoked') + '">' + (active ? 'Activo' : 'Revocado') + '</span><div class="device-count">' + deviceCount + '/3 disp.</div>' + onlineBadge + '</td>' +
-            '<td style="color:' + expireColor + '; font-size:12px; font-weight:' + (expired || expiringSoon ? '700' : '400') + ';">' + formatDateOnly(data.expirationDate) + '</td>' +
+            '<td style="color:' + expireColor + '; font-size:12px; font-weight:' + (expired || expiringSoon ? '700' : '400') + ';">' + expireText + '</td>' +
             '<td class="actions-cell">' +
               '<button class="secondary" onclick="copyCode(\'' + code + '\')">Copiar</button>' +
               '<button class="secondary" onclick="toggleCreds(this, \'.credentials-box\')">Ver datos</button>' +
               '<button class="secondary" onclick="toggleCreds(this, \'.devices-box\')">Dispositivos (' + deviceCount + ')</button>' +
+              (data.isDemo ? '<button class="secondary" onclick="toggleCreds(this, \'.upgrade-box\')">Actualizar plan</button>' : '') +
               '<button class="' + (active ? 'danger' : 'secondary') + '" onclick="toggleActive(\'' + code + '\', ' + active + ')">' + (active ? 'Revocar' : 'Reactivar') + '</button>' +
               '<button class="danger" onclick="deleteCode(\'' + code + '\')">Eliminar</button>' +
               '<div class="credentials-box">' + credText + '</div>' +
               '<div class="credentials-box devices-box">' + devicesListHtml + '</div>' +
+              upgradeBox +
             '</td>';
           tbody.appendChild(tr);
         });
@@ -932,6 +999,23 @@
     updates['deviceActivity.' + deviceId] = firebase.firestore.FieldValue.delete();
     await docRef.update(updates);
     showToast('Dispositivo quitado');
+  };
+
+  // Convierte una cuenta demo en un plan pago: deja de ser demo y le pone la fecha de
+  // vencimiento correspondiente (hoy + los meses elegidos), quedando activa como cliente normal.
+  window.upgradeToPlan = async (code, months) => {
+    const labels = { 1: '1 mes', 3: '3 meses', 6: '6 meses', 12: '1 año' };
+    if (!confirm('¿Activar el plan de ' + labels[months] + ' para el código ' + code + '? Dejará de ser una cuenta demo.')) return;
+    const expires = new Date();
+    expires.setMonth(expires.getMonth() + months);
+    const expirationDate = expires.toISOString().slice(0, 10);
+    await db.collection('access_codes').doc(code).update({
+      isDemo: false,
+      demoExpiresAt: firebase.firestore.FieldValue.delete(),
+      expirationDate: expirationDate,
+      active: true
+    });
+    showToast('Plan de ' + labels[months] + ' activado');
   };
 
   window.deleteCode = async (code) => {
