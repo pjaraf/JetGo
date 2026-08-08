@@ -407,33 +407,17 @@
       <!-- ---------- Vista: Crear cliente nuevo ---------- -->
       <div class="card view-section" id="view-create">
         <h2>Generar nuevo código</h2>
-        <input id="clientName" type="text" placeholder="Nombre del cliente (opcional)" />
+        <input id="clientName" type="text" placeholder="Nombre del cliente" required />
 
-        <div class="mode-row">
-          <button type="button" id="modeXtreamBtn" class="mode-btn active" onclick="setMode('xtream')">Xtream Codes</button>
-          <button type="button" id="modeM3uBtn" class="mode-btn" onclick="setMode('m3u')">Lista M3U</button>
-        </div>
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor / lista</label>
+        <select id="serverSelect" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" onchange="onServerSelectChange()">
+          <option value="">Selecciona uno...</option>
+        </select>
 
-        <div id="xtreamFields">
-          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor</label>
-          <select id="serverSelect" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;">
-            <option value="">Selecciona un servidor...</option>
-          </select>
-          <!-- Solo el administrador principal ve esta opción para usar una URL suelta -->
-          <div id="customHostBox" style="display:none;">
-            <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); margin-bottom:8px; cursor:pointer;">
-              <input type="checkbox" id="useCustomHost" style="width:auto; margin:0;" onchange="document.getElementById('customHostFields').style.display = this.checked ? 'block' : 'none';" />
-              Usar una URL suelta en vez de un servidor guardado
-            </label>
-            <div id="customHostFields" style="display:none;">
-              <input id="host" type="text" placeholder="Host del servidor (http://servidor.com:8080)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
-            </div>
-          </div>
+        <!-- Solo aparecen si el servidor/lista elegido es de tipo Xtream Codes -->
+        <div id="xtreamCredFields" style="display:none;">
           <input id="username" type="text" placeholder="Usuario Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
           <input id="xtreamPassword" type="text" placeholder="Contraseña Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
-        </div>
-        <div id="m3uFields" style="display:none;">
-          <input id="m3uUrl" type="text" placeholder="URL de la lista M3U" />
         </div>
 
         <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Fecha de vencimiento (opcional)</label>
@@ -466,26 +450,30 @@
       <!-- ---------- Vista: Paneles sub administrador ---------- -->
       <!-- ---------- Vista: Servidores Xtream (solo el administrador principal las administra) ---------- -->
       <div class="card view-section" id="view-servers" style="display:none;">
-        <h2>Servidores Xtream guardados</h2>
+        <h2>Servidores y listas guardadas</h2>
         <p style="color:var(--muted); font-size:13px; margin-top:-10px; margin-bottom:16px;">
-          Guarda acá las URLs de tus servidores con un nombre — los sub administradores solo van
-          a ver el nombre al generar un código, nunca la URL real.
+          Guarda acá tus servidores Xtream o listas M3U con un nombre — los sub administradores
+          solo van a ver el nombre al generar un código, nunca la URL real.
         </p>
 
         <div id="serverCreateBox">
-          <input id="serverName" type="text" placeholder="Nombre del servidor (ej. Servidor Principal)" />
+          <div class="mode-row">
+            <button type="button" id="serverTypeXtreamBtn" class="mode-btn active" onclick="setServerType('xtream')">Servidor Xtream Codes</button>
+            <button type="button" id="serverTypeM3uBtn" class="mode-btn" onclick="setServerType('m3u')">Lista M3U</button>
+          </div>
+          <input id="serverName" type="text" placeholder="Nombre para identificarlo (ej. Servidor Principal)" />
           <input id="serverHost" type="text" placeholder="URL del servidor (http://servidor.com:8080)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
-          <button id="createServerBtn" class="full">Guardar servidor</button>
+          <button id="createServerBtn" class="full">Guardar</button>
         </div>
         <p id="serverBlockedMessage" style="display:none; color:var(--muted); font-size:14px; line-height:1.6;">
-          Solo el administrador principal puede agregar o editar servidores.
+          Solo el administrador principal puede agregar o editar servidores y listas.
         </p>
 
         <div class="table-wrap" style="margin-top:20px;">
           <table>
-            <thead><tr><th>Nombre</th><th id="serverUrlHeader">URL</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>Nombre</th><th>Tipo</th><th id="serverUrlHeader">URL</th><th>Acciones</th></tr></thead>
             <tbody id="serversTableBody">
-              <tr><td colspan="3" style="color:var(--muted)">Cargando...</td></tr>
+              <tr><td colspan="4" style="color:var(--muted)">Cargando...</td></tr>
             </tbody>
           </table>
         </div>
@@ -595,7 +583,6 @@
       document.getElementById('nav-servers').style.display = currentUserRole === 'admin' ? 'flex' : 'none';
       document.getElementById('serverCreateBox').style.display = currentUserRole === 'admin' ? 'block' : 'none';
       document.getElementById('serverBlockedMessage').style.display = currentUserRole === 'admin' ? 'none' : 'block';
-      document.getElementById('customHostBox').style.display = currentUserRole === 'admin' ? 'block' : 'none';
       document.getElementById('serverUrlHeader').style.display = currentUserRole === 'admin' ? '' : 'none';
 
       loginScreen.style.display = 'none';
@@ -610,16 +597,26 @@
     }
   });
 
-  // ---------- Alternar entre modo Xtream Codes y M3U ----------
-  let currentMode = 'xtream';
-  function setMode(mode) {
-    currentMode = mode;
-    document.getElementById('modeXtreamBtn').classList.toggle('active', mode === 'xtream');
-    document.getElementById('modeM3uBtn').classList.toggle('active', mode === 'm3u');
-    document.getElementById('xtreamFields').style.display = mode === 'xtream' ? 'block' : 'none';
-    document.getElementById('m3uFields').style.display = mode === 'm3u' ? 'block' : 'none';
+  // ---------- Elegir un servidor o lista del desplegable: muestra usuario/clave solo si es Xtream ----------
+  function onServerSelectChange() {
+    const select = document.getElementById('serverSelect');
+    const selected = serversList.find(s => s.host === select.value);
+    const isXtream = selected ? selected.type !== 'm3u' : false;
+    document.getElementById('xtreamCredFields').style.display = isXtream ? 'block' : 'none';
   }
-  window.setMode = setMode;
+  window.onServerSelectChange = onServerSelectChange;
+
+  // ---------- Alternar tipo al GUARDAR un servidor/lista nuevo (sección Servidores) ----------
+  let newServerType = 'xtream';
+  function setServerType(type) {
+    newServerType = type;
+    document.getElementById('serverTypeXtreamBtn').classList.toggle('active', type === 'xtream');
+    document.getElementById('serverTypeM3uBtn').classList.toggle('active', type === 'm3u');
+    document.getElementById('serverHost').placeholder = type === 'xtream'
+      ? 'URL del servidor (http://servidor.com:8080)'
+      : 'URL de la lista M3U';
+  }
+  window.setServerType = setServerType;
 
   // ---------- Menú hamburguesa: abrir/cerrar ----------
   function openMenu() {
@@ -696,14 +693,30 @@
 
   document.getElementById('generateBtn').addEventListener('click', async () => {
     const clientName = document.getElementById('clientName').value.trim();
+    if (!clientName) {
+      alert('El nombre del cliente es obligatorio.');
+      return;
+    }
+
+    const selectedHost = document.getElementById('serverSelect').value;
+    const selectedServer = serversList.find(s => s.host === selectedHost);
+    if (!selectedServer) {
+      alert('Selecciona un servidor o lista de la lista.');
+      return;
+    }
+    const isM3u = selectedServer.type === 'm3u';
+
     const expirationDate = document.getElementById('expirationDate').value || null;
     const isDemo = document.getElementById('isDemo').checked;
+    // Nota: no hay ningún límite acá que impida crear un segundo código para el mismo
+    // cliente — si alguien quiere dos cuentas, ambos códigos quedan activos por separado,
+    // sin que uno afecte al otro.
     const code = generateRandomCode();
 
     const docData = {
       active: true,
-      clientName: clientName || null,
-      mode: currentMode,
+      clientName: clientName,
+      mode: isM3u ? 'm3u' : 'xtream',
       deviceIds: [],
       expirationDate: expirationDate,
       isDemo: isDemo,
@@ -711,42 +724,26 @@
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    if (currentMode === 'xtream') {
-      const useCustom = currentUserRole === 'admin' && document.getElementById('useCustomHost').checked;
-      const host = useCustom
-        ? document.getElementById('host').value.trim()
-        : document.getElementById('serverSelect').value;
+    if (isM3u) {
+      docData.m3uUrl = selectedHost;
+    } else {
       const username = document.getElementById('username').value.trim();
       const password = document.getElementById('xtreamPassword').value.trim();
-      if (!host) {
-        alert(useCustom ? 'Completa la URL del servidor.' : 'Selecciona un servidor de la lista.');
-        return;
-      }
       if (!username || !password) {
         alert('Completa usuario y contraseña de Xtream Codes.');
         return;
       }
-      docData.host = host;
+      docData.host = selectedHost;
       docData.username = username;
       docData.password = password;
-    } else {
-      const m3uUrl = document.getElementById('m3uUrl').value.trim();
-      if (!m3uUrl) {
-        alert('Completa la URL de la lista M3U.');
-        return;
-      }
-      docData.m3uUrl = m3uUrl;
     }
 
     await db.collection('access_codes').doc(code).set(docData);
     document.getElementById('clientName').value = '';
-    document.getElementById('host').value = '';
     document.getElementById('serverSelect').value = '';
-    if (document.getElementById('useCustomHost')) document.getElementById('useCustomHost').checked = false;
-    if (document.getElementById('customHostFields')) document.getElementById('customHostFields').style.display = 'none';
+    onServerSelectChange();
     document.getElementById('username').value = '';
     document.getElementById('xtreamPassword').value = '';
-    document.getElementById('m3uUrl').value = '';
     document.getElementById('expirationDate').value = '';
     document.getElementById('isDemo').checked = false;
     showToast('Codigo generado: ' + code);
@@ -1042,15 +1039,16 @@
   function renderServerDropdown() {
     const select = document.getElementById('serverSelect');
     const currentValue = select.value;
-    select.innerHTML = '<option value="">Selecciona un servidor...</option>' +
-      serversList.map(s => '<option value="' + s.host.replace(/"/g, '&quot;') + '">' + s.name.replace(/</g, '&lt;') + '</option>').join('');
+    select.innerHTML = '<option value="">Selecciona uno...</option>' +
+      serversList.map(s => '<option value="' + s.host.replace(/"/g, '&quot;') + '">' + s.name.replace(/</g, '&lt;') + (s.type === 'm3u' ? ' (Lista M3U)' : ' (Xtream)') + '</option>').join('');
     select.value = currentValue;
+    onServerSelectChange();
   }
 
   function renderServersTable() {
     const tbody = document.getElementById('serversTableBody');
     if (serversList.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted)">Todavía no hay servidores guardados.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Todavía no hay servidores ni listas guardadas.</td></tr>';
       return;
     }
     tbody.innerHTML = '';
@@ -1061,6 +1059,7 @@
         : '';
       tr.innerHTML =
         '<td>' + s.name + '</td>' +
+        '<td>' + (s.type === 'm3u' ? 'Lista M3U' : 'Xtream Codes') + '</td>' +
         urlCell +
         '<td class="actions-cell">' +
           (currentUserRole === 'admin'
@@ -1075,17 +1074,18 @@
     const name = document.getElementById('serverName').value.trim();
     const host = document.getElementById('serverHost').value.trim();
     if (!name || !host) {
-      alert('Completa el nombre y la URL del servidor.');
+      alert('Completa el nombre y la URL.');
       return;
     }
     await db.collection('servers').add({
       name: name,
       host: host,
+      type: newServerType,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     document.getElementById('serverName').value = '';
     document.getElementById('serverHost').value = '';
-    showToast('Servidor guardado');
+    showToast('Guardado');
     await loadServers();
     renderServersTable();
   });
