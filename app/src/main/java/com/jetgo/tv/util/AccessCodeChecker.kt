@@ -180,4 +180,70 @@ object AccessCodeChecker {
         sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
         return sdf.format(java.util.Date())
     }
+
+    /** Resultado de revisar si el código sigue siendo válido AHORA MISMO (para cerrar la app
+     *  sola si dejó de serlo, aunque el cliente esté viendo algo en ese momento). */
+    data class ValidityCheck(
+        val stillValid: Boolean,
+        /** Marca de tiempo (en milisegundos) que el panel usa para avisar "cerrar la app
+         *  ahora" — por ejemplo, justo después de renovar un plan. Null si no hay ninguna. */
+        val forceCloseSignalMs: Long? = null
+    )
+
+    /**
+     * Revisa el estado actual del código: si sigue activo, si una demo ya venció, y si el
+     * panel mandó una señal de "cerrar la app ahora" (por ejemplo, al renovar un plan).
+     * Se llama a esto cada cierto tiempo mientras la app está abierta.
+     */
+    fun checkStillValid(projectId: String, code: String): ValidityCheck {
+        if (projectId.isBlank() || code.isBlank()) return ValidityCheck(stillValid = true)
+        return try {
+            val normalizedCode = code.trim().uppercase()
+            val docPath = "projects/$projectId/databases/(default)/documents/access_codes/$normalizedCode"
+            val docUrl = "https://firestore.googleapis.com/v1/$docPath"
+
+            val getRequest = Request.Builder().url(docUrl).build()
+            client.newCall(getRequest).execute().use { response ->
+                // Si Firestore ya bloqueó la consulta (código revocado, o demo vencida — las
+                // reglas de seguridad rechazan la consulta sola en ese caso), ya no es válido.
+                if (!response.isSuccessful) return ValidityCheck(stillValid = false)
+                val body = response.body?.string() ?: return ValidityCheck(stillValid = true)
+                val json = JSONObject(body)
+                val fields = json.optJSONObject("fields") ?: return ValidityCheck(stillValid = true)
+
+                val active = fields.optJSONObject("active")?.optBoolean("booleanValue", true) ?: true
+                if (!active) return ValidityCheck(stillValid = false)
+
+                val isDemo = fields.optJSONObject("isDemo")?.optBoolean("booleanValue", false) ?: false
+                if (isDemo) {
+                    val demoExpiresAtIso = fields.optJSONObject("demoExpiresAt")?.optString("timestampValue")
+                    if (!demoExpiresAtIso.isNullOrBlank()) {
+                        val expiresAtMs = parseIsoToMillis(demoExpiresAtIso)
+                        if (expiresAtMs != null && expiresAtMs <= System.currentTimeMillis()) {
+                            return ValidityCheck(stillValid = false)
+                        }
+                    }
+                }
+
+                val signalIso = fields.optJSONObject("forceCloseSignal")?.optString("timestampValue")
+                val signalMs = signalIso?.let { parseIsoToMillis(it) }
+
+                ValidityCheck(stillValid = true, forceCloseSignalMs = signalMs)
+            }
+        } catch (e: Exception) {
+            // Si falla la consulta (sin internet, etc.) NO se cierra la app — solo se cierra
+            // cuando se confirma de verdad que el código ya no es válido.
+            ValidityCheck(stillValid = true)
+        }
+    }
+
+    private fun parseIsoToMillis(iso: String): Long? {
+        return try {
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+            sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            sdf.parse(iso.substring(0, 19).replace("T", "T"))?.time
+        } catch (e: Exception) {
+            null
+        }
+    }
 }

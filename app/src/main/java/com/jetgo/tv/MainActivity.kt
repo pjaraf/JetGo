@@ -122,6 +122,18 @@ private fun AppRoot(viewModel: HomeViewModel) {
     val context = LocalContext.current
     val isTv = remember { isTelevision(context) }
 
+    // Si la demo venció, el código fue revocado, o el panel mandó la señal de "cerrar ahora"
+    // (por ejemplo al renovar un plan), la app se cierra por completo — aunque el cliente
+    // esté viendo algo en ese momento.
+    val forceCloseApp by viewModel.forceCloseApp.collectAsState()
+    LaunchedEffect(forceCloseApp) {
+        if (forceCloseApp) {
+            val activity = context as? android.app.Activity
+            activity?.finishAndRemoveTask()
+            android.os.Process.killProcess(android.os.Process.myPid())
+        }
+    }
+
     // Mantiene la orientación/inmersión sincronizadas con el estado de pantalla completa
     FullscreenPlayerEffect(
         isFullscreen = isFullscreen,

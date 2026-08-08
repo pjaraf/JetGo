@@ -194,6 +194,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         _pendingAutoResume.value = null
     }
 
+    /** Se pone en true cuando hay que cerrar la app por completo: una demo venció, el código
+     *  fue revocado, o el panel mandó la señal de "cerrar ahora" (por ejemplo al renovar). */
+    private val _forceCloseApp = MutableStateFlow(false)
+    val forceCloseApp: StateFlow<Boolean> = _forceCloseApp.asStateFlow()
+
     private fun checkForAutoResume() {
         viewModelScope.launch {
             val last = try { lastPlayingStore.get() } catch (e: Exception) { null } ?: return@launch
@@ -388,6 +393,39 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                             AccessCodeChecker.sendHeartbeat(projectId, code, deviceId)
                         } catch (e: Exception) { /* silencioso */ }
                     }
+                }
+            }
+        }
+
+        // Revisa cada cierto tiempo si el código sigue siendo válido: si una demo ya venció,
+        // si el administrador revocó el código, o si el panel mandó la señal de "cerrar la
+        // app ahora" (por ejemplo, justo al renovar un plan) — la app se cierra sola, aunque
+        // el cliente esté viendo contenido en ese momento. El código guardado NO se borra, así
+        // que si se trata de una renovación, la próxima vez que se abra la app vuelve a entrar
+        // sola, sin que el cliente tenga que volver a escribir el código.
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            while (true) {
+                delay(60_000)
+                val code = try { accessStore.savedCode.first() } catch (e: Exception) { null }
+                if (code.isNullOrBlank()) continue
+                withContext(Dispatchers.IO) {
+                    try {
+                        val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
+                        val result = AccessCodeChecker.checkStillValid(projectId, code)
+                        if (!result.stillValid) {
+                            _forceCloseApp.value = true
+                            return@withContext
+                        }
+                        val signal = result.forceCloseSignalMs
+                        if (signal != null) {
+                            val lastSeen = accessStore.getLastForceCloseSignal()
+                            if (signal > lastSeen) {
+                                accessStore.saveLastForceCloseSignal(signal)
+                                _forceCloseApp.value = true
+                            }
+                        }
+                    } catch (e: Exception) { /* silencioso: si falla la consulta, no se cierra la app */ }
                 }
             }
         }
