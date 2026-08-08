@@ -790,7 +790,18 @@
               ' | Usuario: ' + (data.username || '-') +
               ' | Clave: ' + (data.password || '-');
           }
-          credText += ' | Dispositivos: ' + deviceCount + '/3';
+
+          const deviceIds = Array.isArray(data.deviceIds) ? data.deviceIds : [];
+          const deviceNames = data.deviceNames || {};
+          const devicesListHtml = deviceIds.length === 0
+            ? '<div style="color:var(--muted); font-size:12px; padding:4px 0;">Sin dispositivos registrados todavía</div>'
+            : deviceIds.map(id => {
+                const label = (deviceNames[id] || id).replace(/</g, '&lt;');
+                return '<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 0; border-bottom:1px solid var(--border);">' +
+                  '<span style="font-size:12px; word-break:break-all;">' + label + '</span>' +
+                  '<button class="danger" style="padding:4px 9px; font-size:11px; flex-shrink:0;" onclick="removeDevice(\'' + code + '\', \'' + id.replace(/'/g, "\\'") + '\')">Quitar</button>' +
+                '</div>';
+              }).join('');
 
           const onlineBadge = onlineCount > 0
             ? '<div class="online-badge"><span class="live-dot"></span>' + onlineCount + ' en línea</div>'
@@ -806,11 +817,12 @@
             '<td style="color:' + expireColor + '; font-size:12px; font-weight:' + (expired || expiringSoon ? '700' : '400') + ';">' + formatDateOnly(data.expirationDate) + '</td>' +
             '<td class="actions-cell">' +
               '<button class="secondary" onclick="copyCode(\'' + code + '\')">Copiar</button>' +
-              '<button class="secondary" onclick="toggleCreds(this)">Ver datos</button>' +
-              '<button class="secondary" onclick="resetDevices(\'' + code + '\')">Reiniciar disp.</button>' +
+              '<button class="secondary" onclick="toggleCreds(this, \'.credentials-box\')">Ver datos</button>' +
+              '<button class="secondary" onclick="toggleCreds(this, \'.devices-box\')">Dispositivos (' + deviceCount + ')</button>' +
               '<button class="' + (active ? 'danger' : 'secondary') + '" onclick="toggleActive(\'' + code + '\', ' + active + ')">' + (active ? 'Revocar' : 'Reactivar') + '</button>' +
               '<button class="danger" onclick="deleteCode(\'' + code + '\')">Eliminar</button>' +
               '<div class="credentials-box">' + credText + '</div>' +
+              '<div class="credentials-box devices-box">' + devicesListHtml + '</div>' +
             '</td>';
           tbody.appendChild(tr);
         });
@@ -835,8 +847,8 @@
     document.getElementById('statOnline').textContent = online;
   }
 
-  window.toggleCreds = (btn) => {
-    const box = btn.closest('td').querySelector('.credentials-box');
+  window.toggleCreds = (btn, selector) => {
+    const box = btn.closest('td').querySelector(selector || '.credentials-box');
     box.style.display = box.style.display === 'block' ? 'none' : 'block';
   };
 
@@ -844,10 +856,18 @@
     await db.collection('access_codes').doc(code).update({ active: !currentlyActive });
   };
 
-  window.resetDevices = async (code) => {
-    if (!confirm('¿Reiniciar los dispositivos registrados en el código ' + code + '? Los dispositivos actuales dejarán de tener acceso hasta que vuelvan a ingresar el código.')) return;
-    await db.collection('access_codes').doc(code).update({ deviceIds: [] });
-    showToast('Dispositivos reiniciados');
+  // Quita SOLO un dispositivo puntual de la lista (por su id), dejando el resto intactos.
+  window.removeDevice = async (code, deviceId) => {
+    if (!confirm('¿Quitar este dispositivo del código ' + code + '? Va a dejar de tener acceso hasta que vuelva a ingresar el código.')) return;
+    const docRef = db.collection('access_codes').doc(code);
+    const snap = await docRef.get();
+    const current = Array.isArray(snap.data()?.deviceIds) ? snap.data().deviceIds : [];
+    const updated = current.filter(id => id !== deviceId);
+    const updates = { deviceIds: updated };
+    updates['deviceNames.' + deviceId] = firebase.firestore.FieldValue.delete();
+    updates['deviceActivity.' + deviceId] = firebase.firestore.FieldValue.delete();
+    await docRef.update(updates);
+    showToast('Dispositivo quitado');
   };
 
   window.deleteCode = async (code) => {
