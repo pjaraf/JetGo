@@ -361,6 +361,7 @@
       <div class="nav-item" id="nav-expiring" onclick="selectView('expiring')"><span class="dot"></span> Clientes por vencer<span class="nav-badge" id="badge-expiring">0</span></div>
       <div class="nav-item" id="nav-expired" onclick="selectView('expired')"><span class="dot"></span> Clientes vencidos<span class="nav-badge" id="badge-expired">0</span></div>
       <div class="nav-item" id="nav-demos" onclick="selectView('demos')"><span class="dot"></span> Demos<span class="nav-badge" id="badge-demos">0</span></div>
+      <div class="nav-item" id="nav-servers" onclick="selectView('servers')"><span class="dot"></span> Servidores</div>
       <div class="nav-item" id="nav-subadmins" onclick="selectView('subadmins')"><span class="dot"></span> Paneles sub administrador</div>
     </nav>
     <div class="sidebar-footer">
@@ -414,7 +415,20 @@
         </div>
 
         <div id="xtreamFields">
-          <input id="host" type="text" placeholder="Host del servidor (http://servidor.com:8080)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor</label>
+          <select id="serverSelect" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;">
+            <option value="">Selecciona un servidor...</option>
+          </select>
+          <!-- Solo el administrador principal ve esta opción para usar una URL suelta -->
+          <div id="customHostBox" style="display:none;">
+            <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); margin-bottom:8px; cursor:pointer;">
+              <input type="checkbox" id="useCustomHost" style="width:auto; margin:0;" onchange="document.getElementById('customHostFields').style.display = this.checked ? 'block' : 'none';" />
+              Usar una URL suelta en vez de un servidor guardado
+            </label>
+            <div id="customHostFields" style="display:none;">
+              <input id="host" type="text" placeholder="Host del servidor (http://servidor.com:8080)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+            </div>
+          </div>
           <input id="username" type="text" placeholder="Usuario Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
           <input id="xtreamPassword" type="text" placeholder="Contraseña Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
         </div>
@@ -450,6 +464,33 @@
       </div>
 
       <!-- ---------- Vista: Paneles sub administrador ---------- -->
+      <!-- ---------- Vista: Servidores Xtream (solo el administrador principal las administra) ---------- -->
+      <div class="card view-section" id="view-servers" style="display:none;">
+        <h2>Servidores Xtream guardados</h2>
+        <p style="color:var(--muted); font-size:13px; margin-top:-10px; margin-bottom:16px;">
+          Guarda acá las URLs de tus servidores con un nombre — los sub administradores solo van
+          a ver el nombre al generar un código, nunca la URL real.
+        </p>
+
+        <div id="serverCreateBox">
+          <input id="serverName" type="text" placeholder="Nombre del servidor (ej. Servidor Principal)" />
+          <input id="serverHost" type="text" placeholder="URL del servidor (http://servidor.com:8080)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          <button id="createServerBtn" class="full">Guardar servidor</button>
+        </div>
+        <p id="serverBlockedMessage" style="display:none; color:var(--muted); font-size:14px; line-height:1.6;">
+          Solo el administrador principal puede agregar o editar servidores.
+        </p>
+
+        <div class="table-wrap" style="margin-top:20px;">
+          <table>
+            <thead><tr><th>Nombre</th><th id="serverUrlHeader">URL</th><th>Acciones</th></tr></thead>
+            <tbody id="serversTableBody">
+              <tr><td colspan="3" style="color:var(--muted)">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="card view-section" id="view-subadmins" style="display:none;">
         <h2>Paneles sub administrador</h2>
 
@@ -550,11 +591,19 @@
       // Un sub administrador ni siquiera ve esta opción en el menú
       document.getElementById('nav-subadmins').style.display = currentUserRole === 'admin' ? 'flex' : 'none';
 
+      // Solo el principal ve el menú de Servidores y la opción de URL suelta al crear un código
+      document.getElementById('nav-servers').style.display = currentUserRole === 'admin' ? 'flex' : 'none';
+      document.getElementById('serverCreateBox').style.display = currentUserRole === 'admin' ? 'block' : 'none';
+      document.getElementById('serverBlockedMessage').style.display = currentUserRole === 'admin' ? 'none' : 'block';
+      document.getElementById('customHostBox').style.display = currentUserRole === 'admin' ? 'block' : 'none';
+      document.getElementById('serverUrlHeader').style.display = currentUserRole === 'admin' ? '' : 'none';
+
       loginScreen.style.display = 'none';
       appShell.style.display = 'flex';
       document.getElementById('adminEmail').textContent = user.email || '';
       selectView('create');
       listenToCodes();
+      loadServers();
     } else {
       loginScreen.style.display = 'flex';
       appShell.style.display = 'none';
@@ -591,6 +640,7 @@
     expiring: { title: 'Clientes por vencer', subtitle: 'Vencen dentro de los próximos 7 días' },
     expired: { title: 'Clientes vencidos', subtitle: 'La fecha de vencimiento ya pasó' },
     demos: { title: 'Demos', subtitle: 'Cuentas marcadas como demo' },
+    servers: { title: 'Servidores', subtitle: 'Servidores Xtream guardados por nombre' },
     subadmins: { title: 'Paneles sub administrador', subtitle: 'Dar acceso a este panel a otra persona' }
   };
   let currentView = 'create';
@@ -604,6 +654,9 @@
       document.getElementById('view-subadmins').style.display = 'block';
       document.getElementById('view-subadmins-list').style.display = 'block';
       loadSubadmins();
+    } else if (name === 'servers') {
+      document.getElementById('view-servers').style.display = 'block';
+      renderServersTable();
     } else {
       document.getElementById('view-table').style.display = 'block';
       document.getElementById('tableCardTitle').textContent = VIEW_INFO[name].title;
@@ -659,11 +712,18 @@
     };
 
     if (currentMode === 'xtream') {
-      const host = document.getElementById('host').value.trim();
+      const useCustom = currentUserRole === 'admin' && document.getElementById('useCustomHost').checked;
+      const host = useCustom
+        ? document.getElementById('host').value.trim()
+        : document.getElementById('serverSelect').value;
       const username = document.getElementById('username').value.trim();
       const password = document.getElementById('xtreamPassword').value.trim();
-      if (!host || !username || !password) {
-        alert('Completa host, usuario y contraseña de Xtream Codes.');
+      if (!host) {
+        alert(useCustom ? 'Completa la URL del servidor.' : 'Selecciona un servidor de la lista.');
+        return;
+      }
+      if (!username || !password) {
+        alert('Completa usuario y contraseña de Xtream Codes.');
         return;
       }
       docData.host = host;
@@ -681,6 +741,9 @@
     await db.collection('access_codes').doc(code).set(docData);
     document.getElementById('clientName').value = '';
     document.getElementById('host').value = '';
+    document.getElementById('serverSelect').value = '';
+    if (document.getElementById('useCustomHost')) document.getElementById('useCustomHost').checked = false;
+    if (document.getElementById('customHostFields')) document.getElementById('customHostFields').style.display = 'none';
     document.getElementById('username').value = '';
     document.getElementById('xtreamPassword').value = '';
     document.getElementById('m3uUrl').value = '';
@@ -796,9 +859,13 @@
           const devicesListHtml = deviceIds.length === 0
             ? '<div style="color:var(--muted); font-size:12px; padding:4px 0;">Sin dispositivos registrados todavía</div>'
             : deviceIds.map(id => {
-                const label = (deviceNames[id] || id).replace(/</g, '&lt;');
+                const safeId = id.replace(/</g, '&lt;');
+                const name = deviceNames[id] ? deviceNames[id].replace(/</g, '&lt;') : null;
                 return '<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 0; border-bottom:1px solid var(--border);">' +
-                  '<span style="font-size:12px; word-break:break-all;">' + label + '</span>' +
+                  '<span style="font-size:12px; word-break:break-all;">' +
+                    (name ? '<div style="font-weight:600;">' + name + '</div>' : '') +
+                    '<div style="color:var(--muted); font-size:11px; font-family:ui-monospace,monospace;">' + safeId + '</div>' +
+                  '</span>' +
                   '<button class="danger" style="padding:4px 9px; font-size:11px; flex-shrink:0;" onclick="removeDevice(\'' + code + '\', \'' + id.replace(/'/g, "\\'") + '\')">Quitar</button>' +
                 '</div>';
               }).join('');
@@ -957,6 +1024,77 @@
     await db.collection('admins').doc(uid).update({ revoked: !currentlyRevoked });
     showToast(currentlyRevoked ? 'Acceso reactivado' : 'Acceso revocado');
     loadSubadmins();
+  };
+
+  // ---------- Servidores Xtream guardados por nombre ----------
+  let serversList = [];
+
+  async function loadServers() {
+    try {
+      const snapshot = await db.collection('servers').orderBy('name').get();
+      serversList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (e) {
+      serversList = [];
+    }
+    renderServerDropdown();
+  }
+
+  function renderServerDropdown() {
+    const select = document.getElementById('serverSelect');
+    const currentValue = select.value;
+    select.innerHTML = '<option value="">Selecciona un servidor...</option>' +
+      serversList.map(s => '<option value="' + s.host.replace(/"/g, '&quot;') + '">' + s.name.replace(/</g, '&lt;') + '</option>').join('');
+    select.value = currentValue;
+  }
+
+  function renderServersTable() {
+    const tbody = document.getElementById('serversTableBody');
+    if (serversList.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted)">Todavía no hay servidores guardados.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = '';
+    serversList.forEach(s => {
+      const tr = document.createElement('tr');
+      const urlCell = currentUserRole === 'admin'
+        ? '<td style="font-family:ui-monospace,monospace; font-size:12px; word-break:break-all;">' + s.host + '</td>'
+        : '';
+      tr.innerHTML =
+        '<td>' + s.name + '</td>' +
+        urlCell +
+        '<td class="actions-cell">' +
+          (currentUserRole === 'admin'
+            ? '<button class="danger" onclick="deleteServer(\'' + s.id + '\')">Eliminar</button>'
+            : '<span style="color:var(--muted); font-size:12px;">Solo el principal puede editar</span>') +
+        '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  document.getElementById('createServerBtn').addEventListener('click', async () => {
+    const name = document.getElementById('serverName').value.trim();
+    const host = document.getElementById('serverHost').value.trim();
+    if (!name || !host) {
+      alert('Completa el nombre y la URL del servidor.');
+      return;
+    }
+    await db.collection('servers').add({
+      name: name,
+      host: host,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById('serverName').value = '';
+    document.getElementById('serverHost').value = '';
+    showToast('Servidor guardado');
+    await loadServers();
+    renderServersTable();
+  });
+
+  window.deleteServer = async (id) => {
+    if (!confirm('¿Eliminar este servidor? Los códigos que ya lo usan no se ven afectados, solo dejará de aparecer como opción para códigos nuevos.')) return;
+    await db.collection('servers').doc(id).delete();
+    await loadServers();
+    renderServersTable();
   };
 
   function showToast(msg) {

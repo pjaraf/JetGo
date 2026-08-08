@@ -69,5 +69,14 @@ service cloud.firestore {
       // Solo el administrador principal puede crear, editar o borrar sub administradores.
       allow create, update, delete: if isSignedIn() && isPrincipalAdmin();
     }
+
+    // Colección "servers": la lista de servidores Xtream guardados (nombre + URL real).
+    // Cualquier administrador o sub administrador puede VER la lista (para elegir por nombre
+    // al generar un código), pero solo el principal puede agregar, editar o borrar servidores
+    // — así los sub administradores nunca necesitan escribir ni ver la URL real.
+    match /servers/{serverId} {
+      allow list, get: if isSignedIn() && !isRevoked();
+      allow create, update, delete: if isSignedIn() && isPrincipalAdmin();
+    }
   }
 }
