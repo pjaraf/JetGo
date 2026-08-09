@@ -420,6 +420,22 @@
           <input id="xtreamPassword" type="text" placeholder="Contraseña Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
         </div>
 
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin: 4px 0 8px; cursor:pointer;">
+          <input type="checkbox" id="useSecondSource" style="width:auto; margin:0;" onchange="onUseSecondSourceChange()" />
+          Juntar con un segundo servidor o lista (el cliente ve el contenido de ambos junto)
+        </label>
+
+        <div id="secondSourceBox" style="display:none;">
+          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor / lista adicional</label>
+          <select id="serverSelect2" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" onchange="onServerSelect2Change()">
+            <option value="">Selecciona uno...</option>
+          </select>
+          <div id="xtreamCredFields2" style="display:none;">
+            <input id="username2" type="text" placeholder="Usuario Xtream (del servidor adicional)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+            <input id="xtreamPassword2" type="text" placeholder="Contraseña Xtream (del servidor adicional)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          </div>
+        </div>
+
         <div id="expirationDateBox">
           <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Fecha de vencimiento (opcional)</label>
           <input id="expirationDate" type="date" />
@@ -474,6 +490,20 @@
           </div>
           <input id="serverName" type="text" placeholder="Nombre para identificarlo (ej. Servidor Principal)" />
           <input id="serverHost" type="text" placeholder="URL del servidor (http://servidor.com:8080)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+
+          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Ocultar secciones completas (opcional)</label>
+          <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); cursor:pointer;">
+              <input type="checkbox" id="hideTypeLive" style="width:auto; margin:0;" /> Ocultar TV Vivo
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); cursor:pointer;">
+              <input type="checkbox" id="hideTypeMovie" style="width:auto; margin:0;" /> Ocultar Películas
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); cursor:pointer;">
+              <input type="checkbox" id="hideTypeSeries" style="width:auto; margin:0;" /> Ocultar Series
+            </label>
+          </div>
+
           <button id="createServerBtn" class="full">Guardar</button>
         </div>
         <p id="serverBlockedMessage" style="display:none; color:var(--muted); font-size:14px; line-height:1.6;">
@@ -733,7 +763,42 @@
       alert('Selecciona un servidor o lista de la lista.');
       return;
     }
-    const isM3u = selectedServer.type === 'm3u';
+
+    // ---- Arma la(s) fuente(s) combinadas: 1 normalmente, o 2 si se activó la casilla ----
+    const sources = [];
+
+    function buildSource(server, usernameFieldId, passwordFieldId) {
+      if (server.type === 'm3u') {
+        return { type: 'm3u', serverId: server.id, m3uUrl: server.host };
+      }
+      const username = document.getElementById(usernameFieldId).value.trim();
+      const password = document.getElementById(passwordFieldId).value.trim();
+      if (!username || !password) return null;
+      return { type: 'xtream', serverId: server.id, host: server.host, username: username, password: password };
+    }
+
+    const source1 = buildSource(selectedServer, 'username', 'xtreamPassword');
+    if (selectedServer.type !== 'm3u' && !source1) {
+      alert('Completa usuario y contraseña de Xtream Codes.');
+      return;
+    }
+    sources.push(source1);
+
+    const useSecond = document.getElementById('useSecondSource').checked;
+    if (useSecond) {
+      const selectedHost2 = document.getElementById('serverSelect2').value;
+      const selectedServer2 = serversList.find(s => s.host === selectedHost2);
+      if (!selectedServer2) {
+        alert('Selecciona el segundo servidor o lista, o desmarca la casilla de combinar.');
+        return;
+      }
+      const source2 = buildSource(selectedServer2, 'username2', 'xtreamPassword2');
+      if (selectedServer2.type !== 'm3u' && !source2) {
+        alert('Completa usuario y contraseña del servidor Xtream adicional.');
+        return;
+      }
+      sources.push(source2);
+    }
 
     const isDemo = document.getElementById('isDemo').checked;
     const expirationDate = isDemo ? null : (document.getElementById('expirationDate').value || null);
@@ -745,7 +810,14 @@
     const docData = {
       active: true,
       clientName: clientName,
-      mode: isM3u ? 'm3u' : 'xtream',
+      // Se guardan también sueltos (mode/host/username/password/m3uUrl) apuntando a la
+      // PRIMERA fuente, por compatibilidad con versiones viejas de la app.
+      mode: sources[0].type,
+      host: sources[0].host || null,
+      username: sources[0].username || null,
+      password: sources[0].password || null,
+      m3uUrl: sources[0].m3uUrl || null,
+      sources: sources,
       deviceIds: [],
       expirationDate: expirationDate,
       isDemo: isDemo,
@@ -758,30 +830,17 @@
       docData.demoExpiresAt = firebase.firestore.Timestamp.fromDate(expires);
     }
 
-    if (Array.isArray(selectedServer.hiddenCategories) && selectedServer.hiddenCategories.length > 0) {
-      docData.hiddenCategories = selectedServer.hiddenCategories;
-    }
-
-    if (isM3u) {
-      docData.m3uUrl = selectedHost;
-    } else {
-      const username = document.getElementById('username').value.trim();
-      const password = document.getElementById('xtreamPassword').value.trim();
-      if (!username || !password) {
-        alert('Completa usuario y contraseña de Xtream Codes.');
-        return;
-      }
-      docData.host = selectedHost;
-      docData.username = username;
-      docData.password = password;
-    }
-
     await db.collection('access_codes').doc(code).set(docData);
     document.getElementById('clientName').value = '';
     document.getElementById('serverSelect').value = '';
     onServerSelectChange();
     document.getElementById('username').value = '';
     document.getElementById('xtreamPassword').value = '';
+    document.getElementById('useSecondSource').checked = false;
+    onUseSecondSourceChange();
+    document.getElementById('serverSelect2').value = '';
+    document.getElementById('username2').value = '';
+    document.getElementById('xtreamPassword2').value = '';
     document.getElementById('expirationDate').value = '';
     document.getElementById('isDemo').checked = false;
     onDemoCheckChange();
@@ -1126,13 +1185,36 @@
   }
 
   function renderServerDropdown() {
+    const optionsHtml = '<option value="">Selecciona uno...</option>' +
+      serversList.map(s => '<option value="' + s.host.replace(/"/g, '&quot;') + '">' + s.name.replace(/</g, '&lt;') + (s.type === 'm3u' ? ' (Lista M3U)' : ' (Xtream)') + '</option>').join('');
+
     const select = document.getElementById('serverSelect');
     const currentValue = select.value;
-    select.innerHTML = '<option value="">Selecciona uno...</option>' +
-      serversList.map(s => '<option value="' + s.host.replace(/"/g, '&quot;') + '">' + s.name.replace(/</g, '&lt;') + (s.type === 'm3u' ? ' (Lista M3U)' : ' (Xtream)') + '</option>').join('');
+    select.innerHTML = optionsHtml;
     select.value = currentValue;
     onServerSelectChange();
+
+    const select2 = document.getElementById('serverSelect2');
+    if (select2) {
+      const currentValue2 = select2.value;
+      select2.innerHTML = optionsHtml;
+      select2.value = currentValue2;
+      onServerSelect2Change();
+    }
   }
+
+  function onUseSecondSourceChange() {
+    document.getElementById('secondSourceBox').style.display = document.getElementById('useSecondSource').checked ? 'block' : 'none';
+  }
+  window.onUseSecondSourceChange = onUseSecondSourceChange;
+
+  function onServerSelect2Change() {
+    const select2 = document.getElementById('serverSelect2');
+    const selected = serversList.find(s => s.host === select2.value);
+    const isXtream = selected ? selected.type !== 'm3u' : false;
+    document.getElementById('xtreamCredFields2').style.display = isXtream ? 'block' : 'none';
+  }
+  window.onServerSelect2Change = onServerSelect2Change;
 
   function renderServersTable() {
     const tbody = document.getElementById('serversTableBody');
@@ -1147,11 +1229,19 @@
         ? '<td style="font-family:ui-monospace,monospace; font-size:12px; word-break:break-all;">' + s.host + '</td>'
         : '';
       const hiddenCount = Array.isArray(s.hiddenCategories) ? s.hiddenCategories.length : 0;
+      const hiddenTypes = Array.isArray(s.hiddenTypes) ? s.hiddenTypes : [];
       const hiddenCategoriesBox = currentUserRole === 'admin' ? (
         '<div class="credentials-box hidden-cats-box">' +
-          '<div style="font-size:12px; color:var(--muted); margin-bottom:6px;">Una categoría por línea, tal como aparece en el servidor/lista (ej. "Deportes", "Netflix", "Canales +18"):</div>' +
+          '<div style="font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">Ocultar secciones completas:</div>' +
+          '<div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">' +
+            '<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); cursor:pointer;"><input type="checkbox" id="editHideLive_' + s.id + '" style="width:auto; margin:0;" ' + (hiddenTypes.includes('live') ? 'checked' : '') + ' /> Ocultar TV Vivo</label>' +
+            '<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); cursor:pointer;"><input type="checkbox" id="editHideMovie_' + s.id + '" style="width:auto; margin:0;" ' + (hiddenTypes.includes('movie') ? 'checked' : '') + ' /> Ocultar Películas</label>' +
+            '<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); cursor:pointer;"><input type="checkbox" id="editHideSeries_' + s.id + '" style="width:auto; margin:0;" ' + (hiddenTypes.includes('series') ? 'checked' : '') + ' /> Ocultar Series</label>' +
+          '</div>' +
+          '<div style="font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">Ocultar categorías puntuales:</div>' +
+          '<div style="font-size:12px; color:var(--muted); margin-bottom:6px;">Una por línea, tal como aparece en el servidor/lista (ej. "Deportes", "Netflix", "Canales +18"):</div>' +
           '<textarea id="hiddenCatsInput_' + s.id + '" rows="4" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:13px; margin-bottom:8px;">' + (s.hiddenCategories || []).join('\n') + '</textarea>' +
-          '<button class="secondary full" style="padding:9px;" onclick="saveHiddenCategories(\'' + s.id + '\')">Guardar categorías ocultas</button>' +
+          '<button class="secondary full" style="padding:9px;" onclick="saveHiddenCategories(\'' + s.id + '\')">Guardar</button>' +
         '</div>'
       ) : '';
       tr.innerHTML =
@@ -1160,7 +1250,7 @@
         urlCell +
         '<td class="actions-cell">' +
           (currentUserRole === 'admin'
-            ? '<button class="secondary" onclick="toggleCreds(this, \'.hidden-cats-box\')">Categorías ocultas (' + hiddenCount + ')</button>' +
+            ? '<button class="secondary" onclick="toggleCreds(this, \'.hidden-cats-box\')">Ocultar contenido</button>' +
               '<button class="danger" onclick="deleteServer(\'' + s.id + '\')">Eliminar</button>' +
               hiddenCategoriesBox
             : '<span style="color:var(--muted); font-size:12px;">Solo el principal puede editar</span>') +
@@ -1172,8 +1262,12 @@
   window.saveHiddenCategories = async (serverId) => {
     const raw = document.getElementById('hiddenCatsInput_' + serverId).value;
     const categories = raw.split('\n').map(c => c.trim()).filter(c => c.length > 0);
-    await db.collection('servers').doc(serverId).update({ hiddenCategories: categories });
-    showToast('Categorías ocultas guardadas');
+    const hiddenTypes = [];
+    if (document.getElementById('editHideLive_' + serverId).checked) hiddenTypes.push('live');
+    if (document.getElementById('editHideMovie_' + serverId).checked) hiddenTypes.push('movie');
+    if (document.getElementById('editHideSeries_' + serverId).checked) hiddenTypes.push('series');
+    await db.collection('servers').doc(serverId).update({ hiddenCategories: categories, hiddenTypes: hiddenTypes });
+    showToast('Guardado');
     await loadServers();
     renderServersTable();
   };
@@ -1185,14 +1279,23 @@
       alert('Completa el nombre y la URL.');
       return;
     }
+    const hiddenTypes = [];
+    if (document.getElementById('hideTypeLive').checked) hiddenTypes.push('live');
+    if (document.getElementById('hideTypeMovie').checked) hiddenTypes.push('movie');
+    if (document.getElementById('hideTypeSeries').checked) hiddenTypes.push('series');
+
     await db.collection('servers').add({
       name: name,
       host: host,
       type: newServerType,
+      hiddenTypes: hiddenTypes,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     document.getElementById('serverName').value = '';
     document.getElementById('serverHost').value = '';
+    document.getElementById('hideTypeLive').checked = false;
+    document.getElementById('hideTypeMovie').checked = false;
+    document.getElementById('hideTypeSeries').checked = false;
     showToast('Guardado');
     await loadServers();
     renderServersTable();
