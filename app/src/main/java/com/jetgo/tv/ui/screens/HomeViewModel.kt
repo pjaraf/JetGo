@@ -338,14 +338,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private var currentConfig: ServerConfig? = null
 
-    /** Nombres (en minúscula) de categorías que el administrador ocultó para este cliente —
-     *  se filtran de cualquier listado de categorías (vivo, películas, series). */
+    /** Nombres (en minúscula) de categorías que el administrador ocultó — combinado de todas
+     *  las fuentes (se usa solo para saber si hay que filtrar contenido en modo M3U simple). */
     private var hiddenCategoryNames: Set<String> = emptySet()
 
     /** Secciones completas ocultas por el administrador para este cliente
-     *  (valores: "live", "movie", "series") — la interfaz no muestra esos botones/pestañas. */
+     *  (valores: "live", "movie", "series") — la interfaz no muestra esos botones/pestañas
+     *  SOLO SI TODAS las fuentes combinadas la ocultan (si una la muestra, el botón se queda,
+     *  y solo se filtra el contenido de la fuente que la ocultó). */
     private val _hiddenTypes = MutableStateFlow<Set<String>>(emptySet())
     val hiddenTypes: StateFlow<Set<String>> = _hiddenTypes.asStateFlow()
+
+    /** Ocultamiento configurado POR CADA fuente combinada (mismo orden que [currentSources]),
+     *  para poder mostrar igual una sección si al menos una de las fuentes la permite, filtrando
+     *  solo el contenido de la fuente que la tiene oculta. */
+    private var sourceHiddenConfigs: List<Pair<Set<String>, Set<String>>> = emptyList() // (categorías, tipos) por índice
+
     private var currentMode: String = "xtream" // "xtream" o "m3u"
 
     // Caché en memoria del catálogo completo para búsqueda instantánea tras la primera carga
@@ -514,11 +522,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Arma la fuente única "de compatibilidad" para códigos viejos (sin el arreglo sources) */
+    private fun buildLegacySource(result: AccessCodeResult): com.jetgo.tv.util.ContentSource =
+        com.jetgo.tv.util.ContentSource(
+            type = result.mode ?: "xtream",
+            serverId = null,
+            host = result.host,
+            username = result.username,
+            password = result.password,
+            m3uUrl = result.m3uUrl
+        )
+
     /** Conecta automáticamente al servidor cargado por el administrador para ese código,
      *  sin que el cliente tenga que ver ni escribir host/usuario/contraseña. */
     private fun applyAccessCodeResult(result: AccessCodeResult, code: String, silent: Boolean = false) {
-        hiddenCategoryNames = result.hiddenCategories.map { it.trim().lowercase() }.toSet()
-        _hiddenTypes.value = result.hiddenTypes.map { it.trim().lowercase() }.toSet()
         _settingsInfo.value = SettingsInfo(
             clientName = result.clientName,
             accessCode = code.trim().uppercase(),
@@ -526,40 +543,56 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             maxDevices = result.maxDevices
         )
 
-        // Si hay servidores guardados de por medio (nuevos códigos), se consulta EN VIVO qué
-        // categorías/secciones tienen ocultas AHORA MISMO — así, si el administrador oculta o
-        // reactiva algo, se aplica de inmediato a todos los clientes que usan ese servidor, y
-        // no solo a los códigos que se generen después de ese cambio.
-        val serverIds = result.sources.mapNotNull { it.serverId }.distinct()
-        if (serverIds.isNotEmpty()) {
-            viewModelScope.launch {
-                withContext(Dispatchers.IO) {
+        val sources = if (result.sources.isNotEmpty()) result.sources else listOf(buildLegacySource(result))
+        val fallbackConfig = Pair(
+            result.hiddenCategories.map { it.trim().lowercase() }.toSet(),
+            result.hiddenTypes.map { it.trim().lowercase() }.toSet()
+        )
+
+        viewModelScope.launch {
+            // Por cada fuente combinada, se consulta EN VIVO contra Firestore qué tiene oculto
+            // AHORA MISMO (si tiene un servidor guardado) — así, si el administrador oculta o
+            // reactiva algo, se aplica de inmediato a todos los clientes que usan ese servidor,
+            // y no solo a los códigos que se generen después de ese cambio.
+            val perSourceConfigs = sources.map { source ->
+                if (source.serverId != null) {
                     try {
-                        val context = getApplication<Application>()
-                        val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
-                        val mergedCats = mutableSetOf<String>()
-                        val mergedTypes = mutableSetOf<String>()
-                        serverIds.forEach { id ->
-                            val live = AccessCodeChecker.fetchServerLiveConfig(projectId, id)
-                            mergedCats += live.hiddenCategories.map { it.trim().lowercase() }
-                            mergedTypes += live.hiddenTypes.map { it.trim().lowercase() }
+                        withContext(Dispatchers.IO) {
+                            val context = getApplication<Application>()
+                            val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
+                            val live = AccessCodeChecker.fetchServerLiveConfig(projectId, source.serverId)
+                            Pair(
+                                live.hiddenCategories.map { it.trim().lowercase() }.toSet(),
+                                live.hiddenTypes.map { it.trim().lowercase() }.toSet()
+                            )
                         }
-                        hiddenCategoryNames = mergedCats
-                        _hiddenTypes.value = mergedTypes
-                    } catch (e: Exception) { /* si falla, se queda con lo que ya traía el código */ }
+                    } catch (e: Exception) {
+                        fallbackConfig
+                    }
+                } else {
+                    fallbackConfig
                 }
             }
-        }
+            sourceHiddenConfigs = perSourceConfigs
 
-        if (result.sources.size > 1) {
-            connectMultiSource(result.sources, silent = silent)
-        } else if (result.mode == "m3u" && !result.m3uUrl.isNullOrBlank()) {
-            connectM3u(result.m3uUrl, silent = silent)
-        } else if (!result.host.isNullOrBlank() && !result.username.isNullOrBlank() && !result.password.isNullOrBlank()) {
-            connectXtream(ServerConfig(result.host, result.username, result.password), silent = silent)
+            // Un botón (Vivo/Película/Serie) solo se oculta si TODAS las fuentes combinadas lo
+            // ocultan — si una sola fuente lo permite, el botón se queda, y más adelante se
+            // filtra solo el contenido de la fuente que sí lo tiene oculto.
+            _hiddenTypes.value = if (perSourceConfigs.isEmpty()) emptySet()
+                else perSourceConfigs.map { it.second }.reduce { a, b -> a.intersect(b) }
+            // Para el modo M3U simple (una sola fuente), esto sigue funcionando igual que antes.
+            hiddenCategoryNames = perSourceConfigs.flatMap { it.first }.toSet()
+
+            if (sources.size > 1) {
+                connectMultiSource(sources, silent = silent)
+            } else if (result.mode == "m3u" && !result.m3uUrl.isNullOrBlank()) {
+                connectM3u(result.m3uUrl, silent = silent)
+            } else if (!result.host.isNullOrBlank() && !result.username.isNullOrBlank() && !result.password.isNullOrBlank()) {
+                connectXtream(ServerConfig(result.host, result.username, result.password), silent = silent)
+            }
+            // Si el código es válido pero el administrador no cargó credenciales todavía,
+            // simplemente no se auto-conecta nada (uiState.isConfigured queda en false).
         }
-        // Si el código es válido pero el administrador no cargó credenciales todavía,
-        // simplemente no se auto-conecta nada (uiState.isConfigured queda en false).
     }
 
     /** Vuelve a intentar la conexión con el código ya guardado (sin pedirle nada al cliente) */
@@ -691,12 +724,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             var anySourceWorked = false
 
             sources.forEachIndexed { index, source ->
+                val (sourceHiddenCats, sourceHiddenTypes) = sourceHiddenConfigs.getOrNull(index) ?: (emptySet<String>() to emptySet<String>())
+                if (sourceHiddenTypes.contains("live")) {
+                    // Esta fuente tiene Vivo oculto: no aporta canales, pero la otra fuente
+                    // (si la tiene visible) sigue mostrando los suyos con normalidad.
+                    return@forEachIndexed
+                }
                 try {
                     if (source.type == "m3u" && !source.m3uUrl.isNullOrBlank()) {
                         val result = repository.loadFromM3u(source.m3uUrl)
-                        allLiveChannels += result.channels.map {
-                            it.copy(streamId = "src${index}_${it.streamId}", categoryId = "$index::${it.categoryId}")
-                        }
+                        allLiveChannels += result.channels
+                            .filterNot { sourceHiddenCats.contains(it.categoryId.trim().lowercase()) }
+                            .map { it.copy(streamId = "src${index}_${it.streamId}", categoryId = "$index::${it.categoryId}") }
                         anySourceWorked = true
                     } else if (!source.host.isNullOrBlank() && !source.username.isNullOrBlank() && !source.password.isNullOrBlank()) {
                         val config = ServerConfig(source.host, source.username, source.password)
@@ -704,10 +743,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                             repository.getLiveCategories(config).associate { it.id to it.name }
                         } catch (e: Exception) { emptyMap() }
                         val channels = repository.getLiveChannels(config, categoryId = null)
-                        allLiveChannels += channels.map {
-                            val readableCategory = categoryNameById[it.categoryId] ?: it.categoryId
-                            it.copy(streamId = "src${index}_${it.streamId}", categoryId = "$index::$readableCategory")
-                        }
+                        allLiveChannels += channels
+                            .filterNot { sourceHiddenCats.contains((categoryNameById[it.categoryId] ?: it.categoryId).trim().lowercase()) }
+                            .map {
+                                val readableCategory = categoryNameById[it.categoryId] ?: it.categoryId
+                                it.copy(streamId = "src${index}_${it.streamId}", categoryId = "$index::$readableCategory")
+                            }
                         anySourceWorked = true
                     }
                 } catch (e: Exception) {
@@ -805,10 +846,21 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             // Dos fuentes combinadas: se juntan las categorías de películas/series de cada
             // servidor Xtream que tenga (las fuentes M3U no aportan acá), separadas con un
             // prefijo para saber a cuál servidor pertenece cada una al elegirla después.
+            val typeKey = when (type) {
+                ContentType.MOVIE, ContentType.ANIME, ContentType.SPECIAL -> "movie"
+                ContentType.SERIES -> "series"
+                ContentType.LIVE -> "live"
+            }
             viewModelScope.launch {
                 val allCategories = mutableListOf<Category>()
                 currentSources.forEachIndexed { index, source ->
                     if (source.type == "m3u" || source.host.isNullOrBlank() || source.username.isNullOrBlank() || source.password.isNullOrBlank()) return@forEachIndexed
+                    val (sourceHiddenCats, sourceHiddenTypes) = sourceHiddenConfigs.getOrNull(index) ?: (emptySet<String>() to emptySet<String>())
+                    if (sourceHiddenTypes.contains(typeKey)) {
+                        // Esta fuente tiene esta sección oculta: no aporta categorías de acá,
+                        // pero la otra fuente (si la tiene visible) sigue mostrando las suyas.
+                        return@forEachIndexed
+                    }
                     try {
                         val config = ServerConfig(source.host, source.username, source.password)
                         val categories = when (type) {
@@ -823,7 +875,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                             ContentType.LIVE -> emptyList()
                         }
                         allCategories += categories
-                            .filterNot { hiddenCategoryNames.contains(it.name.trim().lowercase()) }
+                            .filterNot { sourceHiddenCats.contains(it.name.trim().lowercase()) }
                             .map { it.copy(id = "$index::${it.id}") }
                     } catch (e: Exception) {
                         // Si una fuente falla al traer categorías, se sigue con la otra

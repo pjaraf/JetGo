@@ -28,8 +28,7 @@ enum class PhoneMainTab { TV, SERIES, PELICULAS, PERFIL }
 @Composable
 fun PhoneBottomNav(
     selected: PhoneMainTab,
-    onSelect: (PhoneMainTab) -> Unit,
-    hiddenTypes: Set<String> = emptySet()
+    onSelect: (PhoneMainTab) -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -37,32 +36,26 @@ fun PhoneBottomNav(
             .height(64.dp)
             .background(Color(0xFF15171D)),
     ) {
-        if (!hiddenTypes.contains("live")) {
-            NavItem(
-                label = "TV",
-                icon = Icons.Default.LiveTv,
-                selected = selected == PhoneMainTab.TV,
-                modifier = Modifier.weight(1f)
-            ) { onSelect(PhoneMainTab.TV) }
-        }
+        NavItem(
+            label = "TV",
+            icon = Icons.Default.LiveTv,
+            selected = selected == PhoneMainTab.TV,
+            modifier = Modifier.weight(1f)
+        ) { onSelect(PhoneMainTab.TV) }
 
-        if (!hiddenTypes.contains("series")) {
-            NavItem(
-                label = "Series",
-                icon = Icons.Default.Tv,
-                selected = selected == PhoneMainTab.SERIES,
-                modifier = Modifier.weight(1f)
-            ) { onSelect(PhoneMainTab.SERIES) }
-        }
+        NavItem(
+            label = "Series",
+            icon = Icons.Default.Tv,
+            selected = selected == PhoneMainTab.SERIES,
+            modifier = Modifier.weight(1f)
+        ) { onSelect(PhoneMainTab.SERIES) }
 
-        if (!hiddenTypes.contains("movie")) {
-            NavItem(
-                label = "Películas",
-                icon = Icons.Default.Movie,
-                selected = selected == PhoneMainTab.PELICULAS,
-                modifier = Modifier.weight(1f)
-            ) { onSelect(PhoneMainTab.PELICULAS) }
-        }
+        NavItem(
+            label = "Películas",
+            icon = Icons.Default.Movie,
+            selected = selected == PhoneMainTab.PELICULAS,
+            modifier = Modifier.weight(1f)
+        ) { onSelect(PhoneMainTab.PELICULAS) }
 
         NavItem(
             label = "Perfil",

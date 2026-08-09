@@ -95,7 +95,7 @@ fun HomeScreen(
 
         BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(20.dp)) {
             val spacing = 14.dp
-            val buttonCount = 5 - hiddenTypes.count { it == "live" || it == "movie" || it == "series" }
+            val buttonCount = 5
             val buttonWidth = ((maxWidth - spacing * (buttonCount - 1)) / buttonCount).coerceAtLeast(0.dp)
 
             Column(modifier = Modifier.fillMaxSize()) {
@@ -168,27 +168,21 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(spacing)
                 ) {
-                    if (!hiddenTypes.contains("live")) {
-                        HomeActionButton(
-                            label = "VIVO", icon = Icons.Default.PlayCircle,
-                            width = buttonWidth,
-                            focusRequester = vivoFocusRequester
-                        ) { onLiveClick() }
-                    }
+                    HomeActionButton(
+                        label = "VIVO", icon = Icons.Default.PlayCircle,
+                        width = buttonWidth,
+                        focusRequester = vivoFocusRequester
+                    ) { onLiveClick() }
 
-                    if (!hiddenTypes.contains("series")) {
-                        HomeActionButton(
-                            label = "SERIE", icon = Icons.Default.Tv,
-                            width = buttonWidth
-                        ) { onCategoryClick("SERIES") }
-                    }
+                    HomeActionButton(
+                        label = "SERIE", icon = Icons.Default.Tv,
+                        width = buttonWidth
+                    ) { onCategoryClick("SERIES") }
 
-                    if (!hiddenTypes.contains("movie")) {
-                        HomeActionButton(
-                            label = "PELÍCULA", icon = Icons.Default.Movie,
-                            width = buttonWidth
-                        ) { onCategoryClick("MOVIE") }
-                    }
+                    HomeActionButton(
+                        label = "PELÍCULA", icon = Icons.Default.Movie,
+                        width = buttonWidth
+                    ) { onCategoryClick("MOVIE") }
 
                     HomeActionButton(
                         label = "SEGUIR VIENDO", icon = Icons.Default.History,
