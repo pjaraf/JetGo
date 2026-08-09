@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">JetGo</string>
+    <!-- Reemplaza esto por el "Project ID" real de tu proyecto de Firebase
+         (lo ves en Configuración del proyecto, en la consola de Firebase) -->
+    <string name="firebase_project_id">jetgo-f0127</string>
+    <string name="cat_vivo">VIVO</string>
+    <string name="cat_serie">SERIE</string>
+    <string name="cat_pelicula">PELÍCULA</string>
+    <string name="cat_anime">ANIME</string>
+    <string name="cat_especial">ESPECIAL</string>
+    <string name="setup_title">Configura tu servidor</string>
+    <string name="setup_host">URL del servidor (host:puerto)</string>
+    <string name="setup_user">Usuario</string>
+    <string name="setup_pass">Contraseña</string>
+    <string name="setup_m3u">O pega tu enlace M3U</string>
+    <string name="setup_connect">Conectar</string>
+
+    <string name="access_title">Código de acceso</string>
+    <string name="access_hint">Ingresa tu código</string>
+    <string name="access_button">Ingresar</string>
+    <string name="access_error">Código inválido o inactivo</string>
+</resources>

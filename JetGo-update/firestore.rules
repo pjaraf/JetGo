@@ -1,0 +1,90 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Si la cuenta NO tiene documento en /admins, se trata como administrador principal
+    // (así la cuenta que ya usabas antes de este sistema sigue funcionando igual).
+    function isPrincipalAdmin() {
+      return !exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Un sub administrador al que se le revocó el acceso no puede hacer nada, aunque su
+    // sesión de Firebase siga técnicamente iniciada.
+    function isRevoked() {
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('revoked', false) == true;
+    }
+
+    match /access_codes/{codeId} {
+      // La app (sin iniciar sesión) puede CONSULTAR un código puntual si ya sabe cuál es
+      // (para validarlo al ingresar), pero NO puede listar todos los códigos existentes.
+      // Si es una cuenta demo y ya pasó su hora de vencimiento, la consulta se bloquea sola
+      // (sin que el administrador tenga que revocarla a mano).
+      allow get: if resource.data.get('isDemo', false) == false
+        || !('demoExpiresAt' in resource.data)
+        || resource.data.demoExpiresAt > request.time;
+
+      // La app (sin iniciar sesión) puede registrar SU dispositivo en la lista "deviceIds"
+      // de un código activo, siempre que:
+      //  - el código siga activo,
+      //  - solo se modifique el campo deviceIds (nada más),
+      //  - el código todavía no haya llegado al máximo de 3 dispositivos.
+      allow update: if request.auth == null
+        && resource.data.active == true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deviceIds'])
+        && resource.data.get('deviceIds', []).size() < 3
+        && request.resource.data.deviceIds.size() <= 3;
+
+      // La app (sin iniciar sesión) puede avisar "estoy activo ahora mismo" actualizando
+      // solo su marca de tiempo dentro de deviceActivity, para que el panel pueda mostrar
+      // qué dispositivos están usando la app en tiempo real.
+      allow update: if request.auth == null
+        && resource.data.active == true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deviceActivity']);
+
+      // La app (sin iniciar sesión) puede guardar un nombre legible para su propio dispositivo
+      // (marca/modelo), para que el panel admin pueda mostrar cuál es cuál.
+      allow update: if request.auth == null
+        && resource.data.active == true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deviceNames']);
+
+      // El administrador principal ve y administra TODOS los códigos. Un sub administrador
+      // solo ve, edita y borra los códigos que ÉL MISMO creó (ownerId == su propio uid).
+      allow list: if isSignedIn() && !isRevoked()
+        && (isPrincipalAdmin() || resource.data.get('ownerId', '') == request.auth.uid);
+
+      allow create: if isSignedIn() && !isRevoked()
+        && request.resource.data.ownerId == request.auth.uid;
+
+      allow update, delete: if isSignedIn() && !isRevoked()
+        && (isPrincipalAdmin() || resource.data.get('ownerId', '') == request.auth.uid);
+    }
+
+    // Colección "admins": guarda el rol de cada cuenta que puede entrar al panel
+    // ('admin' = principal, 'subadmin' = cuenta creada por el principal).
+    match /admins/{uid} {
+      allow get, list: if isSignedIn();
+
+      // Solo el administrador principal puede crear, editar o borrar sub administradores.
+      allow create, update, delete: if isSignedIn() && isPrincipalAdmin();
+    }
+
+    // Colección "servers": la lista de servidores Xtream guardados (nombre + URL real).
+    // Cualquier administrador o sub administrador puede VER la lista (para elegir por nombre
+    // al generar un código), pero solo el principal puede agregar, editar o borrar servidores
+    // — así los sub administradores nunca necesitan escribir ni ver la URL real.
+    match /servers/{serverId} {
+      // La app (sin iniciar sesión) puede consultar un servidor puntual si ya sabe su ID
+      // (para leer sus categorías ocultas actualizadas cada vez que conecta), pero no puede
+      // listar todos los servidores existentes.
+      allow get: if true;
+      allow list: if isSignedIn() && !isRevoked();
+      allow create, update, delete: if isSignedIn() && isPrincipalAdmin();
+    }
+  }
+}

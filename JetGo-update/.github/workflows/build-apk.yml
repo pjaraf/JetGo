@@ -1,0 +1,67 @@
+name: Build APK (debug)
+
+# Se ejecuta automáticamente al hacer push a main, en cada Pull Request,
+# y también se puede lanzar manualmente desde la pestaña "Actions" de GitHub.
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Descargar el código del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Configurar Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.7
+
+      - name: Compilar APK debug
+        run: gradle assembleDebug --no-daemon --stacktrace -PversionCode=${{ github.run_number }}
+
+      - name: Subir el APK como artefacto descargable
+        uses: actions/upload-artifact@v4
+        with:
+          name: JetGo-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      # ---- Publica/actualiza el Release "latest", que la app instalada consulta
+      #      para detectar automáticamente que hay una versión nueva ----
+      - name: Preparar archivo de versión
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: echo "${{ github.run_number }}" > version.txt
+
+      - name: Eliminar el Release 'latest' anterior (si existe)
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: gh release delete latest --yes --cleanup-tag || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publicar el nuevo Release 'latest'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          gh release create latest \
+            app/build/outputs/apk/debug/app-debug.apk \
+            version.txt \
+            --title "JetGo (build ${{ github.run_number }})" \
+            --notes "Compilación automática desde GitHub Actions (commit ${{ github.sha }})"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
