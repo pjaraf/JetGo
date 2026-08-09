@@ -20,7 +20,10 @@ data class AccessCodeResult(
     val deviceLimitReached: Boolean = false,
     val clientName: String? = null,
     val deviceCount: Int = 0,
-    val maxDevices: Int = 3
+    val maxDevices: Int = 3,
+    /** Nombres de categorías que el administrador ocultó para este servidor/lista — la app
+     *  no debe mostrarlas en ningún listado (vivo, películas ni series). */
+    val hiddenCategories: List<String> = emptyList()
 )
 
 private const val MAX_DEVICES_PER_CODE = 3
@@ -85,7 +88,8 @@ object AccessCodeChecker {
                     m3uUrl = textField("m3uUrl"),
                     clientName = textField("clientName"),
                     deviceCount = if (deviceIds.contains(deviceId)) deviceIds.size else deviceIds.size + 1,
-                    maxDevices = MAX_DEVICES_PER_CODE
+                    maxDevices = MAX_DEVICES_PER_CODE,
+                    hiddenCategories = parseStringArray(fields, "hiddenCategories")
                 )
             }
         } catch (e: Exception) {
@@ -96,6 +100,11 @@ object AccessCodeChecker {
     private fun parseDeviceIds(fields: JSONObject): List<String> {
         val arr = fields.optJSONObject("deviceIds")?.optJSONObject("arrayValue")?.optJSONArray("values") ?: return emptyList()
         return (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.optString("stringValue") }
+    }
+
+    private fun parseStringArray(fields: JSONObject, fieldName: String): List<String> {
+        val arr = fields.optJSONObject(fieldName)?.optJSONObject("arrayValue")?.optJSONArray("values") ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.optString("stringValue")?.takeIf { it.isNotBlank() } }
     }
 
     private fun registerDevice(docUrl: String, updatedDeviceIds: List<String>) {

@@ -337,6 +337,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private var currentConfig: ServerConfig? = null
+
+    /** Nombres (en minúscula) de categorías que el administrador ocultó para este cliente —
+     *  se filtran de cualquier listado de categorías (vivo, películas, series). */
+    private var hiddenCategoryNames: Set<String> = emptySet()
     private var currentMode: String = "xtream" // "xtream" o "m3u"
 
     // Caché en memoria del catálogo completo para búsqueda instantánea tras la primera carga
@@ -508,6 +512,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     /** Conecta automáticamente al servidor cargado por el administrador para ese código,
      *  sin que el cliente tenga que ver ni escribir host/usuario/contraseña. */
     private fun applyAccessCodeResult(result: AccessCodeResult, code: String, silent: Boolean = false) {
+        hiddenCategoryNames = result.hiddenCategories.map { it.trim().lowercase() }.toSet()
         _settingsInfo.value = SettingsInfo(
             clientName = result.clientName,
             accessCode = code.trim().uppercase(),
@@ -670,6 +675,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             _categoryPickerState.value = CategoryPickerUiState(
                 categories = if (type == ContentType.LIVE) {
                     _uiState.value.liveChannels.map { it.categoryId }.distinct()
+                        .filterNot { hiddenCategoryNames.contains(it.trim().lowercase()) }
                         .map { Category(it, it, ContentType.LIVE) }
                 } else emptyList()
             )
@@ -694,9 +700,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         (especial + special).distinctBy { it.id }
                     }
                 }
-                val filtered = if (_parentalState.value.enabled) {
-                    categories.filterNot { AdultContentFilter.isAdult(it.name) }
-                } else categories
+                val filtered = categories
+                    .filterNot { hiddenCategoryNames.contains(it.name.trim().lowercase()) }
+                    .let { list ->
+                        if (_parentalState.value.enabled) list.filterNot { AdultContentFilter.isAdult(it.name) } else list
+                    }
                 _categoryPickerState.value = CategoryPickerUiState(categories = filtered)
 
                 // Para Vivo: siempre se queda mostrando la categoría que quedó por defecto
