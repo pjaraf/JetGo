@@ -306,6 +306,7 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                 viewModel.resumeLastLiveChannelIfNeeded()
             }
             if (!isFullscreen) {
+                val hiddenTypes by viewModel.hiddenTypes.collectAsState()
                 val newestItems = (homeCatalog.movies + homeCatalog.series).shuffled().take(10)
                 HomeScreen(
                     playerManager = viewModel.playerManager,
@@ -334,7 +335,8 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                         viewModel.pausePreviewPlayer()
                         navController.navigate("settings")
                     },
-                    isFullscreen = isFullscreen
+                    isFullscreen = isFullscreen,
+                    hiddenTypes = hiddenTypes
                 )
             }
             // Mientras isFullscreen es true, esta pantalla NO se dibuja (ni oculta): así el
@@ -697,6 +699,7 @@ private fun PhoneApp(viewModel: HomeViewModel) {
             }
         }
 
-        PhoneBottomNav(selected = selectedTab, onSelect = { selectedTab = it })
+        val hiddenTypes by viewModel.hiddenTypes.collectAsState()
+        PhoneBottomNav(selected = selectedTab, onSelect = { selectedTab = it }, hiddenTypes = hiddenTypes)
     }
 }

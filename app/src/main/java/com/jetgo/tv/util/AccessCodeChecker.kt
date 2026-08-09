@@ -8,6 +8,17 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
+/** Una fuente de contenido (un servidor Xtream o una lista M3U) — un código puede tener
+ *  hasta 2, para juntar el contenido de ambas en la misma app. */
+data class ContentSource(
+    val type: String, // "xtream" o "m3u"
+    val serverId: String?,
+    val host: String? = null,
+    val username: String? = null,
+    val password: String? = null,
+    val m3uUrl: String? = null
+)
+
 /** Resultado de validar un código: si es válido, trae también las credenciales del servidor
  *  que el administrador cargó para ese código, para conectar la app automáticamente. */
 data class AccessCodeResult(
@@ -22,8 +33,15 @@ data class AccessCodeResult(
     val deviceCount: Int = 0,
     val maxDevices: Int = 3,
     /** Nombres de categorías que el administrador ocultó para este servidor/lista — la app
-     *  no debe mostrarlas en ningún listado (vivo, películas ni series). */
-    val hiddenCategories: List<String> = emptyList()
+     *  no debe mostrarlas en ningún listado (vivo, películas ni series). Nota: esto es un
+     *  respaldo para códigos viejos; si hay [sources] con serverId, se usa esa info en vivo. */
+    val hiddenCategories: List<String> = emptyList(),
+    /** Tipos de contenido ocultos por completo (valores: "live", "movie", "series") — el
+     *  administrador puede ocultar toda una sección (ej. Vivo) para un servidor/lista. */
+    val hiddenTypes: List<String> = emptyList(),
+    /** Una o dos fuentes de contenido combinadas para este código (nuevo formato). Si viene
+     *  vacío, se usa el formato viejo (host/username/password/m3uUrl sueltos, una sola fuente). */
+    val sources: List<ContentSource> = emptyList()
 )
 
 private const val MAX_DEVICES_PER_CODE = 3
@@ -89,7 +107,9 @@ object AccessCodeChecker {
                     clientName = textField("clientName"),
                     deviceCount = if (deviceIds.contains(deviceId)) deviceIds.size else deviceIds.size + 1,
                     maxDevices = MAX_DEVICES_PER_CODE,
-                    hiddenCategories = parseStringArray(fields, "hiddenCategories")
+                    hiddenCategories = parseStringArray(fields, "hiddenCategories"),
+                    hiddenTypes = parseStringArray(fields, "hiddenTypes"),
+                    sources = parseSources(fields)
                 )
             }
         } catch (e: Exception) {
@@ -105,6 +125,53 @@ object AccessCodeChecker {
     private fun parseStringArray(fields: JSONObject, fieldName: String): List<String> {
         val arr = fields.optJSONObject(fieldName)?.optJSONObject("arrayValue")?.optJSONArray("values") ?: return emptyList()
         return (0 until arr.length()).mapNotNull { i -> arr.optJSONObject(i)?.optString("stringValue")?.takeIf { it.isNotBlank() } }
+    }
+
+    /** Parsea el campo "sources" (arreglo de objetos) del código, si el código fue creado con
+     *  el sistema nuevo de servidores guardados (uno o dos combinados). */
+    private fun parseSources(fields: JSONObject): List<ContentSource> {
+        val arr = fields.optJSONObject("sources")?.optJSONObject("arrayValue")?.optJSONArray("values") ?: return emptyList()
+        val result = mutableListOf<ContentSource>()
+        for (i in 0 until arr.length()) {
+            val entryFields = arr.optJSONObject(i)?.optJSONObject("mapValue")?.optJSONObject("fields") ?: continue
+            fun text(name: String): String? = entryFields.optJSONObject(name)?.optString("stringValue")?.takeIf { it.isNotBlank() }
+            result.add(
+                ContentSource(
+                    type = text("type") ?: "xtream",
+                    serverId = text("serverId"),
+                    host = text("host"),
+                    username = text("username"),
+                    password = text("password"),
+                    m3uUrl = text("m3uUrl")
+                )
+            )
+        }
+        return result
+    }
+
+    /** Datos de un servidor/lista guardado, consultados EN VIVO — así, si el administrador
+     *  oculta o reactiva una categoría, el cambio se aplica de inmediato a todos los clientes
+     *  que usan ese servidor, no solo a los códigos que se generen después. */
+    data class ServerLiveConfig(val hiddenCategories: List<String>, val hiddenTypes: List<String>)
+
+    fun fetchServerLiveConfig(projectId: String, serverId: String): ServerLiveConfig {
+        if (projectId.isBlank() || serverId.isBlank()) return ServerLiveConfig(emptyList(), emptyList())
+        return try {
+            val docPath = "projects/$projectId/databases/(default)/documents/servers/$serverId"
+            val docUrl = "https://firestore.googleapis.com/v1/$docPath"
+            val getRequest = Request.Builder().url(docUrl).build()
+            client.newCall(getRequest).execute().use { response ->
+                if (!response.isSuccessful) return ServerLiveConfig(emptyList(), emptyList())
+                val body = response.body?.string() ?: return ServerLiveConfig(emptyList(), emptyList())
+                val fields = JSONObject(body).optJSONObject("fields") ?: return ServerLiveConfig(emptyList(), emptyList())
+                ServerLiveConfig(
+                    hiddenCategories = parseStringArray(fields, "hiddenCategories"),
+                    hiddenTypes = parseStringArray(fields, "hiddenTypes")
+                )
+            }
+        } catch (e: Exception) {
+            ServerLiveConfig(emptyList(), emptyList())
+        }
     }
 
     private fun registerDevice(docUrl: String, updatedDeviceIds: List<String>) {

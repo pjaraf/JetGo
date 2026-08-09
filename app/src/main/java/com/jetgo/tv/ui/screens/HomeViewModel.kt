@@ -341,6 +341,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     /** Nombres (en minúscula) de categorías que el administrador ocultó para este cliente —
      *  se filtran de cualquier listado de categorías (vivo, películas, series). */
     private var hiddenCategoryNames: Set<String> = emptySet()
+
+    /** Secciones completas ocultas por el administrador para este cliente
+     *  (valores: "live", "movie", "series") — la interfaz no muestra esos botones/pestañas. */
+    private val _hiddenTypes = MutableStateFlow<Set<String>>(emptySet())
+    val hiddenTypes: StateFlow<Set<String>> = _hiddenTypes.asStateFlow()
     private var currentMode: String = "xtream" // "xtream" o "m3u"
 
     // Caché en memoria del catálogo completo para búsqueda instantánea tras la primera carga
@@ -513,13 +518,42 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
      *  sin que el cliente tenga que ver ni escribir host/usuario/contraseña. */
     private fun applyAccessCodeResult(result: AccessCodeResult, code: String, silent: Boolean = false) {
         hiddenCategoryNames = result.hiddenCategories.map { it.trim().lowercase() }.toSet()
+        _hiddenTypes.value = result.hiddenTypes.map { it.trim().lowercase() }.toSet()
         _settingsInfo.value = SettingsInfo(
             clientName = result.clientName,
             accessCode = code.trim().uppercase(),
             deviceCount = result.deviceCount,
             maxDevices = result.maxDevices
         )
-        if (result.mode == "m3u" && !result.m3uUrl.isNullOrBlank()) {
+
+        // Si hay servidores guardados de por medio (nuevos códigos), se consulta EN VIVO qué
+        // categorías/secciones tienen ocultas AHORA MISMO — así, si el administrador oculta o
+        // reactiva algo, se aplica de inmediato a todos los clientes que usan ese servidor, y
+        // no solo a los códigos que se generen después de ese cambio.
+        val serverIds = result.sources.mapNotNull { it.serverId }.distinct()
+        if (serverIds.isNotEmpty()) {
+            viewModelScope.launch {
+                withContext(Dispatchers.IO) {
+                    try {
+                        val context = getApplication<Application>()
+                        val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
+                        val mergedCats = mutableSetOf<String>()
+                        val mergedTypes = mutableSetOf<String>()
+                        serverIds.forEach { id ->
+                            val live = AccessCodeChecker.fetchServerLiveConfig(projectId, id)
+                            mergedCats += live.hiddenCategories.map { it.trim().lowercase() }
+                            mergedTypes += live.hiddenTypes.map { it.trim().lowercase() }
+                        }
+                        hiddenCategoryNames = mergedCats
+                        _hiddenTypes.value = mergedTypes
+                    } catch (e: Exception) { /* si falla, se queda con lo que ya traía el código */ }
+                }
+            }
+        }
+
+        if (result.sources.size > 1) {
+            connectMultiSource(result.sources, silent = silent)
+        } else if (result.mode == "m3u" && !result.m3uUrl.isNullOrBlank()) {
             connectM3u(result.m3uUrl, silent = silent)
         } else if (!result.host.isNullOrBlank() && !result.username.isNullOrBlank() && !result.password.isNullOrBlank()) {
             connectXtream(ServerConfig(result.host, result.username, result.password), silent = silent)
@@ -630,6 +664,82 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Hasta 2 fuentes combinadas (2 Xtream, o Xtream + M3U) para el código actual — vacío si
+     *  el código usa el formato viejo de una sola fuente (esos siguen por connectXtream/M3u). */
+    private var currentSources: List<com.jetgo.tv.util.ContentSource> = emptyList()
+
+    /** Conecta con hasta 2 fuentes de contenido a la vez (2 servidores Xtream, o un Xtream +
+     *  una lista M3U/OTT) y junta los canales en vivo de ambas en una sola lista — así el
+     *  cliente ve todo junto, sin tener que elegir entre un servidor u otro. Las categorías de
+     *  Vivo quedan separadas por fuente (con el nombre de cada una) para que no se mezclen
+     *  categorías con el mismo nombre que en realidad son cosas distintas en cada servidor.
+     */
+    fun connectMultiSource(sources: List<com.jetgo.tv.util.ContentSource>, silent: Boolean = false) {
+        currentSources = sources
+        // Se usa la primera fuente Xtream (si hay alguna) para todo lo que todavía no está
+        // adaptado a múltiples fuentes (el carrusel de Inicio, la búsqueda) — así esas partes
+        // siguen funcionando mostrando contenido real, aunque sea solo de una de las dos.
+        val firstXtream = sources.firstOrNull { it.type != "m3u" && !it.host.isNullOrBlank() && !it.username.isNullOrBlank() && !it.password.isNullOrBlank() }
+        currentConfig = firstXtream?.let { ServerConfig(it.host!!, it.username!!, it.password!!) }
+        currentMode = "xtream" // para que las funciones que miran currentMode traten esto como Xtream, no M3U puro
+
+        viewModelScope.launch {
+            if (!silent) {
+                _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            }
+            val allLiveChannels = mutableListOf<Channel>()
+            var anySourceWorked = false
+
+            sources.forEachIndexed { index, source ->
+                try {
+                    if (source.type == "m3u" && !source.m3uUrl.isNullOrBlank()) {
+                        val result = repository.loadFromM3u(source.m3uUrl)
+                        allLiveChannels += result.channels.map {
+                            it.copy(streamId = "src${index}_${it.streamId}", categoryId = "$index::${it.categoryId}")
+                        }
+                        anySourceWorked = true
+                    } else if (!source.host.isNullOrBlank() && !source.username.isNullOrBlank() && !source.password.isNullOrBlank()) {
+                        val config = ServerConfig(source.host, source.username, source.password)
+                        val categoryNameById = try {
+                            repository.getLiveCategories(config).associate { it.id to it.name }
+                        } catch (e: Exception) { emptyMap() }
+                        val channels = repository.getLiveChannels(config, categoryId = null)
+                        allLiveChannels += channels.map {
+                            val readableCategory = categoryNameById[it.categoryId] ?: it.categoryId
+                            it.copy(streamId = "src${index}_${it.streamId}", categoryId = "$index::$readableCategory")
+                        }
+                        anySourceWorked = true
+                    }
+                } catch (e: Exception) {
+                    // Si una de las dos fuentes falla, se sigue con la otra en vez de fallar todo
+                }
+            }
+
+            if (!anySourceWorked) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "No se pudo conectar con ninguno de los servidores configurados para este código."
+                )
+                return@launch
+            }
+
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                isConfigured = true,
+                liveChannels = allLiveChannels
+            )
+            if (!silent || !isCurrentlyShowingLive) {
+                val lastId = try { configStore.getLastChannelId() } catch (e: Exception) { null }
+                val startingChannel = allLiveChannels.firstOrNull { it.streamId == lastId } ?: allLiveChannels.firstOrNull()
+                startingChannel?.let { playChannel(it) }
+            }
+            if (firstXtream != null) ensureHomeCatalogLoaded()
+            refreshContinueWatching()
+            refreshParentalState()
+            checkForAutoResume()
+        }
+    }
+
     data class LiveChannelInfo(
         val channelName: String,
         val channelLogo: String?,
@@ -670,15 +780,60 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun loadCategoriesForType(type: ContentType) {
         _categoryPickerState.value = CategoryPickerUiState(isLoading = true)
 
+        // Vivo con lista M3U pura, o con 2 fuentes combinadas: las categorías salen del propio
+        // listado de canales ya cargado (no hay una sola API de categorías para todo junto).
+        if (type == ContentType.LIVE && (currentMode == "m3u" || currentSources.size > 1)) {
+            val categories = _uiState.value.liveChannels.map { it.categoryId }.distinct()
+                .filterNot { hiddenCategoryNames.contains(it.substringAfter("::").trim().lowercase()) }
+                .map { Category(id = it, name = it.substringAfter("::"), type = ContentType.LIVE) }
+            _categoryPickerState.value = CategoryPickerUiState(categories = categories)
+            if (categories.isNotEmpty()) {
+                val target = _phoneLiveCategoryId.value?.takeIf { id -> categories.any { it.id == id } }
+                    ?: categories.first().id
+                loadCategoryContent(ContentType.LIVE, target)
+            }
+            return
+        }
+
         if (currentMode == "m3u") {
-            // El modo M3U simple no tiene categorías separadas por API; solo hay una lista plana.
-            _categoryPickerState.value = CategoryPickerUiState(
-                categories = if (type == ContentType.LIVE) {
-                    _uiState.value.liveChannels.map { it.categoryId }.distinct()
-                        .filterNot { hiddenCategoryNames.contains(it.trim().lowercase()) }
-                        .map { Category(it, it, ContentType.LIVE) }
-                } else emptyList()
-            )
+            // Lista M3U pura (sin combinar) y no es Vivo: no maneja categorías de películas/series
+            _categoryPickerState.value = CategoryPickerUiState(categories = emptyList())
+            return
+        }
+
+        if (currentSources.size > 1) {
+            // Dos fuentes combinadas: se juntan las categorías de películas/series de cada
+            // servidor Xtream que tenga (las fuentes M3U no aportan acá), separadas con un
+            // prefijo para saber a cuál servidor pertenece cada una al elegirla después.
+            viewModelScope.launch {
+                val allCategories = mutableListOf<Category>()
+                currentSources.forEachIndexed { index, source ->
+                    if (source.type == "m3u" || source.host.isNullOrBlank() || source.username.isNullOrBlank() || source.password.isNullOrBlank()) return@forEachIndexed
+                    try {
+                        val config = ServerConfig(source.host, source.username, source.password)
+                        val categories = when (type) {
+                            ContentType.MOVIE -> repository.getVodCategories(config)
+                            ContentType.SERIES -> repository.getSeriesCategories(config)
+                            ContentType.ANIME -> repository.getVodCategoriesByKeyword(config, "anime")
+                            ContentType.SPECIAL -> {
+                                val especial = repository.getVodCategoriesByKeyword(config, "especial")
+                                val special = repository.getVodCategoriesByKeyword(config, "special")
+                                (especial + special).distinctBy { it.id }
+                            }
+                            ContentType.LIVE -> emptyList()
+                        }
+                        allCategories += categories
+                            .filterNot { hiddenCategoryNames.contains(it.name.trim().lowercase()) }
+                            .map { it.copy(id = "$index::${it.id}") }
+                    } catch (e: Exception) {
+                        // Si una fuente falla al traer categorías, se sigue con la otra
+                    }
+                }
+                val filtered = if (_parentalState.value.enabled) {
+                    allCategories.filterNot { AdultContentFilter.isAdult(it.name) }
+                } else allCategories
+                _categoryPickerState.value = CategoryPickerUiState(categories = filtered)
+            }
             return
         }
 
@@ -727,11 +882,51 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         _categoryContentState.value = CategoryContentUiState(isLoading = true)
 
-        if (currentMode == "m3u") {
+        // Vivo combinado o M3U puro: el contenido sale del listado de canales ya cargado
+        if (type == ContentType.LIVE && (currentMode == "m3u" || currentSources.size > 1)) {
             val items = _uiState.value.liveChannels
                 .filter { it.categoryId == categoryId }
                 .map { ContentItem(it.streamId, it.name, it.logoUrl, ContentType.LIVE, it.streamUrl) }
             _categoryContentState.value = CategoryContentUiState(items = items)
+            return
+        }
+
+        if (currentMode == "m3u") {
+            _categoryContentState.value = CategoryContentUiState(items = emptyList())
+            return
+        }
+
+        if (currentSources.size > 1) {
+            // El categoryId viene con el prefijo "<índice>::<id real>" — se usa para saber a
+            // cuál de las 2 fuentes combinadas pedirle el contenido.
+            val sourceIndex = categoryId.substringBefore("::", "").toIntOrNull()
+            val realCategoryId = categoryId.substringAfter("::", categoryId)
+            val source = sourceIndex?.let { currentSources.getOrNull(it) }
+            if (source == null || source.host.isNullOrBlank() || source.username.isNullOrBlank() || source.password.isNullOrBlank()) {
+                _categoryContentState.value = CategoryContentUiState(errorMessage = "Fuente no encontrada")
+                return
+            }
+            val config = ServerConfig(source.host, source.username, source.password)
+            viewModelScope.launch {
+                try {
+                    val items = when (type) {
+                        ContentType.MOVIE, ContentType.ANIME, ContentType.SPECIAL -> repository.getMovies(config, realCategoryId).map {
+                            ContentItem(it.streamId, it.name, it.coverUrl, type, it.streamUrl, rating = it.rating)
+                        }
+                        ContentType.SERIES -> repository.getSeries(config, realCategoryId).map {
+                            ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null, rating = it.rating)
+                        }
+                        ContentType.LIVE -> emptyList()
+                    }
+                    val filteredItems = if (_parentalState.value.enabled) items.filterNot { AdultContentFilter.isAdult(it.name) } else items
+                    _categoryContentState.value = CategoryContentUiState(items = filteredItems)
+                    fillMissingPosters(filteredItems, isSeries = type == ContentType.SERIES) { updated ->
+                        _categoryContentState.value = _categoryContentState.value.copy(items = updated)
+                    }
+                } catch (e: Exception) {
+                    _categoryContentState.value = CategoryContentUiState(errorMessage = "Error al cargar contenido: ${e.message}")
+                }
+            }
             return
         }
 

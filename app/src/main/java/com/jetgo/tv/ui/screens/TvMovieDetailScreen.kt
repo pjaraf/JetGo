@@ -255,20 +255,6 @@ private fun TvMovieDetailContent(
                         },
                         modifier = Modifier.fillMaxSize()
                     )
-                    playerManager.playbackError.value?.let { errorMsg ->
-                        Box(
-                            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = errorMsg,
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                modifier = Modifier.padding(16.dp)
-                            )
-                        }
-                    }
                 }
             }
         }

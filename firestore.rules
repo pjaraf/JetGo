@@ -79,7 +79,11 @@ service cloud.firestore {
     // al generar un código), pero solo el principal puede agregar, editar o borrar servidores
     // — así los sub administradores nunca necesitan escribir ni ver la URL real.
     match /servers/{serverId} {
-      allow list, get: if isSignedIn() && !isRevoked();
+      // La app (sin iniciar sesión) puede consultar un servidor puntual si ya sabe su ID
+      // (para leer sus categorías ocultas actualizadas cada vez que conecta), pero no puede
+      // listar todos los servidores existentes.
+      allow get: if true;
+      allow list: if isSignedIn() && !isRevoked();
       allow create, update, delete: if isSignedIn() && isPrincipalAdmin();
     }
   }
