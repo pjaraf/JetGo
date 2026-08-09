@@ -758,6 +758,10 @@
       docData.demoExpiresAt = firebase.firestore.Timestamp.fromDate(expires);
     }
 
+    if (Array.isArray(selectedServer.hiddenCategories) && selectedServer.hiddenCategories.length > 0) {
+      docData.hiddenCategories = selectedServer.hiddenCategories;
+    }
+
     if (isM3u) {
       docData.m3uUrl = selectedHost;
     } else {
@@ -1142,18 +1146,37 @@
       const urlCell = currentUserRole === 'admin'
         ? '<td style="font-family:ui-monospace,monospace; font-size:12px; word-break:break-all;">' + s.host + '</td>'
         : '';
+      const hiddenCount = Array.isArray(s.hiddenCategories) ? s.hiddenCategories.length : 0;
+      const hiddenCategoriesBox = currentUserRole === 'admin' ? (
+        '<div class="credentials-box hidden-cats-box">' +
+          '<div style="font-size:12px; color:var(--muted); margin-bottom:6px;">Una categoría por línea, tal como aparece en el servidor/lista (ej. "Deportes", "Netflix", "Canales +18"):</div>' +
+          '<textarea id="hiddenCatsInput_' + s.id + '" rows="4" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:13px; margin-bottom:8px;">' + (s.hiddenCategories || []).join('\n') + '</textarea>' +
+          '<button class="secondary full" style="padding:9px;" onclick="saveHiddenCategories(\'' + s.id + '\')">Guardar categorías ocultas</button>' +
+        '</div>'
+      ) : '';
       tr.innerHTML =
         '<td>' + s.name + '</td>' +
         '<td>' + (s.type === 'm3u' ? 'Lista M3U' : 'Xtream Codes') + '</td>' +
         urlCell +
         '<td class="actions-cell">' +
           (currentUserRole === 'admin'
-            ? '<button class="danger" onclick="deleteServer(\'' + s.id + '\')">Eliminar</button>'
+            ? '<button class="secondary" onclick="toggleCreds(this, \'.hidden-cats-box\')">Categorías ocultas (' + hiddenCount + ')</button>' +
+              '<button class="danger" onclick="deleteServer(\'' + s.id + '\')">Eliminar</button>' +
+              hiddenCategoriesBox
             : '<span style="color:var(--muted); font-size:12px;">Solo el principal puede editar</span>') +
         '</td>';
       tbody.appendChild(tr);
     });
   }
+
+  window.saveHiddenCategories = async (serverId) => {
+    const raw = document.getElementById('hiddenCatsInput_' + serverId).value;
+    const categories = raw.split('\n').map(c => c.trim()).filter(c => c.length > 0);
+    await db.collection('servers').doc(serverId).update({ hiddenCategories: categories });
+    showToast('Categorías ocultas guardadas');
+    await loadServers();
+    renderServersTable();
+  };
 
   document.getElementById('createServerBtn').addEventListener('click', async () => {
     const name = document.getElementById('serverName').value.trim();
