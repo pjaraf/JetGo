@@ -184,10 +184,12 @@ class PlayerManager(context: Context) {
             .createMediaSource(mediaItem)
 
         _stats.value = _stats.value.copy(channelName = name, isLive = true)
-        // Se detiene limpio antes de cargar lo nuevo — si no, cambiar de canal muy rápido
-        // (por ejemplo, ir y volver al canal anterior enseguida) puede dejar al reproductor
-        // a medio camino entre el canal viejo y el nuevo, y la imagen se queda en negro.
+        // Se limpia por completo el reproductor (no solo "detenido") antes de cargar lo nuevo:
+        // si solo se detiene, puede quedar algo del canal anterior a medio camino, y cambiar
+        // rápido entre canales (sobre todo volviendo al mismo de hace un momento) se queda con
+        // la imagen en negro. Limpiando la cola entera se fuerza a arrancar siempre de cero.
         exoPlayer.stop()
+        exoPlayer.clearMediaItems()
         exoPlayer.setMediaSource(mediaSource)
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
