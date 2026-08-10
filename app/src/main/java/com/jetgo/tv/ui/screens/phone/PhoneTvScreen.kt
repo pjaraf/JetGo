@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -165,14 +166,23 @@ fun PhoneTvScreen(
                             color = Color.Gray,
                             modifier = Modifier.align(Alignment.Center).padding(16.dp)
                         )
-                        else -> LazyColumn {
-                            itemsIndexed(channelsInCategory) { index, item ->
-                                ChannelRow(
-                                    index = index,
-                                    item = item,
-                                    isActive = item.id == activeChannelId,
-                                    onClick = { onChannelTap(item) }
-                                )
+                        else -> {
+                            val listState = rememberLazyListState()
+                            LaunchedEffect(channelsInCategory, activeChannelId) {
+                                val idx = channelsInCategory.indexOfFirst { it.id == activeChannelId }
+                                if (idx >= 0) {
+                                    listState.scrollToItem((idx - 2).coerceAtLeast(0))
+                                }
+                            }
+                            LazyColumn(state = listState) {
+                                itemsIndexed(channelsInCategory) { index, item ->
+                                    ChannelRow(
+                                        index = index,
+                                        item = item,
+                                        isActive = item.id == activeChannelId,
+                                        onClick = { onChannelTap(item) }
+                                    )
+                                }
                             }
                         }
                     }

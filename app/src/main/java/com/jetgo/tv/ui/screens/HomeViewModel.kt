@@ -787,7 +787,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val channelNumber: Int?,
         val current: com.jetgo.tv.data.model.EpgProgram?,
         val next: com.jetgo.tv.data.model.EpgProgram?,
-        val channelId: String? = null
+        val channelId: String? = null,
+        val categoryId: String? = null
     )
 
     private val _liveChannelInfo = MutableStateFlow<LiveChannelInfo?>(null)
@@ -798,7 +799,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         lastLiveChannel = LastLiveChannel(channel.streamId, channel.name, channel.streamUrl)
         isCurrentlyShowingLive = true
         viewModelScope.launch { configStore.saveLastChannelId(channel.streamId) }
-        _liveChannelInfo.value = LiveChannelInfo(channel.name, channel.logoUrl, channel.number, null, null, channel.streamId)
+        _liveChannelInfo.value = LiveChannelInfo(channel.name, channel.logoUrl, channel.number, null, null, channel.streamId, channel.categoryId)
         val config = currentConfig ?: return
         viewModelScope.launch {
             val epg = try { repository.getShortEpg(config, channel.streamId) } catch (e: Exception) { emptyList() }
@@ -808,7 +809,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 channelNumber = channel.number,
                 current = epg.getOrNull(0),
                 next = epg.getOrNull(1),
-                channelId = channel.streamId
+                channelId = channel.streamId,
+                categoryId = channel.categoryId
             )
         }
     }

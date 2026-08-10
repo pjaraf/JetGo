@@ -84,9 +84,21 @@ fun FullscreenPlayerOverlay(
         }
     }
 
-    // Al cambiar de modo (canales <-> categorías), la selección arranca en el primer elemento
+    // Al abrir el panel, la selección arranca en el canal (o categoría) que está REALMENTE
+    // activo ahora mismo — no siempre en el primero de la lista — así se mantiene "en lo
+    // último seleccionado" cada vez que el cliente vuelve a abrir el panel.
     LaunchedEffect(zapMode) {
-        zapSelectedIndex = 0
+        zapSelectedIndex = when (zapMode) {
+            ZapPanelMode.CHANNELS -> {
+                val idx = liveChannelsInCategory.indexOfFirst { it.id == liveChannelInfo?.channelId }
+                idx.coerceAtLeast(0)
+            }
+            ZapPanelMode.CATEGORIES -> {
+                val idx = liveCategories.indexOfFirst { it.id == liveChannelInfo?.categoryId }
+                idx.coerceAtLeast(0)
+            }
+            ZapPanelMode.HIDDEN -> 0
+        }
     }
 
     fun confirmCategorySelection() {
