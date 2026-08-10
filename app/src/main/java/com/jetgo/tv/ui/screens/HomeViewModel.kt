@@ -794,15 +794,25 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _liveChannelInfo = MutableStateFlow<LiveChannelInfo?>(null)
     val liveChannelInfo: StateFlow<LiveChannelInfo?> = _liveChannelInfo.asStateFlow()
 
+    /** La consulta de programación (EPG) del canal anterior — si el cliente cambia de canal
+     *  rápido, se cancela la consulta vieja para que no llegue tarde y pise el banner con
+     *  información de un canal que ya no es el que está viendo. */
+    private var epgFetchJob: kotlinx.coroutines.Job? = null
+
     fun playChannel(channel: Channel) {
         playerManager.playChannel(channel.streamUrl, channel.name)
         lastLiveChannel = LastLiveChannel(channel.streamId, channel.name, channel.streamUrl)
         isCurrentlyShowingLive = true
         viewModelScope.launch { configStore.saveLastChannelId(channel.streamId) }
         _liveChannelInfo.value = LiveChannelInfo(channel.name, channel.logoUrl, channel.number, null, null, channel.streamId, channel.categoryId)
+
+        epgFetchJob?.cancel()
         val config = currentConfig ?: return
-        viewModelScope.launch {
+        epgFetchJob = viewModelScope.launch {
             val epg = try { repository.getShortEpg(config, channel.streamId) } catch (e: Exception) { emptyList() }
+            // Si mientras se esperaba esta consulta el cliente ya cambió a otro canal, esta
+            // respuesta llegó tarde y no corresponde — no se aplica.
+            if (_liveChannelInfo.value?.channelId != channel.streamId) return@launch
             _liveChannelInfo.value = LiveChannelInfo(
                 channelName = channel.name,
                 channelLogo = channel.logoUrl,

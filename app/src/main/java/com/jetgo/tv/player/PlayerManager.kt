@@ -184,6 +184,10 @@ class PlayerManager(context: Context) {
             .createMediaSource(mediaItem)
 
         _stats.value = _stats.value.copy(channelName = name, isLive = true)
+        // Se detiene limpio antes de cargar lo nuevo — si no, cambiar de canal muy rápido
+        // (por ejemplo, ir y volver al canal anterior enseguida) puede dejar al reproductor
+        // a medio camino entre el canal viejo y el nuevo, y la imagen se queda en negro.
+        exoPlayer.stop()
         exoPlayer.setMediaSource(mediaSource)
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
