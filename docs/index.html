@@ -420,16 +420,20 @@
           <input id="xtreamPassword" type="text" placeholder="Contraseña Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
         </div>
 
-        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin: 4px 0 8px; cursor:pointer;">
-          <input type="checkbox" id="useSecondSource" style="width:auto; margin:0;" onchange="onUseSecondSourceChange()" />
-          Juntar con un segundo servidor o lista (el cliente ve el contenido de ambos junto)
-        </label>
+        <div id="useSecondSourceRow">
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin: 4px 0 8px; cursor:pointer;">
+            <input type="checkbox" id="useSecondSource" style="width:auto; margin:0;" onchange="onUseSecondSourceChange()" />
+            Juntar con un segundo servidor o lista (el cliente ve el contenido de ambos junto)
+          </label>
+        </div>
 
         <div id="secondSourceBox" style="display:none;">
-          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor / lista adicional</label>
-          <select id="serverSelect2" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" onchange="onServerSelect2Change()">
-            <option value="">Selecciona uno...</option>
-          </select>
+          <div id="serverSelect2Row">
+            <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor / lista adicional</label>
+            <select id="serverSelect2" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" onchange="onServerSelect2Change()">
+              <option value="">Selecciona uno...</option>
+            </select>
+          </div>
           <div id="xtreamCredFields2" style="display:none;">
             <input id="username2" type="text" placeholder="Usuario Xtream (del servidor adicional)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
             <input id="xtreamPassword2" type="text" placeholder="Contraseña Xtream (del servidor adicional)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
@@ -515,6 +519,43 @@
             <thead><tr><th>Nombre</th><th>Tipo</th><th id="serverUrlHeader">URL</th><th>Acciones</th></tr></thead>
             <tbody id="serversTableBody">
               <tr><td colspan="4" style="color:var(--muted)">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ---------- Combos: 2 servidores/listas ya guardados, combinados con un nombre ---------- -->
+      <div class="card view-section" id="view-servers-combo" style="display:none;">
+        <h2>Combos (servidores mixtos)</h2>
+        <p style="color:var(--muted); font-size:13px; margin-top:-10px; margin-bottom:16px;">
+          Junta 2 servidores/listas que ya tengas guardados en uno solo con su propio nombre —
+          así, al crear un cliente, eliges el combo directo en vez de armar la combinación cada vez.
+        </p>
+
+        <div id="comboCreateBox">
+          <input id="comboName" type="text" placeholder="Nombre del combo (ej. Full + Deportes)" />
+
+          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Primer servidor / lista</label>
+          <select id="comboServer1" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;">
+            <option value="">Selecciona uno...</option>
+          </select>
+
+          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Segundo servidor / lista</label>
+          <select id="comboServer2" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;">
+            <option value="">Selecciona uno...</option>
+          </select>
+
+          <button id="createComboBtn" class="full">Guardar combo</button>
+        </div>
+        <p id="comboBlockedMessage" style="display:none; color:var(--muted); font-size:14px; line-height:1.6;">
+          Solo el administrador principal puede crear combos.
+        </p>
+
+        <div class="table-wrap" style="margin-top:20px;">
+          <table>
+            <thead><tr><th>Nombre</th><th>Combina</th><th>Acciones</th></tr></thead>
+            <tbody id="combosTableBody">
+              <tr><td colspan="3" style="color:var(--muted)">Cargando...</td></tr>
             </tbody>
           </table>
         </div>
@@ -625,6 +666,8 @@
       document.getElementById('serverCreateBox').style.display = currentUserRole === 'admin' ? 'block' : 'none';
       document.getElementById('serverBlockedMessage').style.display = currentUserRole === 'admin' ? 'none' : 'block';
       document.getElementById('serverUrlHeader').style.display = currentUserRole === 'admin' ? '' : 'none';
+      document.getElementById('comboCreateBox').style.display = currentUserRole === 'admin' ? 'block' : 'none';
+      document.getElementById('comboBlockedMessage').style.display = currentUserRole === 'admin' ? 'none' : 'block';
 
       loginScreen.style.display = 'none';
       appShell.style.display = 'flex';
@@ -632,6 +675,7 @@
       selectView('create');
       listenToCodes();
       loadServers();
+      loadCombos();
     } else {
       loginScreen.style.display = 'flex';
       appShell.style.display = 'none';
@@ -641,7 +685,31 @@
   // ---------- Elegir un servidor o lista del desplegable: muestra usuario/clave solo si es Xtream ----------
   function onServerSelectChange() {
     const select = document.getElementById('serverSelect');
-    const selected = serversList.find(s => s.host === select.value);
+    const value = select.value;
+
+    if (value.startsWith('combo::')) {
+      // Es un combo: se muestran los campos de usuario/clave que correspondan según el tipo
+      // de cada uno de los 2 servidores que lo componen, y se oculta la opción manual de
+      // "segundo servidor" (el combo ya trae los 2 fijos).
+      const comboId = value.substring('combo::'.length);
+      const combo = combosList.find(c => c.id === comboId);
+      const member1 = combo ? serversList.find(s => s.id === combo.memberIds[0]) : null;
+      const member2 = combo ? serversList.find(s => s.id === combo.memberIds[1]) : null;
+
+      document.getElementById('xtreamCredFields').style.display = (member1 && member1.type !== 'm3u') ? 'block' : 'none';
+
+      document.getElementById('useSecondSourceRow').style.display = 'none';
+      document.getElementById('secondSourceBox').style.display = 'block';
+      document.getElementById('serverSelect2Row').style.display = 'none';
+      document.getElementById('xtreamCredFields2').style.display = (member2 && member2.type !== 'm3u') ? 'block' : 'none';
+      return;
+    }
+
+    document.getElementById('useSecondSourceRow').style.display = 'block';
+    document.getElementById('serverSelect2Row').style.display = 'block';
+    onUseSecondSourceChange();
+
+    const selected = serversList.find(s => s.host === value);
     const isXtream = selected ? selected.type !== 'm3u' : false;
     document.getElementById('xtreamCredFields').style.display = isXtream ? 'block' : 'none';
   }
@@ -712,7 +780,9 @@
       loadSubadmins();
     } else if (name === 'servers') {
       document.getElementById('view-servers').style.display = 'block';
+      document.getElementById('view-servers-combo').style.display = 'block';
       renderServersTable();
+      renderCombosTable();
     } else {
       document.getElementById('view-table').style.display = 'block';
       document.getElementById('tableCardTitle').textContent = VIEW_INFO[name].title;
@@ -757,14 +827,13 @@
       return;
     }
 
-    const selectedHost = document.getElementById('serverSelect').value;
-    const selectedServer = serversList.find(s => s.host === selectedHost);
-    if (!selectedServer) {
-      alert('Selecciona un servidor o lista de la lista.');
+    const selectedValue = document.getElementById('serverSelect').value;
+    if (!selectedValue) {
+      alert('Selecciona un servidor, lista o combo de la lista.');
       return;
     }
 
-    // ---- Arma la(s) fuente(s) combinadas: 1 normalmente, o 2 si se activó la casilla ----
+    // ---- Arma la(s) fuente(s) combinadas: 1 normalmente, 2 si se activó la casilla, o las 2 fijas de un combo ----
     const sources = [];
 
     function buildSource(server, usernameFieldId, passwordFieldId) {
@@ -777,27 +846,58 @@
       return { type: 'xtream', serverId: server.id, host: server.host, username: username, password: password };
     }
 
-    const source1 = buildSource(selectedServer, 'username', 'xtreamPassword');
-    if (selectedServer.type !== 'm3u' && !source1) {
-      alert('Completa usuario y contraseña de Xtream Codes.');
-      return;
-    }
-    sources.push(source1);
+    let selectedServer;
 
-    const useSecond = document.getElementById('useSecondSource').checked;
-    if (useSecond) {
-      const selectedHost2 = document.getElementById('serverSelect2').value;
-      const selectedServer2 = serversList.find(s => s.host === selectedHost2);
-      if (!selectedServer2) {
-        alert('Selecciona el segundo servidor o lista, o desmarca la casilla de combinar.');
+    if (selectedValue.startsWith('combo::')) {
+      const comboId = selectedValue.substring('combo::'.length);
+      const combo = combosList.find(c => c.id === comboId);
+      const member1 = combo ? serversList.find(s => s.id === combo.memberIds[0]) : null;
+      const member2 = combo ? serversList.find(s => s.id === combo.memberIds[1]) : null;
+      if (!member1 || !member2) {
+        alert('No se pudo cargar este combo (puede que uno de sus servidores haya sido eliminado).');
         return;
       }
-      const source2 = buildSource(selectedServer2, 'username2', 'xtreamPassword2');
-      if (selectedServer2.type !== 'm3u' && !source2) {
-        alert('Completa usuario y contraseña del servidor Xtream adicional.');
+      const source1 = buildSource(member1, 'username', 'xtreamPassword');
+      if (member1.type !== 'm3u' && !source1) {
+        alert('Completa usuario y contraseña para "' + member1.name + '".');
         return;
       }
-      sources.push(source2);
+      const source2 = buildSource(member2, 'username2', 'xtreamPassword2');
+      if (member2.type !== 'm3u' && !source2) {
+        alert('Completa usuario y contraseña para "' + member2.name + '".');
+        return;
+      }
+      sources.push(source1, source2);
+      selectedServer = member1; // para el nombre/mode que se guardan sueltos más abajo
+    } else {
+      selectedServer = serversList.find(s => s.host === selectedValue);
+      if (!selectedServer) {
+        alert('Selecciona un servidor o lista de la lista.');
+        return;
+      }
+
+      const source1 = buildSource(selectedServer, 'username', 'xtreamPassword');
+      if (selectedServer.type !== 'm3u' && !source1) {
+        alert('Completa usuario y contraseña de Xtream Codes.');
+        return;
+      }
+      sources.push(source1);
+
+      const useSecond = document.getElementById('useSecondSource').checked;
+      if (useSecond) {
+        const selectedHost2 = document.getElementById('serverSelect2').value;
+        const selectedServer2 = serversList.find(s => s.host === selectedHost2);
+        if (!selectedServer2) {
+          alert('Selecciona el segundo servidor o lista, o desmarca la casilla de combinar.');
+          return;
+        }
+        const source2 = buildSource(selectedServer2, 'username2', 'xtreamPassword2');
+        if (selectedServer2.type !== 'm3u' && !source2) {
+          alert('Completa usuario y contraseña del servidor Xtream adicional.');
+          return;
+        }
+        sources.push(source2);
+      }
     }
 
     const isDemo = document.getElementById('isDemo').checked;
@@ -1182,15 +1282,21 @@
       serversList = [];
     }
     renderServerDropdown();
+    renderComboServerDropdowns();
   }
 
   function renderServerDropdown() {
     const optionsHtml = '<option value="">Selecciona uno...</option>' +
       serversList.map(s => '<option value="' + s.host.replace(/"/g, '&quot;') + '">' + s.name.replace(/</g, '&lt;') + (s.type === 'm3u' ? ' (Lista M3U)' : ' (Xtream)') + '</option>').join('');
 
+    const comboOptionsHtml = combosList.length === 0 ? '' :
+      '<optgroup label="Combos">' +
+        combosList.map(c => '<option value="combo::' + c.id + '">' + c.name.replace(/</g, '&lt;') + ' (Combo)</option>').join('') +
+      '</optgroup>';
+
     const select = document.getElementById('serverSelect');
     const currentValue = select.value;
-    select.innerHTML = optionsHtml;
+    select.innerHTML = optionsHtml + comboOptionsHtml;
     select.value = currentValue;
     onServerSelectChange();
 
@@ -1306,6 +1412,87 @@
     await db.collection('servers').doc(id).delete();
     await loadServers();
     renderServersTable();
+  };
+
+  // ---------- Combos: 2 servidores/listas ya guardados, combinados con un nombre ----------
+  let combosList = [];
+
+  async function loadCombos() {
+    try {
+      const snapshot = await db.collection('combos').orderBy('name').get();
+      combosList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (e) {
+      combosList = [];
+    }
+    renderComboServerDropdowns();
+    renderServerDropdown(); // para que los combos aparezcan también en "Crear cliente nuevo"
+  }
+
+  function renderComboServerDropdowns() {
+    const optionsHtml = '<option value="">Selecciona uno...</option>' +
+      serversList.map(s => '<option value="' + s.id + '">' + s.name.replace(/</g, '&lt;') + (s.type === 'm3u' ? ' (Lista M3U)' : ' (Xtream)') + '</option>').join('');
+    const sel1 = document.getElementById('comboServer1');
+    const sel2 = document.getElementById('comboServer2');
+    if (sel1) { const v = sel1.value; sel1.innerHTML = optionsHtml; sel1.value = v; }
+    if (sel2) { const v = sel2.value; sel2.innerHTML = optionsHtml; sel2.value = v; }
+  }
+
+  function renderCombosTable() {
+    const tbody = document.getElementById('combosTableBody');
+    if (!tbody) return;
+    if (combosList.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted)">Todavía no hay combos guardados.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = '';
+    combosList.forEach(c => {
+      const memberNames = (c.memberIds || []).map(id => {
+        const s = serversList.find(x => x.id === id);
+        return s ? s.name : '(servidor eliminado)';
+      }).join(' + ');
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + c.name + '</td>' +
+        '<td style="color:var(--muted); font-size:12px;">' + memberNames + '</td>' +
+        '<td class="actions-cell">' +
+          (currentUserRole === 'admin'
+            ? '<button class="danger" onclick="deleteCombo(\'' + c.id + '\')">Eliminar</button>'
+            : '<span style="color:var(--muted); font-size:12px;">Solo el principal puede editar</span>') +
+        '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  document.getElementById('createComboBtn')?.addEventListener('click', async () => {
+    const name = document.getElementById('comboName').value.trim();
+    const id1 = document.getElementById('comboServer1').value;
+    const id2 = document.getElementById('comboServer2').value;
+    if (!name || !id1 || !id2) {
+      alert('Completa el nombre y los 2 servidores/listas a combinar.');
+      return;
+    }
+    if (id1 === id2) {
+      alert('Elige 2 servidores/listas distintos para combinar.');
+      return;
+    }
+    await db.collection('combos').add({
+      name: name,
+      memberIds: [id1, id2],
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById('comboName').value = '';
+    document.getElementById('comboServer1').value = '';
+    document.getElementById('comboServer2').value = '';
+    showToast('Combo guardado');
+    await loadCombos();
+    renderCombosTable();
+  });
+
+  window.deleteCombo = async (id) => {
+    if (!confirm('¿Eliminar este combo? Los códigos que ya lo usan no se ven afectados.')) return;
+    await db.collection('combos').doc(id).delete();
+    await loadCombos();
+    renderCombosTable();
   };
 
   function showToast(msg) {
