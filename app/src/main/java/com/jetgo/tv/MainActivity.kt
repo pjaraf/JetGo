@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -166,13 +167,24 @@ private fun AppRoot(viewModel: HomeViewModel) {
                         SplashLoadingScreen()
                     }
                     !uiState.isConfigured -> {
-                        // El código es válido, pero no se pudo conectar (credenciales del panel
-                        // mal cargadas, servidor caído, etc.). NUNCA se le muestra al cliente la
-                        // pantalla de configuración manual — solo un aviso + reintentar.
-                        ConnectionIssueScreen(
-                            onRetry = { viewModel.retryConnection() },
-                            debugDetail = uiState.debugDetail
-                        )
+                        // El código es válido, pero no se pudo conectar todavía. Esto puede ser
+                        // un problema real (servidor caído) O solo el instante justo al arrancar
+                        // la app (antes de que termine de conectar) — para no mostrar el aviso
+                        // de error en ese instante normal, se espera un par de segundos con el
+                        // logo antes de escalar al aviso de "reintentar".
+                        var showConnectionIssue by remember { mutableStateOf(false) }
+                        LaunchedEffect(Unit) {
+                            delay(4000)
+                            showConnectionIssue = true
+                        }
+                        if (showConnectionIssue) {
+                            ConnectionIssueScreen(
+                                onRetry = { viewModel.retryConnection() },
+                                debugDetail = uiState.debugDetail
+                            )
+                        } else {
+                            SplashLoadingScreen()
+                        }
                     }
                     isTv -> {
                         // ---- Interfaz original para Android TV / Google TV / TV Box (sin cambios) ----

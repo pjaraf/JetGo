@@ -50,6 +50,7 @@ class PlayerManager(context: Context) {
     val playbackError: State<String?> get() = _playbackError
 
     private var retryCount = 0
+    private var bufferingReconnectCount = 0
     private var lastUrl: String? = null
     private var lastName: String = ""
 
@@ -64,15 +65,25 @@ class PlayerManager(context: Context) {
     private fun startBufferingTimeout() {
         cancelBufferingTimeout()
         val runnable = Runnable {
-            // Si después de 25 segundos SIGUE cargando (sin haber avanzado ni fallado con un
-            // error formal), se avisa igual — antes esto se quedaba pegado en silencio,
-            // mostrando el reproductor con la duración pero sin arrancar nunca.
-            if (exoPlayer.playbackState == Player.STATE_BUFFERING) {
-                _playbackError.value = "\"$lastName\" está tardando demasiado en cargar. Verifica tu conexión."
+            // Si sigue "cargando" sin avanzar después de unos segundos, probablemente se pegó
+            // (corte momentáneo de señal, etc.) — se reconecta sola, sin avisarle nada al
+            // cliente, para que la interrupción se note lo menos posible.
+            if (exoPlayer.playbackState == Player.STATE_BUFFERING && bufferingReconnectCount < 4) {
+                bufferingReconnectCount++
+                val url = lastUrl
+                if (url != null) {
+                    try {
+                        exoPlayer.stop()
+                        exoPlayer.prepare()
+                        exoPlayer.playWhenReady = true
+                        exoPlayer.play()
+                    } catch (e: Exception) { /* se reintenta de nuevo si vuelve a quedar pegado */ }
+                }
+                startBufferingTimeout() // sigue vigilando por si necesita reconectar de nuevo
             }
         }
         bufferingTimeoutRunnable = runnable
-        mainHandler.postDelayed(runnable, 25_000)
+        mainHandler.postDelayed(runnable, 8_000)
     }
 
     init {
@@ -96,7 +107,7 @@ class PlayerManager(context: Context) {
                 if (playbackState == Player.STATE_READY) {
                     // Volvió a andar bien: limpia cualquier error anterior y resetea los reintentos
                     _playbackError.value = null
-                    retryCount = 0
+                    retryCount = 0; bufferingReconnectCount = 0
                     cancelBufferingTimeout()
                 } else if (playbackState == Player.STATE_BUFFERING) {
                     startBufferingTimeout()
@@ -152,7 +163,7 @@ class PlayerManager(context: Context) {
         currentUrl = url
         lastUrl = url
         lastName = name
-        retryCount = 0
+        retryCount = 0; bufferingReconnectCount = 0
         _playbackError.value = null
         _videoQuality.value = null
         cancelBufferingTimeout()

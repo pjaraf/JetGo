@@ -86,5 +86,12 @@ service cloud.firestore {
       allow list: if isSignedIn() && !isRevoked();
       allow create, update, delete: if isSignedIn() && isPrincipalAdmin();
     }
+
+    // Colección "combos": combina 2 servidores/listas ya guardados en uno solo con nombre,
+    // para elegirlo directo al crear un cliente sin tener que armar la combinación cada vez.
+    match /combos/{comboId} {
+      allow list, get: if isSignedIn() && !isRevoked();
+      allow create, update, delete: if isSignedIn() && isPrincipalAdmin();
+    }
   }
 }
