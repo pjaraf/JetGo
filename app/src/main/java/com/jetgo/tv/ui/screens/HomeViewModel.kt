@@ -354,6 +354,29 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
      *  solo el contenido de la fuente que la tiene oculta. */
     private var sourceHiddenConfigs: List<Pair<Set<String>, Set<String>>> = emptyList() // (categorías, tipos) por índice
 
+    /** Nombre legible de cada categoría de Vivo por su ID crudo (solo servidor único) — se usa
+     *  para saber qué canales pertenecen a una categoría oculta, sin tocar channel.categoryId
+     *  (del que depende, por ejemplo, mantenerse en la categoría activa del panel de canales). */
+    private var liveCategoryNameById: Map<String, String> = emptyMap()
+
+    /** IDs de canal que pertenecen a una categoría oculta por el administrador — se recalcula
+     *  cada vez que cambian los canales o lo que está oculto, para que el carrusel de logos
+     *  (y cualquier otra lista decorativa) pueda excluirlos. */
+    private val _hiddenChannelIds = MutableStateFlow<Set<String>>(emptySet())
+    val hiddenChannelIds: StateFlow<Set<String>> = _hiddenChannelIds.asStateFlow()
+
+    private fun recomputeHiddenChannelIds() {
+        val channels = _uiState.value.liveChannels
+        _hiddenChannelIds.value = channels.filter { channel ->
+            val readableCategory = if (currentSources.size > 1) {
+                channel.categoryId.substringAfter("::")
+            } else {
+                liveCategoryNameById[channel.categoryId] ?: channel.categoryId
+            }
+            hiddenCategoryNames.contains(readableCategory.trim().lowercase())
+        }.map { it.streamId }.toSet()
+    }
+
     private var currentMode: String = "xtream" // "xtream" o "m3u"
 
     // Caché en memoria del catálogo completo para búsqueda instantánea tras la primera carga
@@ -597,6 +620,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 _hiddenTypes.value = if (perSourceConfigs.isEmpty()) emptySet()
                     else perSourceConfigs.map { it.second }.reduce { a, b -> a.intersect(b) }
                 hiddenCategoryNames = perSourceConfigs.flatMap { it.first }.toSet()
+                recomputeHiddenChannelIds()
             }
         }
     }
@@ -639,11 +663,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 _settingsInfo.value = _settingsInfo.value.copy(expirationDate = expirationText)
                 val channels = repository.getLiveChannels(config, categoryId = null)
+                val categoryNameById = try {
+                    repository.getLiveCategories(config).associate { it.id to it.name }
+                } catch (e: Exception) { emptyMap() }
+                // Se guarda el mapa de nombres por separado (no se toca channel.categoryId,
+                // que sigue siendo el ID crudo — de eso depende, por ejemplo, mantenerse en la
+                // categoría activa al abrir el panel de canales).
+                liveCategoryNameById = categoryNameById
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     isConfigured = true,
                     liveChannels = channels
                 )
+                recomputeHiddenChannelIds()
                 // En una reconexión silenciosa, si YA está reproduciendo algo (por ejemplo el
                 // canal que el usuario acaba de tocar), no lo interrumpe volviendo a poner el
                 // primer canal de la lista.
@@ -775,6 +807,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 isConfigured = true,
                 liveChannels = allLiveChannels
             )
+            recomputeHiddenChannelIds()
             if (!silent || !isCurrentlyShowingLive) {
                 val lastId = try { configStore.getLastChannelId() } catch (e: Exception) { null }
                 val startingChannel = allLiveChannels.firstOrNull { it.streamId == lastId } ?: allLiveChannels.firstOrNull()

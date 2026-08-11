@@ -42,28 +42,36 @@ fun ChannelLogoCarousel(
 ) {
     // Se descartan canales sin URL de logo, Y TAMBIÉN los que sí tienen una URL guardada pero
     // esa imagen no logra cargar (un link roto o caído) — así nunca queda un espacio vacío ni
-    // un ícono roto en el carrusel.
+    // un ícono roto en el carrusel. Es solo decorativo, así que alcanza con revisar un grupo
+    // razonable (no hace falta con miles de canales, y revisarlos uno por uno tardaría demasiado).
     val context = androidx.compose.ui.platform.LocalContext.current
     var brokenLogoUrls by remember { mutableStateOf(setOf<String>()) }
     var checkFinished by remember { mutableStateOf(false) }
-    val candidateChannels = remember(channels) { channels.filter { !it.logoUrl.isNullOrBlank() } }
+    val candidateChannels = remember(channels) {
+        channels.filter { !it.logoUrl.isNullOrBlank() }.distinctBy { it.logoUrl }.take(120)
+    }
     val validChannels = candidateChannels.filter { it.logoUrl !in brokenLogoUrls }
 
-    // Revisa en segundo plano, ANTES de mostrar nada, si cada logo realmente carga bien — así
-    // nunca se alcanza a ver ni por un instante un canal con el logo roto mientras se comprueba.
+    // Revisa en paralelo (todas las URLs a la vez, no una por una) si cada logo carga bien,
+    // ANTES de mostrar nada — así nunca se alcanza a ver un logo roto ni por un instante.
     LaunchedEffect(candidateChannels) {
         checkFinished = false
-        val imageLoader = coil.Coil.imageLoader(context)
-        val broken = mutableSetOf<String>()
-        candidateChannels.forEach { channel ->
-            val url = channel.logoUrl ?: return@forEach
-            val request = ImageRequest.Builder(context).data(url).build()
-            val result = try { imageLoader.execute(request) } catch (e: Exception) { null }
-            if (result == null || result !is SuccessResult) {
-                broken.add(url)
-            }
+        if (candidateChannels.isEmpty()) {
+            checkFinished = true
+            return@LaunchedEffect
         }
-        brokenLogoUrls = broken
+        val imageLoader = coil.Coil.imageLoader(context)
+        val broken = kotlinx.coroutines.coroutineScope {
+            candidateChannels.map { channel ->
+                kotlinx.coroutines.async {
+                    val url = channel.logoUrl ?: return@async null
+                    val request = ImageRequest.Builder(context).data(url).build()
+                    val result = try { imageLoader.execute(request) } catch (e: Exception) { null }
+                    if (result == null || result !is SuccessResult) url else null
+                }
+            }.mapNotNull { it.await() }
+        }
+        brokenLogoUrls = broken.toSet()
         checkFinished = true
     }
 
