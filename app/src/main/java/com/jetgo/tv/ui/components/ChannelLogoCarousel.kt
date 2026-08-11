@@ -28,8 +28,6 @@ import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.jetgo.tv.data.model.Channel
 import com.jetgo.tv.ui.theme.SurfaceDark
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 
 /**
@@ -43,38 +41,26 @@ fun ChannelLogoCarousel(
     modifier: Modifier = Modifier
 ) {
     // Se descartan canales sin URL de logo, Y TAMBIÉN los que sí tienen una URL guardada pero
-    // esa imagen no logra cargar (un link roto o caído) — así nunca queda un espacio vacío ni
-    // un ícono roto en el carrusel. Es solo decorativo, así que alcanza con revisar un grupo
-    // razonable (no hace falta con miles de canales, y revisarlos uno por uno tardaría demasiado).
+    // esa imagen no logra cargar (un link roto o caído) — así nunca queda un espacio vacío
+    // donde debería verse un logo.
     val context = androidx.compose.ui.platform.LocalContext.current
     var brokenLogoUrls by remember { mutableStateOf(setOf<String>()) }
-    var checkFinished by remember { mutableStateOf(false) }
-    val candidateChannels = remember(channels) {
-        channels.filter { !it.logoUrl.isNullOrBlank() }.distinctBy { it.logoUrl }.take(120)
-    }
+    val candidateChannels = remember(channels) { channels.filter { !it.logoUrl.isNullOrBlank() } }
     val validChannels = candidateChannels.filter { it.logoUrl !in brokenLogoUrls }
 
-    // Revisa en paralelo (todas las URLs a la vez, no una por una) si cada logo carga bien,
-    // ANTES de mostrar nada — así nunca se alcanza a ver un logo roto ni por un instante.
+    // Revisa en segundo plano, una sola vez por cada logo nuevo, si realmente carga bien —
+    // si falla, se agrega a la lista de "rotos" y desaparece del carrusel.
     LaunchedEffect(candidateChannels) {
-        checkFinished = false
-        if (candidateChannels.isEmpty()) {
-            checkFinished = true
-            return@LaunchedEffect
-        }
         val imageLoader = coil.Coil.imageLoader(context)
-        val broken = coroutineScope {
-            candidateChannels.map { channel ->
-                async {
-                    val url = channel.logoUrl ?: return@async null
-                    val request = ImageRequest.Builder(context).data(url).build()
-                    val result = try { imageLoader.execute(request) } catch (e: Exception) { null }
-                    if (result == null || result !is SuccessResult) url else null
-                }
-            }.mapNotNull { it.await() }
+        candidateChannels.forEach { channel ->
+            val url = channel.logoUrl ?: return@forEach
+            if (url in brokenLogoUrls) return@forEach
+            val request = ImageRequest.Builder(context).data(url).build()
+            val result = try { imageLoader.execute(request) } catch (e: Exception) { null }
+            if (result == null || result !is SuccessResult) {
+                brokenLogoUrls = brokenLogoUrls + url
+            }
         }
-        brokenLogoUrls = broken.toSet()
-        checkFinished = true
     }
 
     Box(
@@ -82,7 +68,7 @@ fun ChannelLogoCarousel(
             .clip(RoundedCornerShape(14.dp))
             .background(SurfaceDark.copy(alpha = 0.85f))
     ) {
-        if (checkFinished && validChannels.isNotEmpty()) {
+        if (validChannels.isNotEmpty()) {
             // Se repite la lista varias veces para que el desplazamiento en bucle se vea continuo
             val loopedChannels = remember(validChannels) {
                 List(20) { validChannels }.flatten()

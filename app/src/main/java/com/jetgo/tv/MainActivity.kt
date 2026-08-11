@@ -319,13 +319,9 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
             }
             if (!isFullscreen) {
                 val newestItems = (homeCatalog.movies + homeCatalog.series).shuffled().take(10)
-                val hiddenChannelIds by viewModel.hiddenChannelIds.collectAsState()
-                val visibleLiveChannels = remember(uiState.liveChannels, hiddenChannelIds) {
-                    uiState.liveChannels.filterNot { hiddenChannelIds.contains(it.streamId) }
-                }
                 HomeScreen(
                     playerManager = viewModel.playerManager,
-                    liveChannels = visibleLiveChannels,
+                    liveChannels = uiState.liveChannels,
                     newestItems = newestItems,
                     onItemClick = { item -> viewModel.pausePreviewPlayer(); handleItemSelected(item) },
                     onChannelSelected = { viewModel.playChannel(it) },
@@ -512,7 +508,6 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                 items = continueWatching,
                 onItemClick = handleItemSelected,
                 onRemoveItem = { item -> viewModel.removeFromContinueWatching(item) },
-                onClearAll = { viewModel.clearAllContinueWatching() },
                 onBack = { navController.popBackStack() }
             )
         }

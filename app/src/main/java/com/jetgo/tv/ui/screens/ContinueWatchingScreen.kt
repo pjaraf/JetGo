@@ -47,12 +47,10 @@ fun ContinueWatchingScreen(
     items: List<ContentItem>,
     onItemClick: (ContentItem) -> Unit,
     onRemoveItem: (ContentItem) -> Unit,
-    onClearAll: () -> Unit,
     onBack: () -> Unit
 ) {
     BackHandler { onBack() }
     val firstItemFocusRequester = remember { FocusRequester() }
-    var showConfirmClearAll by remember { mutableStateOf(false) }
     LaunchedEffect(items) {
         if (items.isNotEmpty()) {
             try { firstItemFocusRequester.requestFocus() } catch (e: Exception) { /* ignorar */ }
@@ -62,93 +60,13 @@ fun ContinueWatchingScreen(
     Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) {
         SpaceBackground(modifier = Modifier.fillMaxSize())
 
-        Box(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-            Text(
-                text = "Seguir viendo",
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.CenterStart)
-            )
-
-            if (items.isNotEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.Black.copy(alpha = 0.4f))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = { showConfirmClearAll = true }
-                        )
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
-                ) {
-                    Text(text = "Eliminar todo", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-
-        if (showConfirmClearAll) {
-            Box(
-                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(SurfaceDark)
-                        .padding(24.dp)
-                ) {
-                    androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "¿Vaciar \"Seguir viendo\" por completo?",
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Se van a quitar todas las películas y series de esta lista.",
-                            color = Color.Gray,
-                            fontSize = 13.sp,
-                            modifier = Modifier.padding(top = 6.dp, bottom = 18.dp)
-                        )
-                        androidx.compose.foundation.layout.Row {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color.White.copy(alpha = 0.12f))
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                        onClick = { showConfirmClearAll = false }
-                                    )
-                                    .padding(horizontal = 20.dp, vertical = 12.dp)
-                            ) {
-                                Text(text = "Cancelar", color = Color.White, fontSize = 14.sp)
-                            }
-                            androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(12.dp))
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(FocusOrange)
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                        onClick = {
-                                            showConfirmClearAll = false
-                                            onClearAll()
-                                        }
-                                    )
-                                    .padding(horizontal = 20.dp, vertical = 12.dp)
-                            ) {
-                                Text(text = "Eliminar todo", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        Text(
+            text = "Seguir viendo",
+            color = Color.White,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(24.dp)
+        )
 
         if (items.isEmpty()) {
             Text(
