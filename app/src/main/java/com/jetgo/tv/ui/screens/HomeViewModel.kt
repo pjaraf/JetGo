@@ -988,10 +988,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     val items = when (type) {
                         ContentType.MOVIE, ContentType.ANIME, ContentType.SPECIAL -> repository.getMovies(config, realCategoryId).map {
-                            ContentItem("$sourceIndex::${it.streamId}", it.name, it.coverUrl, type, it.streamUrl, rating = it.rating)
+                            ContentItem(it.streamId, it.name, it.coverUrl, type, it.streamUrl, rating = it.rating)
                         }
                         ContentType.SERIES -> repository.getSeries(config, realCategoryId).map {
-                            ContentItem("$sourceIndex::${it.seriesId}", it.name, it.coverUrl, ContentType.SERIES, null, rating = it.rating)
+                            ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null, rating = it.rating)
                         }
                         ContentType.LIVE -> emptyList()
                     }
@@ -1233,14 +1233,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
             refreshContinueWatching()
         }
-        val (config, realId) = resolveConfigForItem(item.id)
-        val resolvedConfig = config ?: run {
+        val config = currentConfig ?: run {
             _seriesDetailState.value = SeriesDetailUiState(isLoading = true)
             return
         }
         viewModelScope.launch {
             val detail = try {
-                repository.getSeriesDetail(resolvedConfig, realId, item.name, item.imageUrl)
+                repository.getSeriesDetail(config, item.id, item.name, item.imageUrl)
             } catch (e: Exception) { null }
 
             if (detail == null) {
@@ -1375,22 +1374,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     // ---------------------------------------------------------------------
 
     /** Carga la ficha completa de la película y empieza a reproducirla automáticamente */
-    /** Para un ítem de película/serie: si su ID trae el prefijo "<índice>::<id real>" (viene de
-     *  una fuente combinada), devuelve el servidor correcto de esa fuente puntual y el ID real
-     *  sin el prefijo. Si no trae prefijo (código de un solo servidor), usa el servidor normal. */
-    private fun resolveConfigForItem(itemId: String): Pair<ServerConfig?, String> {
-        val sourceIndex = itemId.substringBefore("::", "").toIntOrNull()
-        if (sourceIndex != null && currentSources.size > 1) {
-            val realId = itemId.substringAfter("::", itemId)
-            val source = currentSources.getOrNull(sourceIndex)
-            val config = if (source != null && !source.host.isNullOrBlank() && !source.username.isNullOrBlank() && !source.password.isNullOrBlank()) {
-                ServerConfig(source.host, source.username, source.password)
-            } else null
-            return Pair(config, realId)
-        }
-        return Pair(currentConfig, itemId)
-    }
-
     fun loadMovieDetail(item: ContentItem) {
         _movieDetailState.value = MovieDetailUiState(isLoading = true)
         viewModelScope.launch {
@@ -1399,8 +1382,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
             refreshContinueWatching()
         }
-        val (config, realId) = resolveConfigForItem(item.id)
-        val resolvedConfig = config ?: run {
+        val config = currentConfig ?: run {
             _movieDetailState.value = MovieDetailUiState(isLoading = true)
             return
         }
@@ -1408,7 +1390,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             var debugDetail: String? = null
             val detail = try {
-                repository.getMovieDetail(resolvedConfig, realId, item.name, item.imageUrl, fallbackStreamUrl)
+                repository.getMovieDetail(config, item.id, item.name, item.imageUrl, fallbackStreamUrl)
             } catch (e: Exception) {
                 debugDetail = "${e.javaClass.simpleName}: ${e.message}"
                 null
