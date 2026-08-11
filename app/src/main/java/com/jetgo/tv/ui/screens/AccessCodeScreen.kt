@@ -2,8 +2,6 @@ package com.jetgo.tv.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -27,7 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -109,30 +105,19 @@ fun AccessCodeScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 Text("Verificando...", color = Color.Gray, fontSize = 13.sp)
             } else {
-                // ---- Teclado numérico ----
-                val rows = listOf(
-                    listOf("1", "2", "3"),
-                    listOf("4", "5", "6"),
-                    listOf("7", "8", "9"),
-                    listOf("borrar", "0", "")
+                // ---- Campo de texto, igual estilo que el PIN de control parental ----
+                androidx.compose.material3.OutlinedTextField(
+                    value = code,
+                    onValueChange = { input ->
+                        if (input.length <= 6 && input.all { it.isDigit() }) code = input
+                    },
+                    placeholder = { Text("Código de 6 dígitos") },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
+                    ),
+                    singleLine = true,
+                    modifier = Modifier.width(260.dp)
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    rows.forEach { row ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            row.forEach { key ->
-                                when {
-                                    key == "borrar" -> NumpadKey(label = "⌫") {
-                                        if (code.isNotEmpty()) code = code.dropLast(1)
-                                    }
-                                    key.isBlank() -> Spacer(modifier = Modifier.size(60.dp))
-                                    else -> NumpadKey(label = key) {
-                                        if (code.length < 6) code += key
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
             }
 
             errorMessage?.let {
@@ -144,22 +129,5 @@ fun AccessCodeScreen(
             }
         }
         }
-    }
-}
-
-@Composable
-private fun NumpadKey(label: String, onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-    Box(
-        modifier = Modifier
-            .size(60.dp)
-            .clip(CircleShape)
-            .background(if (focused) FocusOrange else SurfaceDark)
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(label, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
     }
 }
