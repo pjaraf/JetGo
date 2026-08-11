@@ -1562,6 +1562,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Vacía por completo "Seguir viendo" (el botón de "Eliminar todo") */
+    fun clearAllContinueWatching() {
+        viewModelScope.launch {
+            watchHistoryStore.clear()
+            refreshContinueWatching()
+        }
+    }
+
     // ---------------------------------------------------------------------
     // Búsqueda automática de carátulas faltantes (TMDB)
     // ---------------------------------------------------------------------

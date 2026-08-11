@@ -512,6 +512,7 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                 items = continueWatching,
                 onItemClick = handleItemSelected,
                 onRemoveItem = { item -> viewModel.removeFromContinueWatching(item) },
+                onClearAll = { viewModel.clearAllContinueWatching() },
                 onBack = { navController.popBackStack() }
             )
         }

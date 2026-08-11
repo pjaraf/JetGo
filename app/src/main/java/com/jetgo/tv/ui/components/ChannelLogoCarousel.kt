@@ -28,6 +28,8 @@ import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.jetgo.tv.data.model.Channel
 import com.jetgo.tv.ui.theme.SurfaceDark
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 
 /**
@@ -61,9 +63,9 @@ fun ChannelLogoCarousel(
             return@LaunchedEffect
         }
         val imageLoader = coil.Coil.imageLoader(context)
-        val broken = kotlinx.coroutines.coroutineScope {
+        val broken = coroutineScope {
             candidateChannels.map { channel ->
-                kotlinx.coroutines.async {
+                async {
                     val url = channel.logoUrl ?: return@async null
                     val request = ImageRequest.Builder(context).data(url).build()
                     val result = try { imageLoader.execute(request) } catch (e: Exception) { null }
