@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -106,18 +107,27 @@ fun AccessCodeScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 Text("Verificando...", color = Color.Gray, fontSize = 13.sp)
             } else {
-                // ---- Campo de texto, igual estilo que el PIN de control parental ----
-                androidx.compose.material3.OutlinedTextField(
+                // ---- Campo de texto invisible: solo se ven los 6 recuadros de arriba, y el
+                // teclado numérico flotante del control remoto/sistema aparece solo (gracias al
+                // foco automático), sin mostrar ningún cuadro de texto de por medio. ----
+                val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+                LaunchedEffect(Unit) {
+                    try { focusRequester.requestFocus() } catch (e: Exception) { /* ignorar */ }
+                }
+                androidx.compose.foundation.text.BasicTextField(
                     value = code,
                     onValueChange = { input ->
                         if (input.length <= 6 && input.all { it.isDigit() }) code = input
                     },
-                    placeholder = { Text("Código de 6 dígitos") },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword
                     ),
                     singleLine = true,
-                    modifier = Modifier.width(260.dp)
+                    textStyle = androidx.compose.ui.text.TextStyle(color = Color.Transparent, fontSize = 1.sp),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.Transparent),
+                    modifier = Modifier
+                        .size(1.dp)
+                        .focusRequester(focusRequester)
                 )
             }
 
