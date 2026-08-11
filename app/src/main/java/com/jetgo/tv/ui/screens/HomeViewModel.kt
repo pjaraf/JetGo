@@ -549,49 +549,55 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             result.hiddenTypes.map { it.trim().lowercase() }.toSet()
         )
 
-        viewModelScope.launch {
-            // Por cada fuente combinada, se consulta EN VIVO contra Firestore qué tiene oculto
-            // AHORA MISMO (si tiene un servidor guardado) — así, si el administrador oculta o
-            // reactiva algo, se aplica de inmediato a todos los clientes que usan ese servidor,
-            // y no solo a los códigos que se generen después de ese cambio.
-            val perSourceConfigs = sources.map { source ->
-                if (source.serverId != null) {
-                    try {
-                        withContext(Dispatchers.IO) {
-                            val context = getApplication<Application>()
-                            val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
-                            val live = AccessCodeChecker.fetchServerLiveConfig(projectId, source.serverId)
-                            Pair(
-                                live.hiddenCategories.map { it.trim().lowercase() }.toSet(),
-                                live.hiddenTypes.map { it.trim().lowercase() }.toSet()
-                            )
+        // Valor de partida inmediato (del código, sin esperar Firestore) — así "currentConfig"
+        // queda listo YA, y el cliente no ve "sin configuración de servidor" si toca Películas
+        // o Series apenas entra, mientras la consulta en vivo de categorías ocultas (más abajo)
+        // todavía no termina.
+        sourceHiddenConfigs = sources.map { fallbackConfig }
+        _hiddenTypes.value = fallbackConfig.second
+        hiddenCategoryNames = fallbackConfig.first
+
+        if (sources.size > 1) {
+            connectMultiSource(sources, silent = silent)
+        } else if (result.mode == "m3u" && !result.m3uUrl.isNullOrBlank()) {
+            connectM3u(result.m3uUrl, silent = silent)
+        } else if (!result.host.isNullOrBlank() && !result.username.isNullOrBlank() && !result.password.isNullOrBlank()) {
+            connectXtream(ServerConfig(result.host, result.username, result.password), silent = silent)
+        }
+        // Si el código es válido pero el administrador no cargó credenciales todavía,
+        // simplemente no se auto-conecta nada (uiState.isConfigured queda en false).
+
+        // Por cada fuente combinada, se consulta EN VIVO contra Firestore qué tiene oculto
+        // AHORA MISMO (si tiene un servidor guardado) — esto corre EN PARALELO, sin retrasar
+        // la conexión real — así, si el administrador oculta o reactiva algo, se aplica de
+        // inmediato a todos los clientes que usan ese servidor.
+        val serverIds = sources.mapNotNull { it.serverId }
+        if (serverIds.isNotEmpty()) {
+            viewModelScope.launch {
+                val perSourceConfigs = sources.map { source ->
+                    if (source.serverId != null) {
+                        try {
+                            withContext(Dispatchers.IO) {
+                                val context = getApplication<Application>()
+                                val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
+                                val live = AccessCodeChecker.fetchServerLiveConfig(projectId, source.serverId)
+                                Pair(
+                                    live.hiddenCategories.map { it.trim().lowercase() }.toSet(),
+                                    live.hiddenTypes.map { it.trim().lowercase() }.toSet()
+                                )
+                            }
+                        } catch (e: Exception) {
+                            fallbackConfig
                         }
-                    } catch (e: Exception) {
+                    } else {
                         fallbackConfig
                     }
-                } else {
-                    fallbackConfig
                 }
+                sourceHiddenConfigs = perSourceConfigs
+                _hiddenTypes.value = if (perSourceConfigs.isEmpty()) emptySet()
+                    else perSourceConfigs.map { it.second }.reduce { a, b -> a.intersect(b) }
+                hiddenCategoryNames = perSourceConfigs.flatMap { it.first }.toSet()
             }
-            sourceHiddenConfigs = perSourceConfigs
-
-            // Un botón (Vivo/Película/Serie) solo se oculta si TODAS las fuentes combinadas lo
-            // ocultan — si una sola fuente lo permite, el botón se queda, y más adelante se
-            // filtra solo el contenido de la fuente que sí lo tiene oculto.
-            _hiddenTypes.value = if (perSourceConfigs.isEmpty()) emptySet()
-                else perSourceConfigs.map { it.second }.reduce { a, b -> a.intersect(b) }
-            // Para el modo M3U simple (una sola fuente), esto sigue funcionando igual que antes.
-            hiddenCategoryNames = perSourceConfigs.flatMap { it.first }.toSet()
-
-            if (sources.size > 1) {
-                connectMultiSource(sources, silent = silent)
-            } else if (result.mode == "m3u" && !result.m3uUrl.isNullOrBlank()) {
-                connectM3u(result.m3uUrl, silent = silent)
-            } else if (!result.host.isNullOrBlank() && !result.username.isNullOrBlank() && !result.password.isNullOrBlank()) {
-                connectXtream(ServerConfig(result.host, result.username, result.password), silent = silent)
-            }
-            // Si el código es válido pero el administrador no cargó credenciales todavía,
-            // simplemente no se auto-conecta nada (uiState.isConfigured queda en false).
         }
     }
 
@@ -897,12 +903,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     allCategories.filterNot { AdultContentFilter.isAdult(it.name) }
                 } else allCategories
                 _categoryPickerState.value = CategoryPickerUiState(categories = filtered)
+                if (type != ContentType.LIVE && filtered.isNotEmpty()) {
+                    loadCategoryContent(type, filtered.first().id)
+                }
             }
             return
         }
 
         val config = currentConfig ?: run {
-            _categoryPickerState.value = CategoryPickerUiState(errorMessage = "Sin configuración de servidor")
+            _categoryPickerState.value = CategoryPickerUiState(isLoading = true)
             return
         }
 
@@ -926,12 +935,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 _categoryPickerState.value = CategoryPickerUiState(categories = filtered)
 
-                // Para Vivo: siempre se queda mostrando la categoría que quedó por defecto
-                // (la última elegida), y no la primera de la lista cada vez.
+                // Siempre se muestra contenido de una vez: en Vivo, la categoría que quedó
+                // por defecto (la última elegida); en película/serie/anime/especial, la
+                // primera de la lista — así el cliente ve carátulas apenas entra, sin tener
+                // que elegir una categoría a mano primero.
                 if (type == ContentType.LIVE && filtered.isNotEmpty()) {
                     val target = _phoneLiveCategoryId.value?.takeIf { id -> filtered.any { it.id == id } }
                         ?: filtered.first().id
                     loadCategoryContent(ContentType.LIVE, target)
+                } else if (type != ContentType.LIVE && filtered.isNotEmpty()) {
+                    loadCategoryContent(type, filtered.first().id)
                 }
             } catch (e: Exception) {
                 _categoryPickerState.value = CategoryPickerUiState(errorMessage = "Error al cargar categorías: ${e.message}")
@@ -995,7 +1008,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val config = currentConfig ?: run {
-            _categoryContentState.value = CategoryContentUiState(errorMessage = "Sin configuración de servidor")
+            _categoryContentState.value = CategoryContentUiState(isLoading = true)
             return
         }
 
@@ -1221,7 +1234,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             refreshContinueWatching()
         }
         val config = currentConfig ?: run {
-            _seriesDetailState.value = SeriesDetailUiState(errorMessage = "Sin configuración de servidor")
+            _seriesDetailState.value = SeriesDetailUiState(isLoading = true)
             return
         }
         viewModelScope.launch {
@@ -1370,7 +1383,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             refreshContinueWatching()
         }
         val config = currentConfig ?: run {
-            _movieDetailState.value = MovieDetailUiState(errorMessage = "Sin configuración de servidor")
+            _movieDetailState.value = MovieDetailUiState(isLoading = true)
             return
         }
         val fallbackStreamUrl = item.streamUrl ?: ""
@@ -1508,7 +1521,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         isSeries: Boolean,
         onUpdated: (List<ContentItem>) -> Unit
     ) {
-        if (!com.jetgo.tv.data.remote.TmdbConfig.isConfigured) return
+        // Desactivado: ya no se buscan carátulas automáticas en TMDB — si una película o serie
+        // no trae carátula propia del servidor, se muestra el logo de la app en su lugar
+        // (ver PosterOrLogo en las pantallas de grilla).
+        return
         val missing = items.filter { it.imageUrl.isNullOrBlank() && it.name.isNotBlank() }
         if (missing.isEmpty()) return
 
