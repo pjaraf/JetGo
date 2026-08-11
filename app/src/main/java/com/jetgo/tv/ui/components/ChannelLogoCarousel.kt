@@ -13,7 +13,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,6 +24,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.request.SuccessResult
 import com.jetgo.tv.data.model.Channel
 import com.jetgo.tv.ui.theme.SurfaceDark
 import kotlinx.coroutines.delay
@@ -35,14 +40,39 @@ fun ChannelLogoCarousel(
     channels: List<Channel>,
     modifier: Modifier = Modifier
 ) {
-    val validChannels = channels.filter { !it.logoUrl.isNullOrBlank() }
+    // Se descartan canales sin URL de logo, Y TAMBIÉN los que sí tienen una URL guardada pero
+    // esa imagen no logra cargar (un link roto o caído) — así nunca queda un espacio vacío ni
+    // un ícono roto en el carrusel.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var brokenLogoUrls by remember { mutableStateOf(setOf<String>()) }
+    var checkFinished by remember { mutableStateOf(false) }
+    val candidateChannels = remember(channels) { channels.filter { !it.logoUrl.isNullOrBlank() } }
+    val validChannels = candidateChannels.filter { it.logoUrl !in brokenLogoUrls }
+
+    // Revisa en segundo plano, ANTES de mostrar nada, si cada logo realmente carga bien — así
+    // nunca se alcanza a ver ni por un instante un canal con el logo roto mientras se comprueba.
+    LaunchedEffect(candidateChannels) {
+        checkFinished = false
+        val imageLoader = coil.Coil.imageLoader(context)
+        val broken = mutableSetOf<String>()
+        candidateChannels.forEach { channel ->
+            val url = channel.logoUrl ?: return@forEach
+            val request = ImageRequest.Builder(context).data(url).build()
+            val result = try { imageLoader.execute(request) } catch (e: Exception) { null }
+            if (result == null || result !is SuccessResult) {
+                broken.add(url)
+            }
+        }
+        brokenLogoUrls = broken
+        checkFinished = true
+    }
 
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
             .background(SurfaceDark.copy(alpha = 0.85f))
     ) {
-        if (validChannels.isNotEmpty()) {
+        if (checkFinished && validChannels.isNotEmpty()) {
             // Se repite la lista varias veces para que el desplazamiento en bucle se vea continuo
             val loopedChannels = remember(validChannels) {
                 List(20) { validChannels }.flatten()
