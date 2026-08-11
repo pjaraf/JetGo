@@ -49,6 +49,19 @@ class PlayerManager(context: Context) {
     private val _playbackError = mutableStateOf<String?>(null)
     val playbackError: State<String?> get() = _playbackError
 
+    /** Texto técnico del estado actual del reproductor (para diagnóstico en pantalla, sin
+     *  necesitar ADB) — se puede mostrar chico en una esquina para sacarle una foto. */
+    private val _debugState = mutableStateOf<String>("")
+    val debugState: State<String> get() = _debugState
+
+    private fun stateName(state: Int) = when (state) {
+        Player.STATE_IDLE -> "IDLE"
+        Player.STATE_BUFFERING -> "BUFFERING"
+        Player.STATE_READY -> "READY"
+        Player.STATE_ENDED -> "ENDED"
+        else -> "?"
+    }
+
     private var retryCount = 0
     private var bufferingReconnectCount = 0
     private var lastUrl: String? = null
@@ -70,6 +83,8 @@ class PlayerManager(context: Context) {
             // cliente, para que la interrupción se note lo menos posible.
             if (exoPlayer.playbackState == Player.STATE_BUFFERING && bufferingReconnectCount < 4) {
                 bufferingReconnectCount++
+                val hora = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date())
+                _debugState.value = "[$hora] RECONEXIÓN AUTOMÁTICA #$bufferingReconnectCount (seguía en BUFFERING después de 8s)"
                 val url = lastUrl
                 if (url != null) {
                     try {
@@ -101,6 +116,8 @@ class PlayerManager(context: Context) {
 
         exoPlayer.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
+                val hora = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date())
+                _debugState.value = "[$hora] estado=${stateName(playbackState)} buffer=${exoPlayer.bufferedPosition}ms pos=${exoPlayer.currentPosition}ms reintentos=$retryCount/$bufferingReconnectCount"
                 if (playbackState == Player.STATE_ENDED) {
                     onPlaybackEnded?.invoke()
                 }
@@ -121,6 +138,8 @@ class PlayerManager(context: Context) {
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                val hora = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date())
+                _debugState.value = "[$hora] ERROR: ${error.errorCodeName} — ${error.cause?.javaClass?.simpleName}: ${error.cause?.message ?: error.message}"
                 val url = lastUrl
                 if (url != null && retryCount < 2) {
                     // Reintenta un par de veces solo (cortes momentáneos de red/servidor),

@@ -252,6 +252,21 @@ fun FullscreenPlayerOverlay(
                 )
             }
 
+            // Texto chico de diagnóstico técnico — para sacarle una foto si un canal se
+            // congela y así detectar la causa real sin necesitar computadora ni ADB.
+            val debugState = playerManager.debugState.value
+            if (debugState.isNotBlank()) {
+                Text(
+                    text = debugState,
+                    color = Color.Yellow,
+                    fontSize = 10.sp,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .background(Color.Black.copy(alpha = 0.6f))
+                        .padding(4.dp)
+                )
+            }
+
             LiveZapPanel(
                 mode = zapMode,
                 categories = liveCategories,
