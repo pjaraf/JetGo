@@ -1074,7 +1074,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val url = repository.getFirstEpisodeUrl(config, item.id)
             if (url != null) {
-                playerManager.playChannel(url, item.name)
+                playerManager.playChannel(url, item.name, isLive = false)
             }
             onReady()
         }
@@ -1297,7 +1297,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val episode = currentEpisode(episodeId) ?: return
         val seriesId = _seriesDetailState.value.detail?.seriesId
         val seriesDetail = _seriesDetailState.value.detail
-        playerManager.playChannel(episode.streamUrl, "${_seriesDetailState.value.detail?.name} · ${episode.title}")
+        playerManager.playChannel(episode.streamUrl, "${_seriesDetailState.value.detail?.name} · ${episode.title}", isLive = false)
 
         // Igual que en películas: si el servidor no informó la extensión real del archivo,
         // se prueban automáticamente otras extensiones comunes (mp4/ts/avi/m3u8) si la
@@ -1468,7 +1468,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             if (hasMeaningfulProgress && saved != null) {
                 _resumePrompt.value = ResumePrompt(contentKey, title, streamUrl, saved.positionMs, onCompleted)
             } else {
-                playerManager.playChannel(streamUrl, title)
+                playerManager.playChannel(streamUrl, title, isLive = false)
                 startPositionTracking(contentKey, onCompleted)
             }
         }
@@ -1476,7 +1476,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun resumeFromPrompt() {
         val prompt = _resumePrompt.value ?: return
-        playerManager.playChannel(prompt.streamUrl, prompt.title)
+        playerManager.playChannel(prompt.streamUrl, prompt.title, isLive = false)
         startPositionTracking(prompt.contentKey, prompt.onCompleted)
         viewModelScope.launch {
             kotlinx.coroutines.delay(500) // deja que el reproductor prepare el contenido antes de saltar
@@ -1487,7 +1487,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startOverFromPrompt() {
         val prompt = _resumePrompt.value ?: return
-        playerManager.playChannel(prompt.streamUrl, prompt.title)
+        playerManager.playChannel(prompt.streamUrl, prompt.title, isLive = false)
         startPositionTracking(prompt.contentKey, prompt.onCompleted)
         _resumePrompt.value = null
     }

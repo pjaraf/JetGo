@@ -37,10 +37,17 @@ class PlayerManager(context: Context) {
      *  uno por software), se prueba primero ese; el problemático queda como último recurso.
      */
     private class MtkAwareRenderersFactory(context: Context) : androidx.media3.exoplayer.DefaultRenderersFactory(context) {
+        /** Se activa solo mientras se reproduce Película/Serie — Vivo nunca pasa por acá. */
+        var avoidMtkDecoder: Boolean = false
+
         private val safeSelector = androidx.media3.exoplayer.mediacodec.MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
             val decoders = androidx.media3.exoplayer.mediacodec.MediaCodecSelector.DEFAULT
                 .getDecoderInfos(mimeType, requiresSecureDecoder, requiresTunnelingDecoder)
-            decoders.sortedBy { if (it.name == "c2.mtk.avc.decoder") 1 else 0 }
+            if (avoidMtkDecoder) {
+                decoders.sortedBy { if (it.name == "c2.mtk.avc.decoder") 1 else 0 }
+            } else {
+                decoders
+            }
         }
 
         override fun buildVideoRenderers(
@@ -60,9 +67,17 @@ class PlayerManager(context: Context) {
         }
     }
 
+    private val renderersFactory = MtkAwareRenderersFactory(context)
+
+    /** Cambia si se evita el decodificador MTK problemático — solo se activa para
+     *  Película/Serie, nunca para Vivo (se controla desde playChannel). */
+    private var avoidMtkDecoder: Boolean
+        get() = renderersFactory.avoidMtkDecoder
+        set(value) { renderersFactory.avoidMtkDecoder = value }
+
     val exoPlayer: ExoPlayer = ExoPlayer.Builder(
         context,
-        MtkAwareRenderersFactory(context)
+        renderersFactory
             // Si el decodificador de hardware del dispositivo no soporta el formato de una
             // película/serie puntual (algo común en TV Box con chips más débiles o viejos),
             // reintenta automáticamente con un decodificador alternativo en vez de fallar
@@ -228,7 +243,7 @@ class PlayerManager(context: Context) {
 
     private var currentUrl: String? = null
 
-    fun playChannel(url: String, name: String) {
+    fun playChannel(url: String, name: String, isLive: Boolean = true) {
         if (url == currentUrl && exoPlayer.playbackState != Player.STATE_IDLE && exoPlayer.playbackState != Player.STATE_ENDED) {
             // Ya está reproduciendo justo esta URL: no la recarga de nuevo
             exoPlayer.playWhenReady = true
@@ -241,6 +256,9 @@ class PlayerManager(context: Context) {
         _playbackError.value = null
         _videoQuality.value = null
         cancelBufferingTimeout()
+        // El ajuste que evita el decodificador MTK problemático (c2.mtk.avc.decoder) solo se
+        // aplica en Películas/Series — Vivo sigue exactamente igual que antes de ese cambio.
+        avoidMtkDecoder = !isLive
 
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
@@ -257,7 +275,7 @@ class PlayerManager(context: Context) {
         val mediaSource = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(httpDataSourceFactory)
             .createMediaSource(mediaItem)
 
-        _stats.value = _stats.value.copy(channelName = name, isLive = true)
+        _stats.value = _stats.value.copy(channelName = name, isLive = isLive)
         // Se limpia por completo el reproductor (no solo "detenido") antes de cargar lo nuevo:
         // si solo se detiene, puede quedar algo del canal anterior a medio camino, y cambiar
         // rápido entre canales (sobre todo volviendo al mismo de hace un momento) se queda con
