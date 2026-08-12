@@ -1298,6 +1298,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val seriesId = _seriesDetailState.value.detail?.seriesId
         val seriesDetail = _seriesDetailState.value.detail
         playerManager.playChannel(episode.streamUrl, "${_seriesDetailState.value.detail?.name} · ${episode.title}")
+
+        // Igual que en películas: si el servidor no informó la extensión real del archivo,
+        // se prueban automáticamente otras extensiones comunes (mp4/ts/avi/m3u8) si la
+        // primera falla — antes esto solo pasaba con películas, no con capítulos de series.
+        pendingAlternateUrls = episode.alternateStreamUrls
+        pendingContentKey = "series:$episodeId"
+        pendingTitle = "${seriesDetail?.name} · ${episode.title}"
+
         startPositionTracking("series:$episodeId", onCompleted = {
             seriesId?.let { id ->
                 viewModelScope.launch {
@@ -1307,6 +1315,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         })
+        pendingOnCompleted = {
+            seriesId?.let { id ->
+                viewModelScope.launch {
+                    watchHistoryStore.remove(id, "SERIES")
+                    refreshContinueWatching()
+                    lastPlayingStore.clear()
+                }
+            }
+        }
         if (seriesId != null && seriesDetail != null) {
             viewModelScope.launch {
                 lastPlayingStore.save(seriesId, "SERIES", seriesDetail.name, seriesDetail.coverUrl)

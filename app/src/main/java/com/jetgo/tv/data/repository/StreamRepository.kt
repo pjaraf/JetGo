@@ -176,6 +176,12 @@ class StreamRepository {
                 val seasonNum = seasonKey.toIntOrNull() ?: return@mapNotNull null
                 val mapped = episodes.mapNotNull { ep ->
                     val epIdInt = ep.id.toIntOrNull() ?: return@mapNotNull null
+                    val realExtension = ep.containerExtension?.takeIf { it.isNotBlank() }
+                    val alternates = if (realExtension == null) {
+                        listOf("mp4", "ts", "avi", "m3u8").map { ext ->
+                            XtreamApi.seriesStreamUrl(config.host, config.username, config.password, epIdInt, ext)
+                        }
+                    } else emptyList()
                     SeriesEpisode(
                         id = ep.id,
                         title = ep.title?.takeIf { it.isNotBlank() } ?: "Episodio ${ep.episodeNum ?: 0}",
@@ -183,8 +189,9 @@ class StreamRepository {
                         season = seasonNum,
                         streamUrl = XtreamApi.seriesStreamUrl(
                             config.host, config.username, config.password,
-                            epIdInt, ep.containerExtension?.takeIf { it.isNotBlank() } ?: "mkv"
-                        )
+                            epIdInt, realExtension ?: "mkv"
+                        ),
+                        alternateStreamUrls = alternates
                     )
                 }.sortedBy { it.episodeNum }
                 seasonNum to mapped
