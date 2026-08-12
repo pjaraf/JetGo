@@ -29,7 +29,23 @@ data class TrackOption(
  */
 class PlayerManager(context: Context) {
 
-    val exoPlayer: ExoPlayer = ExoPlayer.Builder(context).build()
+    val exoPlayer: ExoPlayer = ExoPlayer.Builder(
+        context,
+        androidx.media3.exoplayer.DefaultRenderersFactory(context)
+            // Si el decodificador de hardware del dispositivo no soporta el formato de una
+            // película/serie puntual (algo común en TV Box con chips más débiles o viejos),
+            // reintenta automáticamente con un decodificador por software en vez de fallar
+            // directo — esto es lo que suele causar que "funcione en unos equipos y en otros
+            // no" para el mismo contenido exacto.
+            .setEnableDecoderFallback(true)
+    ).setTrackSelector(
+        androidx.media3.exoplayer.trackselection.DefaultTrackSelector(context).apply {
+            // Deja probar un formato aunque exceda un poco lo que el chip "dice" soportar
+            // oficialmente, en vez de descartarlo de entrada — varios TV Box reportan sus
+            // límites de forma más conservadora de lo que en la práctica pueden reproducir.
+            parameters = buildUponParameters().setExceedRendererCapabilitiesIfNecessary(true).build()
+        }
+    ).build()
 
     private val _stats = mutableStateOf(PlaybackStats())
     val stats: State<PlaybackStats> get() = _stats
