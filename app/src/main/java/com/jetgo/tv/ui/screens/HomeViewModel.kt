@@ -1074,7 +1074,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val url = repository.getFirstEpisodeUrl(config, item.id)
             if (url != null) {
-                playerManager.playChannel(url, item.name, isLive = false)
+                playerManager.playChannel(url, item.name)
             }
             onReady()
         }
@@ -1297,15 +1297,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val episode = currentEpisode(episodeId) ?: return
         val seriesId = _seriesDetailState.value.detail?.seriesId
         val seriesDetail = _seriesDetailState.value.detail
-        playerManager.playChannel(episode.streamUrl, "${_seriesDetailState.value.detail?.name} · ${episode.title}", isLive = false)
-
-        // Igual que en películas: si el servidor no informó la extensión real del archivo,
-        // se prueban automáticamente otras extensiones comunes (mp4/ts/avi/m3u8) si la
-        // primera falla — antes esto solo pasaba con películas, no con capítulos de series.
-        pendingAlternateUrls = episode.alternateStreamUrls
-        pendingContentKey = "series:$episodeId"
-        pendingTitle = "${seriesDetail?.name} · ${episode.title}"
-
+        playerManager.playChannel(episode.streamUrl, "${_seriesDetailState.value.detail?.name} · ${episode.title}")
         startPositionTracking("series:$episodeId", onCompleted = {
             seriesId?.let { id ->
                 viewModelScope.launch {
@@ -1315,15 +1307,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         })
-        pendingOnCompleted = {
-            seriesId?.let { id ->
-                viewModelScope.launch {
-                    watchHistoryStore.remove(id, "SERIES")
-                    refreshContinueWatching()
-                    lastPlayingStore.clear()
-                }
-            }
-        }
         if (seriesId != null && seriesDetail != null) {
             viewModelScope.launch {
                 lastPlayingStore.save(seriesId, "SERIES", seriesDetail.name, seriesDetail.coverUrl)
@@ -1468,7 +1451,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             if (hasMeaningfulProgress && saved != null) {
                 _resumePrompt.value = ResumePrompt(contentKey, title, streamUrl, saved.positionMs, onCompleted)
             } else {
-                playerManager.playChannel(streamUrl, title, isLive = false)
+                playerManager.playChannel(streamUrl, title)
                 startPositionTracking(contentKey, onCompleted)
             }
         }
@@ -1476,7 +1459,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun resumeFromPrompt() {
         val prompt = _resumePrompt.value ?: return
-        playerManager.playChannel(prompt.streamUrl, prompt.title, isLive = false)
+        playerManager.playChannel(prompt.streamUrl, prompt.title)
         startPositionTracking(prompt.contentKey, prompt.onCompleted)
         viewModelScope.launch {
             kotlinx.coroutines.delay(500) // deja que el reproductor prepare el contenido antes de saltar
@@ -1487,7 +1470,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startOverFromPrompt() {
         val prompt = _resumePrompt.value ?: return
-        playerManager.playChannel(prompt.streamUrl, prompt.title, isLive = false)
+        playerManager.playChannel(prompt.streamUrl, prompt.title)
         startPositionTracking(prompt.contentKey, prompt.onCompleted)
         _resumePrompt.value = null
     }

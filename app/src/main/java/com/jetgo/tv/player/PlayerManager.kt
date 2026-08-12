@@ -29,73 +29,7 @@ data class TrackOption(
  */
 class PlayerManager(context: Context) {
 
-    /** Fábrica de decodificadores que evita usar como PRIMERA opción el decodificador
-     *  "c2.mtk.avc.decoder" (falla conocida en chips MediaTek, como en TV con Google TV
-     *  de la marca TCL) — SOLO se activa para Película/Serie, nunca para Vivo. La bandera es
-     *  @Volatile porque se escribe desde el hilo principal (al elegir qué reproducir) y se lee
-     *  desde el hilo interno del reproductor — sin esto, esa lectura/escritura cruzada entre
-     *  hilos puede fallar de forma intermitente.
-     */
-    private class MtkAwareRenderersFactory(context: Context) : androidx.media3.exoplayer.DefaultRenderersFactory(context) {
-        @Volatile
-        var avoidMtkDecoder: Boolean = false
-
-        private val safeSelector = androidx.media3.exoplayer.mediacodec.MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
-            val decoders = try {
-                androidx.media3.exoplayer.mediacodec.MediaCodecSelector.DEFAULT
-                    .getDecoderInfos(mimeType, requiresSecureDecoder, requiresTunnelingDecoder)
-            } catch (e: Exception) {
-                emptyList()
-            }
-            if (avoidMtkDecoder && decoders.size > 1) {
-                // Antes solo se postergaba como última opción — pero un decodificador que
-                // se cae puede hacerlo a nivel del propio chip, algo que ninguna protección
-                // de la app puede atrapar. Ahora se excluye directamente, y solo se usa como
-                // respaldo si de verdad no hay ningún otro decodificador para este formato.
-                val sinElProblematico = decoders.filterNot { it.name == "c2.mtk.avc.decoder" }
-                if (sinElProblematico.isNotEmpty()) sinElProblematico else decoders
-            } else {
-                decoders
-            }
-        }
-
-        override fun buildVideoRenderers(
-            context: Context,
-            extensionRendererMode: Int,
-            mediaCodecSelector: androidx.media3.exoplayer.mediacodec.MediaCodecSelector,
-            enableDecoderFallback: Boolean,
-            eventHandler: android.os.Handler,
-            eventListener: androidx.media3.exoplayer.video.VideoRendererEventListener,
-            allowedVideoJoiningTimeMs: Long,
-            out: ArrayList<androidx.media3.exoplayer.Renderer>
-        ) {
-            super.buildVideoRenderers(
-                context, extensionRendererMode, safeSelector, enableDecoderFallback,
-                eventHandler, eventListener, allowedVideoJoiningTimeMs, out
-            )
-        }
-    }
-
-    private val renderersFactory = MtkAwareRenderersFactory(context)
-
-    /** Se activa SOLO mientras se reproduce Película/Serie (lo controla playChannel) —
-     *  Vivo nunca pasa por acá, queda exactamente igual que siempre. */
-    private var avoidMtkDecoder: Boolean
-        get() = renderersFactory.avoidMtkDecoder
-        set(value) { renderersFactory.avoidMtkDecoder = value }
-
-    val exoPlayer: ExoPlayer = ExoPlayer.Builder(
-        context,
-        renderersFactory
-            .setEnableDecoderFallback(true)
-    ).setTrackSelector(
-        androidx.media3.exoplayer.trackselection.DefaultTrackSelector(context).apply {
-            // Deja probar un formato aunque exceda un poco lo que el chip "dice" soportar
-            // oficialmente, en vez de descartarlo de entrada — varios TV Box reportan sus
-            // límites de forma más conservadora de lo que en la práctica pueden reproducir.
-            parameters = buildUponParameters().setExceedRendererCapabilitiesIfNecessary(true).build()
-        }
-    ).build()
+    val exoPlayer: ExoPlayer = ExoPlayer.Builder(context).build()
 
     private val _stats = mutableStateOf(PlaybackStats())
     val stats: State<PlaybackStats> get() = _stats
@@ -114,25 +48,6 @@ class PlayerManager(context: Context) {
      *  se perdía en silencio y solo se veía una pantalla negra sin ninguna explicación. */
     private val _playbackError = mutableStateOf<String?>(null)
     val playbackError: State<String?> get() = _playbackError
-
-    /** Texto técnico del estado actual del reproductor (para diagnóstico en pantalla, sin
-     *  necesitar ADB) — se puede mostrar chico en una esquina para sacarle una foto o copiarlo. */
-    private val _debugState = mutableStateOf<String>("")
-    val debugState: State<String> get() = _debugState
-
-    private var lastErrorText: String? = null
-
-    private fun updateDebugState(stateLine: String) {
-        _debugState.value = if (lastErrorText != null) "$stateLine\n$lastErrorText" else stateLine
-    }
-
-    private fun stateName(state: Int) = when (state) {
-        Player.STATE_IDLE -> "IDLE"
-        Player.STATE_BUFFERING -> "BUFFERING"
-        Player.STATE_READY -> "READY"
-        Player.STATE_ENDED -> "ENDED"
-        else -> "?"
-    }
 
     private var retryCount = 0
     private var bufferingReconnectCount = 0
@@ -155,8 +70,6 @@ class PlayerManager(context: Context) {
             // cliente, para que la interrupción se note lo menos posible.
             if (exoPlayer.playbackState == Player.STATE_BUFFERING && bufferingReconnectCount < 4) {
                 bufferingReconnectCount++
-                val hora = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date())
-                updateDebugState("[$hora] RECONEXIÓN AUTOMÁTICA #$bufferingReconnectCount (seguía en BUFFERING después de 8s)")
                 val url = lastUrl
                 if (url != null) {
                     try {
@@ -188,15 +101,12 @@ class PlayerManager(context: Context) {
 
         exoPlayer.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
-                val hora = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date())
-                updateDebugState("[$hora] estado=${stateName(playbackState)} buffer=${exoPlayer.bufferedPosition}ms pos=${exoPlayer.currentPosition}ms reintentos=$retryCount/$bufferingReconnectCount")
                 if (playbackState == Player.STATE_ENDED) {
                     onPlaybackEnded?.invoke()
                 }
                 if (playbackState == Player.STATE_READY) {
                     // Volvió a andar bien: limpia cualquier error anterior y resetea los reintentos
                     _playbackError.value = null
-                    lastErrorText = null
                     retryCount = 0; bufferingReconnectCount = 0
                     cancelBufferingTimeout()
                 } else if (playbackState == Player.STATE_BUFFERING) {
@@ -211,9 +121,6 @@ class PlayerManager(context: Context) {
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                val hora = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date())
-                lastErrorText = "[$hora] ERROR: ${error.errorCodeName} — ${error.cause?.javaClass?.simpleName}: ${error.cause?.message ?: error.message}"
-                updateDebugState(lastErrorText!!)
                 val url = lastUrl
                 if (url != null && retryCount < 2) {
                     // Reintenta un par de veces solo (cortes momentáneos de red/servidor),
@@ -247,7 +154,7 @@ class PlayerManager(context: Context) {
 
     private var currentUrl: String? = null
 
-    fun playChannel(url: String, name: String, isLive: Boolean = true) {
+    fun playChannel(url: String, name: String) {
         if (url == currentUrl && exoPlayer.playbackState != Player.STATE_IDLE && exoPlayer.playbackState != Player.STATE_ENDED) {
             // Ya está reproduciendo justo esta URL: no la recarga de nuevo
             exoPlayer.playWhenReady = true
@@ -260,48 +167,34 @@ class PlayerManager(context: Context) {
         _playbackError.value = null
         _videoQuality.value = null
         cancelBufferingTimeout()
-        // El ajuste que evita el decodificador MTK problemático solo se aplica en Película/
-        // Serie — Vivo sigue exactamente igual que siempre, sin ningún cambio de por medio.
-        avoidMtkDecoder = !isLive
 
-        // Todo lo que sigue queda protegido: si algo puntual falla acá (un formato raro, un
-        // dato inesperado del servidor, etc.), la app NUNCA se debe cerrar sola — en el peor
-        // caso, simplemente esa película/canal no arranca, pero la app se queda abierta.
-        try {
-            val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-                .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-                .setConnectTimeoutMs(15000)
-                .setReadTimeoutMs(15000)
-                .setAllowCrossProtocolRedirects(true)
+        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+            .setConnectTimeoutMs(15000)
+            .setReadTimeoutMs(15000)
+            .setAllowCrossProtocolRedirects(true)
 
-            val mediaItem = MediaItem.fromUri(url)
+        val mediaItem = MediaItem.fromUri(url)
 
-            // Antes se elegía a mano entre HLS/progresivo mirando si la URL tenía ".m3u8" — pero
-            // las películas/series vienen en formatos variados (.mp4, .mkv, .ts, etc.) que ese
-            // chequeo simple no cubre bien en todos los casos. DefaultMediaSourceFactory detecta
-            // el tipo correcto de forma más confiable, sea cual sea el formato del archivo.
-            val mediaSource = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(httpDataSourceFactory)
-                .createMediaSource(mediaItem)
+        // Antes se elegía a mano entre HLS/progresivo mirando si la URL tenía ".m3u8" — pero
+        // las películas/series vienen en formatos variados (.mp4, .mkv, .ts, etc.) que ese
+        // chequeo simple no cubre bien en todos los casos. DefaultMediaSourceFactory detecta
+        // el tipo correcto de forma más confiable, sea cual sea el formato del archivo.
+        val mediaSource = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(httpDataSourceFactory)
+            .createMediaSource(mediaItem)
 
-            _stats.value = _stats.value.copy(channelName = name, isLive = isLive)
-            // Se limpia por completo el reproductor (no solo "detenido") antes de cargar lo nuevo:
-            // si solo se detiene, puede quedar algo del canal anterior a medio camino, y cambiar
-            // rápido entre canales (sobre todo volviendo al mismo de hace un momento) se queda con
-            // la imagen en negro. Limpiando la cola entera se fuerza a arrancar siempre de cero.
-            exoPlayer.stop()
-            exoPlayer.clearMediaItems()
-            exoPlayer.setMediaSource(mediaSource)
-            exoPlayer.prepare()
-            exoPlayer.playWhenReady = true
-            exoPlayer.play() // explícito además de playWhenReady: en algunos TV Box, solo con
-                              // la marca "listo para reproducir" no alcanza para que arranque solo
-        } catch (e: Exception) {
-            _debugState.value = "[ERROR AL PREPARAR] ${e.javaClass.simpleName}: ${e.message}"
-        } catch (e: Throwable) {
-            // Incluye errores graves (ej. quedarse sin memoria) que normalmente cerrarían
-            // la app entera — mejor mostrar que esa película no arrancó, que perder la app.
-            _debugState.value = "[ERROR GRAVE AL PREPARAR] ${e.javaClass.simpleName}: ${e.message}"
-        }
+        _stats.value = _stats.value.copy(channelName = name, isLive = true)
+        // Se limpia por completo el reproductor (no solo "detenido") antes de cargar lo nuevo:
+        // si solo se detiene, puede quedar algo del canal anterior a medio camino, y cambiar
+        // rápido entre canales (sobre todo volviendo al mismo de hace un momento) se queda con
+        // la imagen en negro. Limpiando la cola entera se fuerza a arrancar siempre de cero.
+        exoPlayer.stop()
+        exoPlayer.clearMediaItems()
+        exoPlayer.setMediaSource(mediaSource)
+        exoPlayer.prepare()
+        exoPlayer.playWhenReady = true
+        exoPlayer.play() // explícito además de playWhenReady: en algunos TV Box, solo con
+                          // la marca "listo para reproducir" no alcanza para que arranque solo
     }
 
     fun release() {

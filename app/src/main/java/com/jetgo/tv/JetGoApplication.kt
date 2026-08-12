@@ -13,32 +13,6 @@ import okhttp3.OkHttpClient
  */
 class JetGoApplication : Application(), ImageLoaderFactory {
 
-    override fun onCreate() {
-        super.onCreate()
-
-        // Red de seguridad general: si ocurre un error que ni siquiera las protecciones
-        // puntuales (ej. dentro del reproductor) alcanzan a cubrir, en vez de que la app se
-        // cierre por completo y el cliente quede afuera, se reinicia sola en la pantalla de
-        // inicio — así el problema puntual no lo deja sin poder usar la app.
-        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            try {
-                val intent = android.content.Intent(this, MainActivity::class.java).apply {
-                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                }
-                val pendingIntent = android.app.PendingIntent.getActivity(
-                    this, 0, intent,
-                    android.app.PendingIntent.FLAG_ONE_SHOT or android.app.PendingIntent.FLAG_IMMUTABLE
-                )
-                val alarmManager = getSystemService(android.content.Context.ALARM_SERVICE) as android.app.AlarmManager
-                alarmManager.set(android.app.AlarmManager.RTC, System.currentTimeMillis() + 500, pendingIntent)
-            } catch (e: Exception) {
-                // Si ni siquiera se pudo programar el reinicio, no hay más nada que hacer acá
-            }
-            android.os.Process.killProcess(android.os.Process.myPid())
-        }
-    }
-
     override fun newImageLoader(): ImageLoader {
         val client = OkHttpClient.Builder()
             .addInterceptor { chain ->

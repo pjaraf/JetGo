@@ -76,10 +76,7 @@ data class SeriesEpisode(
     val title: String,
     val episodeNum: Int,
     val season: Int,
-    val streamUrl: String,
-    /** URLs con extensiones alternativas (mp4/ts/avi/m3u8) a probar si la primera falla —
-     *  solo se llenan cuando el servidor no informó la extensión real del archivo. */
-    val alternateStreamUrls: List<String> = emptyList()
+    val streamUrl: String
 )
 
 data class SeriesDetail(
