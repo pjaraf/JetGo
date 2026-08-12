@@ -318,6 +318,20 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                 viewModel.resumeLastLiveChannelIfNeeded()
             }
             if (!isFullscreen) {
+                // Apretar "atrás" una vez en Inicio avisa que hay que apretarlo de nuevo para
+                // salir — evita que la app se cierre sin querer con un solo apretón.
+                var lastBackPressTime by remember { mutableStateOf(0L) }
+                val context = androidx.compose.ui.platform.LocalContext.current
+                BackHandler {
+                    val now = System.currentTimeMillis()
+                    if (now - lastBackPressTime < 2000) {
+                        (context as? android.app.Activity)?.finishAndRemoveTask()
+                    } else {
+                        lastBackPressTime = now
+                        android.widget.Toast.makeText(context, "Presiona de nuevo para salir", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+
                 val newestItems = (homeCatalog.movies + homeCatalog.series).shuffled().take(10)
                 HomeScreen(
                     playerManager = viewModel.playerManager,

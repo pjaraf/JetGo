@@ -200,23 +200,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val forceCloseApp: StateFlow<Boolean> = _forceCloseApp.asStateFlow()
 
     private fun checkForAutoResume() {
+        // Desactivado a pedido: si la app se cierra, al volver a abrirla debe partir siempre
+        // desde cero, sin ofrecer retomar automáticamente lo que se estaba viendo antes.
         viewModelScope.launch {
-            val last = try { lastPlayingStore.get() } catch (e: Exception) { null } ?: return@launch
-            val minutesAgo = (System.currentTimeMillis() - last.savedAtMs) / 60_000
-            // Solo tiene sentido retomar solo si fue hace POCO (el sistema recién mató la app
-            // a mitad de la película) — si pasó más de media hora, mejor que el usuario elija
-            // desde "Seguir viendo" como siempre, no imponerle algo de hace rato.
-            if (minutesAgo <= 30) {
-                _pendingAutoResume.value = ContentItem(
-                    id = last.itemId,
-                    name = last.name,
-                    imageUrl = last.imageUrl,
-                    type = if (last.itemType == "SERIES") ContentType.SERIES else ContentType.MOVIE,
-                    streamUrl = null
-                )
-            } else {
-                lastPlayingStore.clear()
-            }
+            try { lastPlayingStore.clear() } catch (e: Exception) { /* ignorar */ }
         }
     }
     private val watchHistoryStore = WatchHistoryStore(application)
@@ -995,7 +982,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         }
                         ContentType.LIVE -> emptyList()
                     }
-                    val filteredItems = if (_parentalState.value.enabled) items.filterNot { AdultContentFilter.isAdult(it.name) } else items
+                    val filteredItems = (if (_parentalState.value.enabled) items.filterNot { AdultContentFilter.isAdult(it.name) } else items).distinctBy { it.id }
                     _categoryContentState.value = CategoryContentUiState(items = filteredItems)
                     fillMissingPosters(filteredItems, isSeries = type == ContentType.SERIES) { updated ->
                         _categoryContentState.value = _categoryContentState.value.copy(items = updated)
@@ -1028,10 +1015,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val filteredItems = if (type != ContentType.LIVE && _parentalState.value.enabled) {
                     items.filterNot { AdultContentFilter.isAdult(it.name) }
                 } else items
-                _categoryContentState.value = CategoryContentUiState(items = filteredItems)
+                val dedupedItems = if (type != ContentType.LIVE) filteredItems.distinctBy { it.id } else filteredItems
+                _categoryContentState.value = CategoryContentUiState(items = dedupedItems)
 
                 if (type != ContentType.LIVE) {
-                    fillMissingPosters(filteredItems, isSeries = type == ContentType.SERIES) { updated ->
+                    fillMissingPosters(dedupedItems, isSeries = type == ContentType.SERIES) { updated ->
                         _categoryContentState.value = _categoryContentState.value.copy(items = updated)
                     }
                 }
@@ -1201,9 +1189,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             val parentalOn = _parentalState.value.enabled
-            val cleanMovies = if (parentalOn) movies.filterNot { AdultContentFilter.isAdult(it.name) } else movies
-            val cleanSeries = if (parentalOn) series.filterNot { AdultContentFilter.isAdult(it.name) } else series
-            val cleanAnime = if (parentalOn) anime.filterNot { AdultContentFilter.isAdult(it.name) } else anime
+            val cleanMovies = (if (parentalOn) movies.filterNot { AdultContentFilter.isAdult(it.name) } else movies).distinctBy { it.id }
+            val cleanSeries = (if (parentalOn) series.filterNot { AdultContentFilter.isAdult(it.name) } else series).distinctBy { it.id }
+            val cleanAnime = (if (parentalOn) anime.filterNot { AdultContentFilter.isAdult(it.name) } else anime).distinctBy { it.id }
 
             _homeCatalog.value = HomeCatalogState(isLoading = false, movies = cleanMovies, series = cleanSeries, anime = cleanAnime)
             homeCatalogLoaded = true
