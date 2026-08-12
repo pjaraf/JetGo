@@ -48,7 +48,12 @@ class PlayerManager(context: Context) {
                 emptyList()
             }
             if (avoidMtkDecoder && decoders.size > 1) {
-                decoders.sortedBy { if (it.name == "c2.mtk.avc.decoder") 1 else 0 }
+                // Antes solo se postergaba como última opción — pero un decodificador que
+                // se cae puede hacerlo a nivel del propio chip, algo que ninguna protección
+                // de la app puede atrapar. Ahora se excluye directamente, y solo se usa como
+                // respaldo si de verdad no hay ningún otro decodificador para este formato.
+                val sinElProblematico = decoders.filterNot { it.name == "c2.mtk.avc.decoder" }
+                if (sinElProblematico.isNotEmpty()) sinElProblematico else decoders
             } else {
                 decoders
             }
