@@ -29,60 +29,9 @@ data class TrackOption(
  */
 class PlayerManager(context: Context) {
 
-    /** Fábrica de decodificadores que evita usar como PRIMERA opción el decodificador
-     *  "c2.mtk.avc.decoder" (el decodificador de video H.264 más nuevo de chips MediaTek,
-     *  usado en varios TV Box/TV con Google TV como los TCL) — tiene fallas conocidas con
-     *  ciertos videos que hacen que se caiga la reproducción por completo. Si el dispositivo
-     *  tiene otro decodificador alternativo para el mismo formato (uno más viejo tipo OMX, o
-     *  uno por software), se prueba primero ese; el problemático queda como último recurso.
-     */
-    private class MtkAwareRenderersFactory(context: Context) : androidx.media3.exoplayer.DefaultRenderersFactory(context) {
-        /** Se activa solo mientras se reproduce Película/Serie — Vivo nunca pasa por acá. */
-        var avoidMtkDecoder: Boolean = false
-
-        private val safeSelector = androidx.media3.exoplayer.mediacodec.MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
-            val decoders = androidx.media3.exoplayer.mediacodec.MediaCodecSelector.DEFAULT
-                .getDecoderInfos(mimeType, requiresSecureDecoder, requiresTunnelingDecoder)
-            if (avoidMtkDecoder) {
-                decoders.sortedBy { if (it.name == "c2.mtk.avc.decoder") 1 else 0 }
-            } else {
-                decoders
-            }
-        }
-
-        override fun buildVideoRenderers(
-            context: Context,
-            extensionRendererMode: Int,
-            mediaCodecSelector: androidx.media3.exoplayer.mediacodec.MediaCodecSelector,
-            enableDecoderFallback: Boolean,
-            eventHandler: android.os.Handler,
-            eventListener: androidx.media3.exoplayer.video.VideoRendererEventListener,
-            allowedVideoJoiningTimeMs: Long,
-            out: ArrayList<androidx.media3.exoplayer.Renderer>
-        ) {
-            super.buildVideoRenderers(
-                context, extensionRendererMode, safeSelector, enableDecoderFallback,
-                eventHandler, eventListener, allowedVideoJoiningTimeMs, out
-            )
-        }
-    }
-
-    private val renderersFactory = MtkAwareRenderersFactory(context)
-
-    /** Cambia si se evita el decodificador MTK problemático — solo se activa para
-     *  Película/Serie, nunca para Vivo (se controla desde playChannel). */
-    private var avoidMtkDecoder: Boolean
-        get() = renderersFactory.avoidMtkDecoder
-        set(value) { renderersFactory.avoidMtkDecoder = value }
-
     val exoPlayer: ExoPlayer = ExoPlayer.Builder(
         context,
-        renderersFactory
-            // Si el decodificador de hardware del dispositivo no soporta el formato de una
-            // película/serie puntual (algo común en TV Box con chips más débiles o viejos),
-            // reintenta automáticamente con un decodificador alternativo en vez de fallar
-            // directo — esto es lo que suele causar que "funcione en unos equipos y en otros
-            // no" para el mismo contenido exacto.
+        androidx.media3.exoplayer.DefaultRenderersFactory(context)
             .setEnableDecoderFallback(true)
     ).setTrackSelector(
         androidx.media3.exoplayer.trackselection.DefaultTrackSelector(context).apply {
@@ -256,9 +205,6 @@ class PlayerManager(context: Context) {
         _playbackError.value = null
         _videoQuality.value = null
         cancelBufferingTimeout()
-        // El ajuste que evita el decodificador MTK problemático (c2.mtk.avc.decoder) solo se
-        // aplica en Películas/Series — Vivo sigue exactamente igual que antes de ese cambio.
-        avoidMtkDecoder = !isLive
 
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
