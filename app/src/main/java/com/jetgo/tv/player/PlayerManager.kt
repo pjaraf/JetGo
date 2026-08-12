@@ -206,33 +206,44 @@ class PlayerManager(context: Context) {
         _videoQuality.value = null
         cancelBufferingTimeout()
 
-        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-            .setConnectTimeoutMs(15000)
-            .setReadTimeoutMs(15000)
-            .setAllowCrossProtocolRedirects(true)
+        // Todo lo que sigue queda protegido: si algo puntual falla acá (un formato raro, un
+        // dato inesperado del servidor, etc.), la app NUNCA se debe cerrar sola — en el peor
+        // caso, simplemente esa película/canal no arranca, pero la app se queda abierta.
+        try {
+            val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+                .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+                .setConnectTimeoutMs(15000)
+                .setReadTimeoutMs(15000)
+                .setAllowCrossProtocolRedirects(true)
 
-        val mediaItem = MediaItem.fromUri(url)
+            val mediaItem = MediaItem.fromUri(url)
 
-        // Antes se elegía a mano entre HLS/progresivo mirando si la URL tenía ".m3u8" — pero
-        // las películas/series vienen en formatos variados (.mp4, .mkv, .ts, etc.) que ese
-        // chequeo simple no cubre bien en todos los casos. DefaultMediaSourceFactory detecta
-        // el tipo correcto de forma más confiable, sea cual sea el formato del archivo.
-        val mediaSource = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(httpDataSourceFactory)
-            .createMediaSource(mediaItem)
+            // Antes se elegía a mano entre HLS/progresivo mirando si la URL tenía ".m3u8" — pero
+            // las películas/series vienen en formatos variados (.mp4, .mkv, .ts, etc.) que ese
+            // chequeo simple no cubre bien en todos los casos. DefaultMediaSourceFactory detecta
+            // el tipo correcto de forma más confiable, sea cual sea el formato del archivo.
+            val mediaSource = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(httpDataSourceFactory)
+                .createMediaSource(mediaItem)
 
-        _stats.value = _stats.value.copy(channelName = name, isLive = isLive)
-        // Se limpia por completo el reproductor (no solo "detenido") antes de cargar lo nuevo:
-        // si solo se detiene, puede quedar algo del canal anterior a medio camino, y cambiar
-        // rápido entre canales (sobre todo volviendo al mismo de hace un momento) se queda con
-        // la imagen en negro. Limpiando la cola entera se fuerza a arrancar siempre de cero.
-        exoPlayer.stop()
-        exoPlayer.clearMediaItems()
-        exoPlayer.setMediaSource(mediaSource)
-        exoPlayer.prepare()
-        exoPlayer.playWhenReady = true
-        exoPlayer.play() // explícito además de playWhenReady: en algunos TV Box, solo con
-                          // la marca "listo para reproducir" no alcanza para que arranque solo
+            _stats.value = _stats.value.copy(channelName = name, isLive = isLive)
+            // Se limpia por completo el reproductor (no solo "detenido") antes de cargar lo nuevo:
+            // si solo se detiene, puede quedar algo del canal anterior a medio camino, y cambiar
+            // rápido entre canales (sobre todo volviendo al mismo de hace un momento) se queda con
+            // la imagen en negro. Limpiando la cola entera se fuerza a arrancar siempre de cero.
+            exoPlayer.stop()
+            exoPlayer.clearMediaItems()
+            exoPlayer.setMediaSource(mediaSource)
+            exoPlayer.prepare()
+            exoPlayer.playWhenReady = true
+            exoPlayer.play() // explícito además de playWhenReady: en algunos TV Box, solo con
+                              // la marca "listo para reproducir" no alcanza para que arranque solo
+        } catch (e: Exception) {
+            _debugState.value = "[ERROR AL PREPARAR] ${e.javaClass.simpleName}: ${e.message}"
+        } catch (e: Throwable) {
+            // Incluye errores graves (ej. quedarse sin memoria) que normalmente cerrarían
+            // la app entera — mejor mostrar que esa película no arrancó, que perder la app.
+            _debugState.value = "[ERROR GRAVE AL PREPARAR] ${e.javaClass.simpleName}: ${e.message}"
+        }
     }
 
     fun release() {
