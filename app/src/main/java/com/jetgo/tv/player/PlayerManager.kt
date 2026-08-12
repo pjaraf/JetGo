@@ -29,12 +29,43 @@ data class TrackOption(
  */
 class PlayerManager(context: Context) {
 
+    /** Fábrica de decodificadores que evita usar como PRIMERA opción el decodificador
+     *  "c2.mtk.avc.decoder" (el decodificador de video H.264 más nuevo de chips MediaTek,
+     *  usado en varios TV Box/TV con Google TV como los TCL) — tiene fallas conocidas con
+     *  ciertos videos que hacen que se caiga la reproducción por completo. Si el dispositivo
+     *  tiene otro decodificador alternativo para el mismo formato (uno más viejo tipo OMX, o
+     *  uno por software), se prueba primero ese; el problemático queda como último recurso.
+     */
+    private class MtkAwareRenderersFactory(context: Context) : androidx.media3.exoplayer.DefaultRenderersFactory(context) {
+        private val safeSelector = androidx.media3.exoplayer.mediacodec.MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
+            val decoders = androidx.media3.exoplayer.mediacodec.MediaCodecSelector.DEFAULT
+                .getDecoderInfos(mimeType, requiresSecureDecoder, requiresTunnelingDecoder)
+            decoders.sortedBy { if (it.name == "c2.mtk.avc.decoder") 1 else 0 }
+        }
+
+        override fun buildVideoRenderers(
+            context: Context,
+            extensionRendererMode: Int,
+            mediaCodecSelector: androidx.media3.exoplayer.mediacodec.MediaCodecSelector,
+            enableDecoderFallback: Boolean,
+            eventHandler: android.os.Handler,
+            eventListener: androidx.media3.exoplayer.video.VideoRendererEventListener,
+            allowedVideoJoiningTimeMs: Long,
+            out: ArrayList<androidx.media3.exoplayer.Renderer>
+        ) {
+            super.buildVideoRenderers(
+                context, extensionRendererMode, safeSelector, enableDecoderFallback,
+                eventHandler, eventListener, allowedVideoJoiningTimeMs, out
+            )
+        }
+    }
+
     val exoPlayer: ExoPlayer = ExoPlayer.Builder(
         context,
-        androidx.media3.exoplayer.DefaultRenderersFactory(context)
+        MtkAwareRenderersFactory(context)
             // Si el decodificador de hardware del dispositivo no soporta el formato de una
             // película/serie puntual (algo común en TV Box con chips más débiles o viejos),
-            // reintenta automáticamente con un decodificador por software en vez de fallar
+            // reintenta automáticamente con un decodificador alternativo en vez de fallar
             // directo — esto es lo que suele causar que "funcione en unos equipos y en otros
             // no" para el mismo contenido exacto.
             .setEnableDecoderFallback(true)
