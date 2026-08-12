@@ -200,23 +200,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val forceCloseApp: StateFlow<Boolean> = _forceCloseApp.asStateFlow()
 
     private fun checkForAutoResume() {
+        // Desactivado a pedido: si la app se cierra, al volver a abrirla debe partir siempre
+        // desde cero, sin ofrecer retomar automáticamente lo que se estaba viendo antes.
         viewModelScope.launch {
-            val last = try { lastPlayingStore.get() } catch (e: Exception) { null } ?: return@launch
-            val minutesAgo = (System.currentTimeMillis() - last.savedAtMs) / 60_000
-            // Solo tiene sentido retomar solo si fue hace POCO (el sistema recién mató la app
-            // a mitad de la película) — si pasó más de media hora, mejor que el usuario elija
-            // desde "Seguir viendo" como siempre, no imponerle algo de hace rato.
-            if (minutesAgo <= 30) {
-                _pendingAutoResume.value = ContentItem(
-                    id = last.itemId,
-                    name = last.name,
-                    imageUrl = last.imageUrl,
-                    type = if (last.itemType == "SERIES") ContentType.SERIES else ContentType.MOVIE,
-                    streamUrl = null
-                )
-            } else {
-                lastPlayingStore.clear()
-            }
+            try { lastPlayingStore.clear() } catch (e: Exception) { /* ignorar */ }
         }
     }
     private val watchHistoryStore = WatchHistoryStore(application)
@@ -903,15 +890,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     allCategories.filterNot { AdultContentFilter.isAdult(it.name) }
                 } else allCategories
                 _categoryPickerState.value = CategoryPickerUiState(categories = filtered)
-                if (type != ContentType.LIVE && filtered.isNotEmpty()) {
-                    loadCategoryContent(type, filtered.first().id)
-                }
             }
             return
         }
 
         val config = currentConfig ?: run {
-            _categoryPickerState.value = CategoryPickerUiState(isLoading = true)
+            _categoryPickerState.value = CategoryPickerUiState(errorMessage = "Sin configuración de servidor")
             return
         }
 
@@ -935,16 +919,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 _categoryPickerState.value = CategoryPickerUiState(categories = filtered)
 
-                // Siempre se muestra contenido de una vez: en Vivo, la categoría que quedó
-                // por defecto (la última elegida); en película/serie/anime/especial, la
-                // primera de la lista — así el cliente ve carátulas apenas entra, sin tener
-                // que elegir una categoría a mano primero.
+                // Para Vivo: siempre se queda mostrando la categoría que quedó por defecto
+                // (la última elegida), y no la primera de la lista cada vez.
                 if (type == ContentType.LIVE && filtered.isNotEmpty()) {
                     val target = _phoneLiveCategoryId.value?.takeIf { id -> filtered.any { it.id == id } }
                         ?: filtered.first().id
                     loadCategoryContent(ContentType.LIVE, target)
-                } else if (type != ContentType.LIVE && filtered.isNotEmpty()) {
-                    loadCategoryContent(type, filtered.first().id)
                 }
             } catch (e: Exception) {
                 _categoryPickerState.value = CategoryPickerUiState(errorMessage = "Error al cargar categorías: ${e.message}")
@@ -988,14 +968,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     val items = when (type) {
                         ContentType.MOVIE, ContentType.ANIME, ContentType.SPECIAL -> repository.getMovies(config, realCategoryId).map {
-                            ContentItem(it.streamId, it.name, it.coverUrl, type, it.streamUrl, rating = it.rating)
+                            ContentItem("$sourceIndex::${it.streamId}", it.name, it.coverUrl, type, it.streamUrl, rating = it.rating)
                         }
                         ContentType.SERIES -> repository.getSeries(config, realCategoryId).map {
-                            ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null, rating = it.rating)
+                            ContentItem("$sourceIndex::${it.seriesId}", it.name, it.coverUrl, ContentType.SERIES, null, rating = it.rating)
                         }
                         ContentType.LIVE -> emptyList()
                     }
-                    val filteredItems = if (_parentalState.value.enabled) items.filterNot { AdultContentFilter.isAdult(it.name) } else items
+                    val filteredItems = (if (_parentalState.value.enabled) items.filterNot { AdultContentFilter.isAdult(it.name) } else items).distinctBy { it.id }
                     _categoryContentState.value = CategoryContentUiState(items = filteredItems)
                     fillMissingPosters(filteredItems, isSeries = type == ContentType.SERIES) { updated ->
                         _categoryContentState.value = _categoryContentState.value.copy(items = updated)
@@ -1008,7 +988,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val config = currentConfig ?: run {
-            _categoryContentState.value = CategoryContentUiState(isLoading = true)
+            _categoryContentState.value = CategoryContentUiState(errorMessage = "Sin configuración de servidor")
             return
         }
 
@@ -1028,10 +1008,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val filteredItems = if (type != ContentType.LIVE && _parentalState.value.enabled) {
                     items.filterNot { AdultContentFilter.isAdult(it.name) }
                 } else items
-                _categoryContentState.value = CategoryContentUiState(items = filteredItems)
+                val dedupedItems = if (type != ContentType.LIVE) filteredItems.distinctBy { it.id } else filteredItems
+                _categoryContentState.value = CategoryContentUiState(items = dedupedItems)
 
                 if (type != ContentType.LIVE) {
-                    fillMissingPosters(filteredItems, isSeries = type == ContentType.SERIES) { updated ->
+                    fillMissingPosters(dedupedItems, isSeries = type == ContentType.SERIES) { updated ->
                         _categoryContentState.value = _categoryContentState.value.copy(items = updated)
                     }
                 }
@@ -1201,9 +1182,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             val parentalOn = _parentalState.value.enabled
-            val cleanMovies = if (parentalOn) movies.filterNot { AdultContentFilter.isAdult(it.name) } else movies
-            val cleanSeries = if (parentalOn) series.filterNot { AdultContentFilter.isAdult(it.name) } else series
-            val cleanAnime = if (parentalOn) anime.filterNot { AdultContentFilter.isAdult(it.name) } else anime
+            val cleanMovies = (if (parentalOn) movies.filterNot { AdultContentFilter.isAdult(it.name) } else movies).distinctBy { it.id }
+            val cleanSeries = (if (parentalOn) series.filterNot { AdultContentFilter.isAdult(it.name) } else series).distinctBy { it.id }
+            val cleanAnime = (if (parentalOn) anime.filterNot { AdultContentFilter.isAdult(it.name) } else anime).distinctBy { it.id }
 
             _homeCatalog.value = HomeCatalogState(isLoading = false, movies = cleanMovies, series = cleanSeries, anime = cleanAnime)
             homeCatalogLoaded = true
@@ -1225,6 +1206,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     // ---------------------------------------------------------------------
 
     /** Carga toda la ficha de la serie (sinopsis + todas las temporadas/capítulos) */
+    /** Para un ítem de película/serie: si su ID trae el prefijo "<índice>::<id real>" (viene de
+     *  una fuente combinada), devuelve el servidor correcto de esa fuente puntual y el ID real
+     *  sin el prefijo. Si no trae prefijo (código de un solo servidor), usa el servidor normal. */
+    private fun resolveConfigForItem(itemId: String): Pair<ServerConfig?, String> {
+        val sourceIndex = itemId.substringBefore("::", "").toIntOrNull()
+        if (sourceIndex != null && currentSources.size > 1) {
+            val realId = itemId.substringAfter("::", itemId)
+            val source = currentSources.getOrNull(sourceIndex)
+            val config = if (source != null && !source.host.isNullOrBlank() && !source.username.isNullOrBlank() && !source.password.isNullOrBlank()) {
+                ServerConfig(source.host, source.username, source.password)
+            } else null
+            return Pair(config, realId)
+        }
+        return Pair(currentConfig, itemId)
+    }
+
     fun loadSeriesDetail(item: ContentItem) {
         _seriesDetailState.value = SeriesDetailUiState(isLoading = true)
         viewModelScope.launch {
@@ -1233,13 +1230,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
             refreshContinueWatching()
         }
-        val config = currentConfig ?: run {
-            _seriesDetailState.value = SeriesDetailUiState(isLoading = true)
+        val (config, realId) = resolveConfigForItem(item.id)
+        val resolvedConfig = config ?: run {
+            _seriesDetailState.value = SeriesDetailUiState(errorMessage = "Sin configuración de servidor")
             return
         }
         viewModelScope.launch {
             val detail = try {
-                repository.getSeriesDetail(config, item.id, item.name, item.imageUrl)
+                repository.getSeriesDetail(resolvedConfig, realId, item.name, item.imageUrl)
             } catch (e: Exception) { null }
 
             if (detail == null) {
@@ -1382,15 +1380,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
             refreshContinueWatching()
         }
-        val config = currentConfig ?: run {
-            _movieDetailState.value = MovieDetailUiState(isLoading = true)
+        val (config, realId) = resolveConfigForItem(item.id)
+        val resolvedConfig = config ?: run {
+            _movieDetailState.value = MovieDetailUiState(errorMessage = "Sin configuración de servidor")
             return
         }
         val fallbackStreamUrl = item.streamUrl ?: ""
         viewModelScope.launch {
             var debugDetail: String? = null
             val detail = try {
-                repository.getMovieDetail(config, item.id, item.name, item.imageUrl, fallbackStreamUrl)
+                repository.getMovieDetail(resolvedConfig, realId, item.name, item.imageUrl, fallbackStreamUrl)
             } catch (e: Exception) {
                 debugDetail = "${e.javaClass.simpleName}: ${e.message}"
                 null
@@ -1521,10 +1520,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         isSeries: Boolean,
         onUpdated: (List<ContentItem>) -> Unit
     ) {
-        // Desactivado: ya no se buscan carátulas automáticas en TMDB — si una película o serie
-        // no trae carátula propia del servidor, se muestra el logo de la app en su lugar
-        // (ver PosterOrLogo en las pantallas de grilla).
-        return
+        if (!com.jetgo.tv.data.remote.TmdbConfig.isConfigured) return
         val missing = items.filter { it.imageUrl.isNullOrBlank() && it.name.isNotBlank() }
         if (missing.isEmpty()) return
 

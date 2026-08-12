@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.jetgo.tv.data.model.Category
 import com.jetgo.tv.data.model.ContentItem
-import com.jetgo.tv.ui.components.PosterOrLogo
 import com.jetgo.tv.ui.theme.BackgroundDark
 import com.jetgo.tv.ui.theme.FocusOrange
 import com.jetgo.tv.ui.theme.SurfaceDark
@@ -144,7 +143,14 @@ private fun PhoneCategoryPosterCard(item: ContentItem, onClick: () -> Unit) {
                 .clip(RoundedCornerShape(10.dp))
                 .background(SurfaceDark)
         ) {
-            PosterOrLogo(imageUrl = item.imageUrl, name = item.name)
+            if (!item.imageUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = item.imageUrl,
+                    contentDescription = item.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
         Text(
             text = item.name,
