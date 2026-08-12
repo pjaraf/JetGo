@@ -200,10 +200,23 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val forceCloseApp: StateFlow<Boolean> = _forceCloseApp.asStateFlow()
 
     private fun checkForAutoResume() {
-        // Desactivado a pedido: si la app se cierra, al volver a abrirla debe partir siempre
-        // desde cero, sin ofrecer retomar automáticamente lo que se estaba viendo antes.
         viewModelScope.launch {
-            try { lastPlayingStore.clear() } catch (e: Exception) { /* ignorar */ }
+            val last = try { lastPlayingStore.get() } catch (e: Exception) { null } ?: return@launch
+            val minutesAgo = (System.currentTimeMillis() - last.savedAtMs) / 60_000
+            // Solo tiene sentido retomar solo si fue hace POCO (el sistema recién mató la app
+            // a mitad de la película) — si pasó más de media hora, mejor que el usuario elija
+            // desde "Seguir viendo" como siempre, no imponerle algo de hace rato.
+            if (minutesAgo <= 30) {
+                _pendingAutoResume.value = ContentItem(
+                    id = last.itemId,
+                    name = last.name,
+                    imageUrl = last.imageUrl,
+                    type = if (last.itemType == "SERIES") ContentType.SERIES else ContentType.MOVIE,
+                    streamUrl = null
+                )
+            } else {
+                lastPlayingStore.clear()
+            }
         }
     }
     private val watchHistoryStore = WatchHistoryStore(application)
@@ -975,14 +988,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     val items = when (type) {
                         ContentType.MOVIE, ContentType.ANIME, ContentType.SPECIAL -> repository.getMovies(config, realCategoryId).map {
-                            ContentItem("$sourceIndex::${it.streamId}", it.name, it.coverUrl, type, it.streamUrl, rating = it.rating)
+                            ContentItem(it.streamId, it.name, it.coverUrl, type, it.streamUrl, rating = it.rating)
                         }
                         ContentType.SERIES -> repository.getSeries(config, realCategoryId).map {
-                            ContentItem("$sourceIndex::${it.seriesId}", it.name, it.coverUrl, ContentType.SERIES, null, rating = it.rating)
+                            ContentItem(it.seriesId, it.name, it.coverUrl, ContentType.SERIES, null, rating = it.rating)
                         }
                         ContentType.LIVE -> emptyList()
                     }
-                    val filteredItems = (if (_parentalState.value.enabled) items.filterNot { AdultContentFilter.isAdult(it.name) } else items).distinctBy { it.id }
+                    val filteredItems = if (_parentalState.value.enabled) items.filterNot { AdultContentFilter.isAdult(it.name) } else items
                     _categoryContentState.value = CategoryContentUiState(items = filteredItems)
                     fillMissingPosters(filteredItems, isSeries = type == ContentType.SERIES) { updated ->
                         _categoryContentState.value = _categoryContentState.value.copy(items = updated)
@@ -1015,11 +1028,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val filteredItems = if (type != ContentType.LIVE && _parentalState.value.enabled) {
                     items.filterNot { AdultContentFilter.isAdult(it.name) }
                 } else items
-                val dedupedItems = if (type != ContentType.LIVE) filteredItems.distinctBy { it.id } else filteredItems
-                _categoryContentState.value = CategoryContentUiState(items = dedupedItems)
+                _categoryContentState.value = CategoryContentUiState(items = filteredItems)
 
                 if (type != ContentType.LIVE) {
-                    fillMissingPosters(dedupedItems, isSeries = type == ContentType.SERIES) { updated ->
+                    fillMissingPosters(filteredItems, isSeries = type == ContentType.SERIES) { updated ->
                         _categoryContentState.value = _categoryContentState.value.copy(items = updated)
                     }
                 }
@@ -1189,9 +1201,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             val parentalOn = _parentalState.value.enabled
-            val cleanMovies = (if (parentalOn) movies.filterNot { AdultContentFilter.isAdult(it.name) } else movies).distinctBy { it.id }
-            val cleanSeries = (if (parentalOn) series.filterNot { AdultContentFilter.isAdult(it.name) } else series).distinctBy { it.id }
-            val cleanAnime = (if (parentalOn) anime.filterNot { AdultContentFilter.isAdult(it.name) } else anime).distinctBy { it.id }
+            val cleanMovies = if (parentalOn) movies.filterNot { AdultContentFilter.isAdult(it.name) } else movies
+            val cleanSeries = if (parentalOn) series.filterNot { AdultContentFilter.isAdult(it.name) } else series
+            val cleanAnime = if (parentalOn) anime.filterNot { AdultContentFilter.isAdult(it.name) } else anime
 
             _homeCatalog.value = HomeCatalogState(isLoading = false, movies = cleanMovies, series = cleanSeries, anime = cleanAnime)
             homeCatalogLoaded = true
@@ -1213,22 +1225,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     // ---------------------------------------------------------------------
 
     /** Carga toda la ficha de la serie (sinopsis + todas las temporadas/capítulos) */
-    /** Para un ítem de película/serie: si su ID trae el prefijo "<índice>::<id real>" (viene de
-     *  una fuente combinada), devuelve el servidor correcto de esa fuente puntual y el ID real
-     *  sin el prefijo. Si no trae prefijo (código de un solo servidor), usa el servidor normal. */
-    private fun resolveConfigForItem(itemId: String): Pair<ServerConfig?, String> {
-        val sourceIndex = itemId.substringBefore("::", "").toIntOrNull()
-        if (sourceIndex != null && currentSources.size > 1) {
-            val realId = itemId.substringAfter("::", itemId)
-            val source = currentSources.getOrNull(sourceIndex)
-            val config = if (source != null && !source.host.isNullOrBlank() && !source.username.isNullOrBlank() && !source.password.isNullOrBlank()) {
-                ServerConfig(source.host, source.username, source.password)
-            } else null
-            return Pair(config, realId)
-        }
-        return Pair(currentConfig, itemId)
-    }
-
     fun loadSeriesDetail(item: ContentItem) {
         _seriesDetailState.value = SeriesDetailUiState(isLoading = true)
         viewModelScope.launch {
@@ -1237,14 +1233,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
             refreshContinueWatching()
         }
-        val (config, realId) = resolveConfigForItem(item.id)
-        val resolvedConfig = config ?: run {
+        val config = currentConfig ?: run {
             _seriesDetailState.value = SeriesDetailUiState(isLoading = true)
             return
         }
         viewModelScope.launch {
             val detail = try {
-                repository.getSeriesDetail(resolvedConfig, realId, item.name, item.imageUrl)
+                repository.getSeriesDetail(config, item.id, item.name, item.imageUrl)
             } catch (e: Exception) { null }
 
             if (detail == null) {
@@ -1387,8 +1382,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
             refreshContinueWatching()
         }
-        val (config, realId) = resolveConfigForItem(item.id)
-        val resolvedConfig = config ?: run {
+        val config = currentConfig ?: run {
             _movieDetailState.value = MovieDetailUiState(isLoading = true)
             return
         }
@@ -1396,7 +1390,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             var debugDetail: String? = null
             val detail = try {
-                repository.getMovieDetail(resolvedConfig, realId, item.name, item.imageUrl, fallbackStreamUrl)
+                repository.getMovieDetail(config, item.id, item.name, item.imageUrl, fallbackStreamUrl)
             } catch (e: Exception) {
                 debugDetail = "${e.javaClass.simpleName}: ${e.message}"
                 null
