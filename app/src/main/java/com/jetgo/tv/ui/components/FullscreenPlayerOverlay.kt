@@ -230,6 +230,23 @@ fun FullscreenPlayerOverlay(
                     }
                 }
             )
+
+            // Texto chico de diagnóstico técnico — para copiarlo si una película/serie no
+            // arranca, y así detectar la causa real sin necesitar computadora ni ADB.
+            val vodDebugState = playerManager.debugState.value
+            if (vodDebugState.isNotBlank()) {
+                Text(
+                    text = vodDebugState,
+                    color = Color.Yellow,
+                    fontSize = 10.sp,
+                    maxLines = 2,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .background(Color.Black.copy(alpha = 0.6f))
+                        .padding(4.dp)
+                )
+            }
+
             if (showNextEpisodeMessage) {
                 Box(
                     modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)),
@@ -249,6 +266,22 @@ fun FullscreenPlayerOverlay(
                     info = info,
                     videoQuality = playerManager.videoQuality.value,
                     modifier = Modifier.align(Alignment.BottomCenter)
+                )
+            }
+
+            // Texto chico de diagnóstico técnico — para copiarlo o sacarle una foto si algo
+            // se traba, y así detectar la causa real sin necesitar computadora ni ADB.
+            val debugState = playerManager.debugState.value
+            if (debugState.isNotBlank()) {
+                Text(
+                    text = debugState,
+                    color = Color.Yellow,
+                    fontSize = 10.sp,
+                    maxLines = 2,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .background(Color.Black.copy(alpha = 0.6f))
+                        .padding(4.dp)
                 )
             }
 
