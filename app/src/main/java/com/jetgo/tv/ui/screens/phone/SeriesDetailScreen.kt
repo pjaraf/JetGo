@@ -113,13 +113,13 @@ private fun SeriesDetailContent(
             AndroidView(
                 factory = { context ->
                     PlayerView(context).apply {
-                        player = playerManager.exoPlayer
+                        player = playerManager.vodExoPlayer
                         useController = true
                     }
                 },
                 update = { view ->
-                    if (view.player !== playerManager.exoPlayer) {
-                        view.player = playerManager.exoPlayer
+                    if (view.player !== playerManager.vodExoPlayer) {
+                        view.player = playerManager.vodExoPlayer
                     }
                 },
                 modifier = Modifier.fillMaxSize()

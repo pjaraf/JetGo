@@ -8,7 +8,6 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime
-import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
@@ -23,13 +22,29 @@ data class TrackOption(
 )
 
 /**
- * Encapsula un único ExoPlayer reutilizable para el panel de reproducción en vivo,
- * exponiendo bitrate/estado como State de Compose para actualizar el overlay
- * (equivalente al indicador "4Kb/s" que se ve en la captura de referencia).
+ * Maneja DOS reproductores completamente separados — uno para Vivo y otro para Película/Serie
+ * — para que cualquier ajuste que se necesite en uno (ej. compatibilidad de decodificador en
+ * algún TV Box puntual) se pueda aplicar sin que le toque nada al otro, ni siquiera como
+ * posible efecto secundario. Cada uno tiene su propia lógica de reconexión/reintento, así
+ * ninguno de los dos depende del estado del otro.
  */
 class PlayerManager(context: Context) {
 
+    // =====================================================================================
+    // REPRODUCTOR DE VIVO — configuración simple, sin ningún ajuste especial, tal como
+    // siempre funcionó. No se debe tocar esta parte para probar cosas nuevas: para eso está
+    // el reproductor de Película/Serie de más abajo, que es completamente independiente.
+    // =====================================================================================
     val exoPlayer: ExoPlayer = ExoPlayer.Builder(context).build()
+
+    // =====================================================================================
+    // REPRODUCTOR DE PELÍCULA/SERIE — separado por completo del de Vivo. Acá es donde se
+    // pueden probar ajustes de compatibilidad (decodificadores, etc.) sin ningún riesgo de
+    // que afecten a Vivo, porque literalmente es otro objeto ExoPlayer distinto.
+    // =====================================================================================
+    private val vodRenderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(context)
+        .setEnableDecoderFallback(true)
+    val vodExoPlayer: ExoPlayer = ExoPlayer.Builder(context, vodRenderersFactory).build()
 
     private val _stats = mutableStateOf(PlaybackStats())
     val stats: State<PlaybackStats> get() = _stats
@@ -49,57 +64,74 @@ class PlayerManager(context: Context) {
     private val _playbackError = mutableStateOf<String?>(null)
     val playbackError: State<String?> get() = _playbackError
 
-    private var retryCount = 0
-    private var bufferingReconnectCount = 0
-    private var lastUrl: String? = null
-    private var lastName: String = ""
-
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private var bufferingTimeoutRunnable: Runnable? = null
 
-    private fun cancelBufferingTimeout() {
-        bufferingTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
-        bufferingTimeoutRunnable = null
-    }
+    /** Agrupa todo el estado de reconexión/reintento que necesita CADA reproductor por
+     *  separado — así el de Vivo y el de Película/Serie nunca se pisan entre sí. */
+    private inner class PlayerState(val player: ExoPlayer, val isLive: Boolean) {
+        var retryCount = 0
+        var bufferingReconnectCount = 0
+        var lastUrl: String? = null
+        var lastName: String = ""
+        var currentUrl: String? = null
+        var bufferingTimeoutRunnable: Runnable? = null
 
-    private fun startBufferingTimeout() {
-        cancelBufferingTimeout()
-        val runnable = Runnable {
-            // Si sigue "cargando" sin avanzar después de unos segundos, probablemente se pegó
-            // (corte momentáneo de señal, etc.) — se reconecta sola, sin avisarle nada al
-            // cliente, para que la interrupción se note lo menos posible.
-            if (exoPlayer.playbackState == Player.STATE_BUFFERING && bufferingReconnectCount < 4) {
-                bufferingReconnectCount++
-                val url = lastUrl
-                if (url != null) {
-                    try {
-                        exoPlayer.stop()
-                        exoPlayer.prepare()
-                        exoPlayer.playWhenReady = true
-                        exoPlayer.play()
-                    } catch (e: Exception) { /* se reintenta de nuevo si vuelve a quedar pegado */ }
-                }
-                startBufferingTimeout() // sigue vigilando por si necesita reconectar de nuevo
-            }
+        fun cancelBufferingTimeout() {
+            bufferingTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+            bufferingTimeoutRunnable = null
         }
-        bufferingTimeoutRunnable = runnable
-        mainHandler.postDelayed(runnable, 8_000)
+
+        fun startBufferingTimeout() {
+            cancelBufferingTimeout()
+            val runnable = Runnable {
+                // Si sigue "cargando" sin avanzar después de unos segundos, probablemente se
+                // pegó (corte momentáneo de señal, etc.) — se reconecta solo, sin avisarle
+                // nada al cliente, para que la interrupción se note lo menos posible.
+                if (player.playbackState == Player.STATE_BUFFERING && bufferingReconnectCount < 4) {
+                    bufferingReconnectCount++
+                    val url = lastUrl
+                    if (url != null) {
+                        try {
+                            player.stop()
+                            player.prepare()
+                            player.playWhenReady = true
+                            player.play()
+                        } catch (e: Exception) { /* se reintenta de nuevo si vuelve a quedar pegado */ }
+                    }
+                    startBufferingTimeout() // sigue vigilando por si necesita reconectar de nuevo
+                }
+            }
+            bufferingTimeoutRunnable = runnable
+            mainHandler.postDelayed(runnable, 8_000)
+        }
     }
+
+    private val liveState = PlayerState(exoPlayer, isLive = true)
+    private val vodState = PlayerState(vodExoPlayer, isLive = false)
 
     init {
-        exoPlayer.addAnalyticsListener(object : AnalyticsListener {
+        setupPlayer(exoPlayer, liveState)
+        setupPlayer(vodExoPlayer, vodState)
+    }
+
+    private fun setupPlayer(player: ExoPlayer, state: PlayerState) {
+        player.addAnalyticsListener(object : AnalyticsListener {
             override fun onBandwidthEstimate(
                 eventTime: EventTime,
                 totalLoadTimeMs: Int,
                 totalBytesLoaded: Long,
                 bitrateEstimate: Long
             ) {
-                val kbps = (bitrateEstimate / 1000).toInt()
-                _stats.value = _stats.value.copy(bitrateKbps = kbps)
+                // Solo actualiza el bitrate visible si este reproductor es el que está
+                // activo ahora mismo (evita que el que está en pausa de fondo pise el dato).
+                if (state.currentUrl != null) {
+                    val kbps = (bitrateEstimate / 1000).toInt()
+                    _stats.value = _stats.value.copy(bitrateKbps = kbps)
+                }
             }
         })
 
-        exoPlayer.addListener(object : Player.Listener {
+        player.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_ENDED) {
                     onPlaybackEnded?.invoke()
@@ -107,12 +139,12 @@ class PlayerManager(context: Context) {
                 if (playbackState == Player.STATE_READY) {
                     // Volvió a andar bien: limpia cualquier error anterior y resetea los reintentos
                     _playbackError.value = null
-                    retryCount = 0; bufferingReconnectCount = 0
-                    cancelBufferingTimeout()
+                    state.retryCount = 0; state.bufferingReconnectCount = 0
+                    state.cancelBufferingTimeout()
                 } else if (playbackState == Player.STATE_BUFFERING) {
-                    startBufferingTimeout()
+                    state.startBufferingTimeout()
                 } else {
-                    cancelBufferingTimeout()
+                    state.cancelBufferingTimeout()
                 }
             }
 
@@ -121,14 +153,14 @@ class PlayerManager(context: Context) {
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                val url = lastUrl
-                if (url != null && retryCount < 2) {
+                val url = state.lastUrl
+                if (url != null && state.retryCount < 2) {
                     // Reintenta un par de veces solo (cortes momentáneos de red/servidor),
                     // antes de mostrarle un error al usuario.
-                    retryCount++
+                    state.retryCount++
                     try {
-                        exoPlayer.prepare()
-                        exoPlayer.playWhenReady = true
+                        player.prepare()
+                        player.playWhenReady = true
                     } catch (e: Exception) { /* ignorar, se maneja abajo si vuelve a fallar */ }
                 } else {
                     val causaHttp = (error.cause as? androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException)?.responseCode
@@ -136,7 +168,7 @@ class PlayerManager(context: Context) {
                         causaHttp != null -> "El servidor respondió con error HTTP $causaHttp"
                         else -> "${error.errorCodeName} — ${error.cause?.message ?: error.message}"
                     }
-                    _playbackError.value = "No se pudo reproducir \"$lastName\".\n$detalle"
+                    _playbackError.value = "No se pudo reproducir \"${state.lastName}\".\n$detalle"
                 }
             }
 
@@ -152,21 +184,23 @@ class PlayerManager(context: Context) {
         })
     }
 
-    private var currentUrl: String? = null
+    /** [isLive] decide cuál de los 2 reproductores se usa — Vivo o Película/Serie. */
+    fun playChannel(url: String, name: String, isLive: Boolean = true) {
+        val state = if (isLive) liveState else vodState
+        val player = state.player
 
-    fun playChannel(url: String, name: String) {
-        if (url == currentUrl && exoPlayer.playbackState != Player.STATE_IDLE && exoPlayer.playbackState != Player.STATE_ENDED) {
+        if (url == state.currentUrl && player.playbackState != Player.STATE_IDLE && player.playbackState != Player.STATE_ENDED) {
             // Ya está reproduciendo justo esta URL: no la recarga de nuevo
-            exoPlayer.playWhenReady = true
+            player.playWhenReady = true
             return
         }
-        currentUrl = url
-        lastUrl = url
-        lastName = name
-        retryCount = 0; bufferingReconnectCount = 0
+        state.currentUrl = url
+        state.lastUrl = url
+        state.lastName = name
+        state.retryCount = 0; state.bufferingReconnectCount = 0
         _playbackError.value = null
         _videoQuality.value = null
-        cancelBufferingTimeout()
+        state.cancelBufferingTimeout()
 
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
@@ -183,37 +217,59 @@ class PlayerManager(context: Context) {
         val mediaSource = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(httpDataSourceFactory)
             .createMediaSource(mediaItem)
 
-        _stats.value = _stats.value.copy(channelName = name, isLive = true)
+        _stats.value = _stats.value.copy(channelName = name, isLive = isLive)
         // Se limpia por completo el reproductor (no solo "detenido") antes de cargar lo nuevo:
         // si solo se detiene, puede quedar algo del canal anterior a medio camino, y cambiar
         // rápido entre canales (sobre todo volviendo al mismo de hace un momento) se queda con
         // la imagen en negro. Limpiando la cola entera se fuerza a arrancar siempre de cero.
-        exoPlayer.stop()
-        exoPlayer.clearMediaItems()
-        exoPlayer.setMediaSource(mediaSource)
-        exoPlayer.prepare()
-        exoPlayer.playWhenReady = true
-        exoPlayer.play() // explícito además de playWhenReady: en algunos TV Box, solo con
-                          // la marca "listo para reproducir" no alcanza para que arranque solo
+        player.stop()
+        player.clearMediaItems()
+        player.setMediaSource(mediaSource)
+        player.prepare()
+        player.playWhenReady = true
+        player.play() // explícito además de playWhenReady: en algunos TV Box, solo con
+                       // la marca "listo para reproducir" no alcanza para que arranque solo
     }
 
     fun release() {
         exoPlayer.release()
+        vodExoPlayer.release()
     }
 
-    /** Posición actual de reproducción, en milisegundos */
-    fun currentPositionMs(): Long = try { exoPlayer.currentPosition } catch (e: Exception) { 0L }
+    /** Pausa ambos reproductores — se usa cuando la app pasa a segundo plano */
+    fun pauseAll() {
+        try { exoPlayer.pause() } catch (e: Exception) { /* ignorar */ }
+        try { vodExoPlayer.pause() } catch (e: Exception) { /* ignorar */ }
+    }
 
-    /** Duración total del contenido actual, en milisegundos (0 si aún no se sabe, ej. streams en vivo) */
-    fun durationMs(): Long = try { exoPlayer.duration.coerceAtLeast(0) } catch (e: Exception) { 0L }
+    /** Reanuda ambos reproductores (el que no tenía nada cargado simplemente no hace nada) */
+    fun playAll() {
+        try { exoPlayer.play() } catch (e: Exception) { /* ignorar */ }
+        try { vodExoPlayer.play() } catch (e: Exception) { /* ignorar */ }
+    }
+
+    /** Detiene ambos por completo — usado al cerrar sesión o desconectar */
+    fun stopAll() {
+        try { exoPlayer.stop() } catch (e: Exception) { /* ignorar */ }
+        try { vodExoPlayer.stop() } catch (e: Exception) { /* ignorar */ }
+    }
+
+    // ---- Todo lo de acá para abajo es SOLO para Película/Serie (el reproductor de Vivo no
+    // usa nada de esto: no tiene controles de avance/retroceso ni pistas seleccionables) ----
+
+    /** Posición actual de reproducción, en milisegundos */
+    fun currentPositionMs(): Long = try { vodExoPlayer.currentPosition } catch (e: Exception) { 0L }
+
+    /** Duración total del contenido actual, en milisegundos (0 si aún no se sabe) */
+    fun durationMs(): Long = try { vodExoPlayer.duration.coerceAtLeast(0) } catch (e: Exception) { 0L }
 
     /** Salta a una posición específica (usado para "Seguir viendo" y la barra de progreso) */
     fun seekTo(positionMs: Long) {
-        try { exoPlayer.seekTo(positionMs) } catch (e: Exception) { /* ignorar */ }
+        try { vodExoPlayer.seekTo(positionMs) } catch (e: Exception) { /* ignorar */ }
     }
 
     fun togglePlayPause() {
-        if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+        if (vodExoPlayer.isPlaying) vodExoPlayer.pause() else vodExoPlayer.play()
     }
 
     fun seekForward(ms: Long = 10_000) {
@@ -233,7 +289,7 @@ class PlayerManager(context: Context) {
     private fun getTracks(type: Int): List<TrackOption> {
         val result = mutableListOf<TrackOption>()
         try {
-            val tracks = exoPlayer.currentTracks
+            val tracks = vodExoPlayer.currentTracks
             for (group in tracks.groups) {
                 if (group.type != type) continue
                 for (i in 0 until group.length) {
@@ -251,7 +307,7 @@ class PlayerManager(context: Context) {
     fun selectTrack(option: TrackOption) {
         try {
             val override = TrackSelectionOverride(option.group, listOf(option.trackIndex))
-            exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+            vodExoPlayer.trackSelectionParameters = vodExoPlayer.trackSelectionParameters
                 .buildUpon()
                 .setOverrideForType(override)
                 .build()
@@ -261,7 +317,7 @@ class PlayerManager(context: Context) {
     /** Apaga los subtítulos por completo */
     fun disableSubtitles() {
         try {
-            exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+            vodExoPlayer.trackSelectionParameters = vodExoPlayer.trackSelectionParameters
                 .buildUpon()
                 .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
                 .build()
@@ -270,7 +326,7 @@ class PlayerManager(context: Context) {
 
     private fun enableSubtitleType() {
         try {
-            exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+            vodExoPlayer.trackSelectionParameters = vodExoPlayer.trackSelectionParameters
                 .buildUpon()
                 .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
                 .build()

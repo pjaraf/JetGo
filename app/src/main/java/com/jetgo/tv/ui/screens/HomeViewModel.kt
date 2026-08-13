@@ -125,7 +125,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun disconnect() {
         viewModelScope.launch {
             configStore.clear()
-            playerManager.exoPlayer.stop()
+            playerManager.stopAll()
             currentConfig = null
             _uiState.value = HomeUiState()
         }
@@ -159,7 +159,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     /** Cierra la sesión por completo: pide el código de acceso de nuevo la próxima vez */
     fun logout() {
         viewModelScope.launch {
-            playerManager.exoPlayer.stop()
+            playerManager.stopAll()
             configStore.clear()
             accessStore.clear()
             currentConfig = null
@@ -1055,7 +1055,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val url = repository.getFirstEpisodeUrl(config, item.id)
             if (url != null) {
-                playerManager.playChannel(url, item.name)
+                playerManager.playChannel(url, item.name, isLive = false)
             }
             onReady()
         }
@@ -1295,7 +1295,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val episode = currentEpisode(episodeId) ?: return
         val seriesId = _seriesDetailState.value.detail?.seriesId
         val seriesDetail = _seriesDetailState.value.detail
-        playerManager.playChannel(episode.streamUrl, "${_seriesDetailState.value.detail?.name} · ${episode.title}")
+        playerManager.playChannel(episode.streamUrl, "${_seriesDetailState.value.detail?.name} · ${episode.title}", isLive = false)
         startPositionTracking("series:$episodeId", onCompleted = {
             seriesId?.let { id ->
                 viewModelScope.launch {
@@ -1362,7 +1362,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         playerManager.onPlaybackEnded = null
         onSeriesFullyFinished = null
         stopPositionTracking()
-        try { playerManager.exoPlayer.pause() } catch (e: Exception) { /* ignorar */ }
+        try { playerManager.vodExoPlayer.pause() } catch (e: Exception) { /* ignorar */ }
         viewModelScope.launch { lastPlayingStore.clear() }
         _seriesDetailState.value = SeriesDetailUiState()
     }
@@ -1426,7 +1426,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun clearMovieDetail() {
         stopPositionTracking()
         playerManager.onPlaybackEnded = null
-        try { playerManager.exoPlayer.pause() } catch (e: Exception) { /* ignorar */ }
+        try { playerManager.vodExoPlayer.pause() } catch (e: Exception) { /* ignorar */ }
         viewModelScope.launch { lastPlayingStore.clear() }
         _movieDetailState.value = MovieDetailUiState()
     }
@@ -1450,7 +1450,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             if (hasMeaningfulProgress && saved != null) {
                 _resumePrompt.value = ResumePrompt(contentKey, title, streamUrl, saved.positionMs, onCompleted)
             } else {
-                playerManager.playChannel(streamUrl, title)
+                playerManager.playChannel(streamUrl, title, isLive = false)
                 startPositionTracking(contentKey, onCompleted)
             }
         }
@@ -1458,7 +1458,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun resumeFromPrompt() {
         val prompt = _resumePrompt.value ?: return
-        playerManager.playChannel(prompt.streamUrl, prompt.title)
+        playerManager.playChannel(prompt.streamUrl, prompt.title, isLive = false)
         startPositionTracking(prompt.contentKey, prompt.onCompleted)
         viewModelScope.launch {
             kotlinx.coroutines.delay(500) // deja que el reproductor prepare el contenido antes de saltar
@@ -1469,7 +1469,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startOverFromPrompt() {
         val prompt = _resumePrompt.value ?: return
-        playerManager.playChannel(prompt.streamUrl, prompt.title)
+        playerManager.playChannel(prompt.streamUrl, prompt.title, isLive = false)
         startPositionTracking(prompt.contentKey, prompt.onCompleted)
         _resumePrompt.value = null
     }

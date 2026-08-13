@@ -198,18 +198,22 @@ fun FullscreenPlayerOverlay(
             )
     ) {
         var resizeMode by remember { mutableStateOf(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL) }
+        // Esta pantalla se usa tanto para Vivo como para Película/Serie — cada uno con su
+        // propio reproductor completamente separado (ver PlayerManager). Si isVod cambia
+        // (ej. sales de una película y vuelves a Vivo), la vista se re-vincula al otro.
+        val activePlayer = if (isVod) playerManager.vodExoPlayer else playerManager.exoPlayer
 
         AndroidView(
             factory = { context ->
                 PlayerView(context).apply {
-                    player = playerManager.exoPlayer
+                    player = activePlayer
                     useController = false
                 }
             },
             update = { view ->
                 view.resizeMode = resizeMode
-                if (view.player !== playerManager.exoPlayer) {
-                    view.player = playerManager.exoPlayer
+                if (view.player !== activePlayer) {
+                    view.player = activePlayer
                 }
             },
             modifier = Modifier.fillMaxSize()

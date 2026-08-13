@@ -85,14 +85,14 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         // La app no debe seguir reproduciendo cuando queda en segundo plano (se minimiza,
-        // se apaga la pantalla, o se cambia a otra app) — se pausa por completo.
-        try { viewModel.playerManager.exoPlayer.pause() } catch (e: Exception) { /* ignorar */ }
+        // se apaga la pantalla, o se cambia a otra app) — se pausan ambos reproductores.
+        viewModel.playerManager.pauseAll()
     }
 
     override fun onStart() {
         super.onStart()
         // Al volver al primer plano, retoma automáticamente lo que se estaba viendo.
-        try { viewModel.playerManager.exoPlayer.play() } catch (e: Exception) { /* ignorar */ }
+        viewModel.playerManager.playAll()
     }
 }
 
