@@ -922,20 +922,22 @@
 
     document.getElementById('clientName').value = '';
     document.getElementById('clientPhone').value = '';
+    // Cada cliente necesita SU PROPIO usuario y contraseña (no se repiten entre clientes) —
+    // esto se limpia siempre, sea administrador principal o sub administrador.
+    document.getElementById('username').value = '';
+    document.getElementById('xtreamPassword').value = '';
+    document.getElementById('username2').value = '';
+    document.getElementById('xtreamPassword2').value = '';
     if (currentUserRole === 'subadmin') {
-      // El sub administrador siempre usa el mismo servidor/combo asignado — no tiene
-      // sentido borrarle el usuario/clave que acaba de escribir, ni el servidor elegido
-      // (que ni siquiera puede cambiar), así el próximo cliente lo arma más rápido.
+      // El servidor/combo asignado se queda igual — el sub administrador no puede cambiarlo,
+      // así que no tiene sentido tocarlo acá.
+      onServerSelectChange();
     } else {
       document.getElementById('serverSelect').value = '';
       onServerSelectChange();
-      document.getElementById('username').value = '';
-      document.getElementById('xtreamPassword').value = '';
       document.getElementById('useSecondSource').checked = false;
       onUseSecondSourceChange();
       document.getElementById('serverSelect2').value = '';
-      document.getElementById('username2').value = '';
-      document.getElementById('xtreamPassword2').value = '';
     }
     document.getElementById('expirationDate').value = '';
     document.getElementById('isDemo').checked = false;
