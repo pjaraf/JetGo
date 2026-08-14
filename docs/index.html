@@ -29,7 +29,6 @@
     font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
-
   /* ---------- Login (pantalla completa, sin sidebar) ---------- */
   #loginScreen {
     min-height: 100vh;
@@ -62,10 +61,8 @@
   }
   .login-logo .name { font-size: 19px; font-weight: 700; }
   .login-logo .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-
   /* ---------- Layout general (sidebar + contenido) ---------- */
   .app { display: flex; min-height: 100vh; }
-
   .sidebar {
     width: 220px;
     flex-shrink: 0;
@@ -89,7 +86,6 @@
     font-weight: 800; font-size: 15px;
   }
   .sidebar .brand .name { font-size: 16px; font-weight: 700; }
-
   .nav-item {
     display: flex; align-items: center; gap: 10px;
     padding: 11px 12px;
@@ -107,7 +103,6 @@
     color: var(--orange);
   }
   .nav-item .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-
   .sidebar-footer {
     margin-top: auto;
     padding: 12px 8px 0;
@@ -118,9 +113,7 @@
     word-break: break-all;
     margin-bottom: 10px;
   }
-
   .main { flex: 1; min-width: 0; }
-
   .topbar {
     display: flex; align-items: center; justify-content: space-between;
     padding: 20px 28px;
@@ -128,9 +121,7 @@
   }
   .topbar h1 { font-size: 19px; margin: 0; }
   .topbar p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
-
   .content { padding: 24px 28px 60px; max-width: 1100px; }
-
   /* ---------- Tarjetas de estadísticas ---------- */
   .stats-grid {
     display: grid;
@@ -154,7 +145,6 @@
   .stat-card.accent-green .stat-value { color: var(--green); }
   .stat-card.accent-red .stat-value { color: var(--red); }
   .stat-card.accent-blue .stat-value { color: var(--blue); }
-
   .live-dot {
     display: inline-block; width: 7px; height: 7px; border-radius: 50%;
     background: var(--green); margin-right: 5px;
@@ -169,7 +159,6 @@
     display: inline-flex; align-items: center; gap: 5px;
     font-size: 11px; color: var(--green); font-weight: 700; margin-top: 3px;
   }
-
   /* ---------- Botón hamburguesa + menú desplegable ---------- */
   .hamburger-btn {
     width: 40px; height: 40px;
@@ -216,7 +205,6 @@
     margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border);
   }
   .menu-drawer .admin-email { font-size: 12px; color: var(--muted); word-break: break-all; margin-bottom: 10px; }
-
   .nav-badge {
     margin-left: auto;
     background: rgba(255,255,255,0.08);
@@ -227,7 +215,6 @@
     border-radius: 20px;
   }
   .nav-item.active .nav-badge { background: rgba(255,122,46,0.2); color: var(--orange); }
-
   /* ---------- Tarjetas generales ---------- */
   .card {
     background: var(--surface);
@@ -240,7 +227,6 @@
     font-size: 15px; margin: 0 0 16px;
     display: flex; align-items: center; gap: 8px;
   }
-
   input {
     width: 100%;
     padding: 12px 14px;
@@ -253,7 +239,6 @@
   }
   input::placeholder { color: var(--muted); }
   input:focus { outline: 2px solid var(--orange); outline-offset: 0; }
-
   button {
     padding: 12px 16px;
     border-radius: 10px;
@@ -270,7 +255,6 @@
   button.full { width: 100%; }
   button.secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
   button.danger { background: var(--red-dim); color: var(--red); }
-
   .mode-row { display: flex; gap: 10px; margin-bottom: 14px; }
   .mode-btn {
     flex: 1;
@@ -283,7 +267,6 @@
     font-size: 13px;
   }
   .mode-btn.active { background: var(--orange-dim); color: var(--orange); border-color: var(--orange); }
-
   .credentials-box {
     background: var(--surface2);
     border: 1px solid var(--border);
@@ -295,9 +278,7 @@
     word-break: break-all;
     display: none;
   }
-
   #error { color: var(--red); font-size: 13px; margin-top: 10px; }
-
   /* ---------- Tabla ---------- */
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; margin-top: 4px; min-width: 640px; }
@@ -313,13 +294,11 @@
   .device-count { color: var(--muted); font-size: 11px; margin-top: 3px; }
   .actions-cell { display: flex; flex-wrap: wrap; gap: 6px; }
   .actions-cell button { width: auto; padding: 7px 11px; font-size: 12px; }
-
   #copyToast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
     background: var(--green); color: #06210f; padding: 11px 20px; border-radius: 30px;
     font-size: 14px; font-weight: 700; display: none; z-index: 50;
   }
-
   @media (max-width: 720px) {
     .sidebar { display: none; }
     .content { padding: 18px; }
@@ -328,7 +307,6 @@
 </style>
 </head>
 <body>
-
 <!-- ---------- LOGIN ---------- -->
 <div id="loginScreen">
   <div class="login-card">
@@ -345,10 +323,8 @@
     <div id="error"></div>
   </div>
 </div>
-
 <!-- ---------- APP (menú hamburguesa + panel), visible tras iniciar sesión ---------- -->
 <div class="app" id="appShell" style="display:none;">
-
   <div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
   <div class="menu-drawer" id="menuDrawer">
     <div class="brand">
@@ -369,7 +345,6 @@
       <button class="secondary full" id="logout">Cerrar sesión</button>
     </div>
   </div>
-
   <div class="main">
     <div class="topbar">
       <button class="hamburger-btn" onclick="openMenu()">☰</button>
@@ -378,7 +353,6 @@
         <p id="viewSubtitle">Genera un código de acceso para un cliente</p>
       </div>
     </div>
-
     <div class="content">
       <!-- ---------- Estadísticas: siempre visibles arriba, sin importar la sección ---------- -->
       <div class="stats-grid">
@@ -403,32 +377,28 @@
           <div class="stat-value" id="statOnline">0</div>
         </div>
       </div>
-
       <!-- ---------- Vista: Crear cliente nuevo ---------- -->
       <div class="card view-section" id="view-create">
         <h2>Generar nuevo código</h2>
         <input id="clientName" type="text" placeholder="Nombre del cliente" required />
-
+        <input id="clientPhone" type="tel" placeholder="Teléfono (WhatsApp) con código de país, ej. 56912345678" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
         <div id="serverSelectRow">
           <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor / lista</label>
           <select id="serverSelect" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" onchange="onServerSelectChange()">
           <option value="">Selecciona uno...</option>
           </select>
         </div>
-
         <!-- Solo aparecen si el servidor/lista elegido es de tipo Xtream Codes -->
         <div id="xtreamCredFields" style="display:none;">
-          <input id="username" type="text" placeholder="Usuario Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
-          <input id="xtreamPassword" type="text" placeholder="Contraseña Xtream" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          <input id="username" type="text" placeholder="Usuario" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          <input id="xtreamPassword" type="text" placeholder="Contraseña" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
         </div>
-
         <div id="useSecondSourceRow">
           <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin: 4px 0 8px; cursor:pointer;">
             <input type="checkbox" id="useSecondSource" style="width:auto; margin:0;" onchange="onUseSecondSourceChange()" />
             Juntar con un segundo servidor o lista (el cliente ve el contenido de ambos junto)
           </label>
         </div>
-
         <div id="secondSourceBox" style="display:none;">
           <div id="serverSelect2Row">
             <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor / lista adicional</label>
@@ -437,21 +407,18 @@
             </select>
           </div>
           <div id="xtreamCredFields2" style="display:none;">
-            <input id="username2" type="text" placeholder="Usuario Xtream (del servidor adicional)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
-            <input id="xtreamPassword2" type="text" placeholder="Contraseña Xtream (del servidor adicional)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+            <input id="username2" type="text" placeholder="Usuario" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+            <input id="xtreamPassword2" type="text" placeholder="Contraseña" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
           </div>
         </div>
-
         <div id="expirationDateBox">
           <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Fecha de vencimiento (opcional)</label>
           <input id="expirationDate" type="date" />
         </div>
-
         <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin: 4px 0 8px; cursor:pointer;">
           <input type="checkbox" id="isDemo" style="width:auto; margin:0;" onchange="onDemoCheckChange()" />
           Marcar como cuenta demo
         </label>
-
         <div id="demoDurationBox" style="display:none;">
           <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Duración de la demo</label>
           <div class="mode-row">
@@ -460,10 +427,12 @@
             <button type="button" id="demo12hBtn" class="mode-btn" onclick="setDemoHours(12)">12 horas</button>
           </div>
         </div>
-
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin: 4px 0 8px; cursor:pointer;">
+          <input type="checkbox" id="sendWhatsapp" style="width:auto; margin:0;" checked />
+          Abrir WhatsApp con el código listo para enviar al cliente
+        </label>
         <button id="generateBtn" class="full">Generar nuevo código</button>
       </div>
-
       <!-- ---------- Vistas con tabla filtrada: activos / por vencer / vencidos / demos ---------- -->
       <div class="card view-section" id="view-table" style="display:none;">
         <h2 id="tableCardTitle">Clientes</h2>
@@ -479,7 +448,6 @@
           </table>
         </div>
       </div>
-
       <!-- ---------- Vista: Paneles sub administrador ---------- -->
       <!-- ---------- Vista: Servidores Xtream (solo el administrador principal las administra) ---------- -->
       <div class="card view-section" id="view-servers" style="display:none;">
@@ -488,7 +456,6 @@
           Guarda acá tus servidores Xtream o listas M3U con un nombre — los sub administradores
           solo van a ver el nombre al generar un código, nunca la URL real.
         </p>
-
         <div id="serverCreateBox">
           <div class="mode-row">
             <button type="button" id="serverTypeXtreamBtn" class="mode-btn active" onclick="setServerType('xtream')">Servidor Xtream Codes</button>
@@ -496,7 +463,6 @@
           </div>
           <input id="serverName" type="text" placeholder="Nombre para identificarlo (ej. Servidor Principal)" />
           <input id="serverHost" type="text" placeholder="URL del servidor (http://servidor.com:8080)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
-
           <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Ocultar secciones completas (opcional)</label>
           <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">
             <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); cursor:pointer;">
@@ -509,13 +475,11 @@
               <input type="checkbox" id="hideTypeSeries" style="width:auto; margin:0;" /> Ocultar Series
             </label>
           </div>
-
           <button id="createServerBtn" class="full">Guardar</button>
         </div>
         <p id="serverBlockedMessage" style="display:none; color:var(--muted); font-size:14px; line-height:1.6;">
           Solo el administrador principal puede agregar o editar servidores y listas.
         </p>
-
         <div class="table-wrap" style="margin-top:20px;">
           <table>
             <thead><tr><th>Nombre</th><th>Tipo</th><th id="serverUrlHeader">URL</th><th>Acciones</th></tr></thead>
@@ -525,7 +489,6 @@
           </table>
         </div>
       </div>
-
       <!-- ---------- Combos: 2 servidores/listas ya guardados, combinados con un nombre ---------- -->
       <div class="card view-section" id="view-servers-combo" style="display:none;">
         <h2>Combos (servidores mixtos)</h2>
@@ -533,26 +496,21 @@
           Junta 2 servidores/listas que ya tengas guardados en uno solo con su propio nombre —
           así, al crear un cliente, eliges el combo directo en vez de armar la combinación cada vez.
         </p>
-
         <div id="comboCreateBox">
           <input id="comboName" type="text" placeholder="Nombre del combo (ej. Full + Deportes)" />
-
           <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Primer servidor / lista</label>
           <select id="comboServer1" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;">
             <option value="">Selecciona uno...</option>
           </select>
-
           <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Segundo servidor / lista</label>
           <select id="comboServer2" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;">
             <option value="">Selecciona uno...</option>
           </select>
-
           <button id="createComboBtn" class="full">Guardar combo</button>
         </div>
         <p id="comboBlockedMessage" style="display:none; color:var(--muted); font-size:14px; line-height:1.6;">
           Solo el administrador principal puede crear combos.
         </p>
-
         <div class="table-wrap" style="margin-top:20px;">
           <table>
             <thead><tr><th>Nombre</th><th>Combina</th><th>Acciones</th></tr></thead>
@@ -562,30 +520,24 @@
           </table>
         </div>
       </div>
-
       <div class="card view-section" id="view-subadmins" style="display:none;">
         <h2>Paneles sub administrador</h2>
-
         <!-- Se muestra solo si eres el administrador principal -->
         <div id="subadminCreateBox">
           <input id="subadminUsername" type="text" placeholder="Usuario del sub administrador (sin espacios)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
           <input id="subadminPassword" type="text" placeholder="Contraseña (mínimo 6 caracteres)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
-
           <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor/lista que va a poder usar (solo ese, no ve los demás)</label>
           <select id="subadminServerSelect" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;">
             <option value="">Selecciona uno...</option>
           </select>
-
           <button id="createSubadminBtn" class="full">Crear sub administrador</button>
           <div id="subadminError" style="color:var(--red); font-size:13px; margin-top:10px;"></div>
         </div>
-
         <!-- Se muestra si NO eres el administrador principal -->
         <p id="subadminBlockedMessage" style="display:none; color:var(--muted); font-size:14px; line-height:1.6;">
           Solo el administrador principal puede crear otros sub administradores.
         </p>
       </div>
-
       <div class="card view-section" id="view-subadmins-list" style="display:none;">
         <h2>Sub administradores existentes</h2>
         <div class="table-wrap">
@@ -598,17 +550,13 @@
         </div>
       </div>
     </div>
-
   </div>
 </div>
-
 <div id="copyToast">Código copiado</div>
-
 <!-- Firebase (SDK compat, sin necesidad de bundler) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-
 <script>
   // =========================================================================
   // 1) PEGA AQUI la configuracion de tu proyecto de Firebase
@@ -623,20 +571,16 @@
     appId: "1:880287180978:web:019ab79dd76a24d96e81ab"
   };
   // =========================================================================
-
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db = firebase.firestore();
-
   // Los sub administradores inician sesión con "usuario" en vez de correo — por dentro,
   // Firebase Auth sigue necesitando algo con forma de correo, así que se arma uno interno
   // pegándole este dominio (el sub administrador nunca lo ve ni lo necesita saber).
   const SUBADMIN_EMAIL_DOMAIN = '@subadmin.jetgo.internal';
-
   const loginScreen = document.getElementById('loginScreen');
   const appShell = document.getElementById('appShell');
   const errorEl = document.getElementById('error');
-
   document.getElementById('loginBtn').addEventListener('click', () => {
     const input = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
@@ -655,12 +599,9 @@
         }
       });
   });
-
   document.getElementById('logout').addEventListener('click', () => auth.signOut());
-
   let currentUserRole = 'admin'; // por defecto, hasta que se confirme contra Firestore
   let currentAssignedServerId = null; // solo aplica si currentUserRole === 'subadmin'
-
   auth.onAuthStateChanged(async user => {
     if (user) {
       // Revisa si esta cuenta tiene un rol asignado (sub administrador) o si fue revocada
@@ -685,12 +626,10 @@
         currentUserRole = 'admin';
         currentAssignedServerId = null;
       }
-
       document.getElementById('subadminCreateBox').style.display = currentUserRole === 'admin' ? 'block' : 'none';
       document.getElementById('subadminBlockedMessage').style.display = currentUserRole === 'admin' ? 'none' : 'block';
       // Un sub administrador ni siquiera ve esta opción en el menú
       document.getElementById('nav-subadmins').style.display = currentUserRole === 'admin' ? 'flex' : 'none';
-
       // Solo el principal ve el menú de Servidores y la opción de URL suelta al crear un código
       document.getElementById('nav-servers').style.display = currentUserRole === 'admin' ? 'flex' : 'none';
       document.getElementById('serverCreateBox').style.display = currentUserRole === 'admin' ? 'block' : 'none';
@@ -698,7 +637,6 @@
       document.getElementById('serverUrlHeader').style.display = currentUserRole === 'admin' ? '' : 'none';
       document.getElementById('comboCreateBox').style.display = currentUserRole === 'admin' ? 'block' : 'none';
       document.getElementById('comboBlockedMessage').style.display = currentUserRole === 'admin' ? 'none' : 'block';
-
       loginScreen.style.display = 'none';
       appShell.style.display = 'flex';
       document.getElementById('adminEmail').textContent = currentUsername || user.email || '';
@@ -711,12 +649,10 @@
       appShell.style.display = 'none';
     }
   });
-
   // ---------- Elegir un servidor o lista del desplegable: muestra usuario/clave solo si es Xtream ----------
   function onServerSelectChange() {
     const select = document.getElementById('serverSelect');
     const value = select.value;
-
     if (value.startsWith('combo::')) {
       // Es un combo: se muestran los campos de usuario/clave que correspondan según el tipo
       // de cada uno de los 2 servidores que lo componen, y se oculta la opción manual de
@@ -725,26 +661,21 @@
       const combo = combosList.find(c => c.id === comboId);
       const member1 = combo ? serversList.find(s => s.id === combo.memberIds[0]) : null;
       const member2 = combo ? serversList.find(s => s.id === combo.memberIds[1]) : null;
-
       document.getElementById('xtreamCredFields').style.display = (member1 && member1.type !== 'm3u') ? 'block' : 'none';
-
       document.getElementById('useSecondSourceRow').style.display = 'none';
       document.getElementById('secondSourceBox').style.display = 'block';
       document.getElementById('serverSelect2Row').style.display = 'none';
       document.getElementById('xtreamCredFields2').style.display = (member2 && member2.type !== 'm3u') ? 'block' : 'none';
       return;
     }
-
     document.getElementById('useSecondSourceRow').style.display = currentUserRole === 'subadmin' ? 'none' : 'block';
     document.getElementById('serverSelect2Row').style.display = 'block';
     onUseSecondSourceChange();
-
     const selected = serversList.find(s => s.host === value);
     const isXtream = selected ? selected.type !== 'm3u' : false;
     document.getElementById('xtreamCredFields').style.display = isXtream ? 'block' : 'none';
   }
   window.onServerSelectChange = onServerSelectChange;
-
   // ---------- Alternar tipo al GUARDAR un servidor/lista nuevo (sección Servidores) ----------
   let newServerType = 'xtream';
   function setServerType(type) {
@@ -756,7 +687,6 @@
       : 'URL de la lista M3U';
   }
   window.setServerType = setServerType;
-
   // ---------- Duración de la demo (3, 5 o 12 horas) ----------
   let demoHours = 3;
   function setDemoHours(hours) {
@@ -766,7 +696,6 @@
     document.getElementById('demo12hBtn').classList.toggle('active', hours === 12);
   }
   window.setDemoHours = setDemoHours;
-
   function onDemoCheckChange() {
     const isDemo = document.getElementById('isDemo').checked;
     document.getElementById('demoDurationBox').style.display = isDemo ? 'block' : 'none';
@@ -774,7 +703,6 @@
     document.getElementById('expirationDateBox').style.display = isDemo ? 'none' : 'block';
   }
   window.onDemoCheckChange = onDemoCheckChange;
-
   // ---------- Menú hamburguesa: abrir/cerrar ----------
   function openMenu() {
     document.getElementById('menuDrawer').classList.add('open');
@@ -786,7 +714,6 @@
   }
   window.openMenu = openMenu;
   window.closeMenu = closeMenu;
-
   // ---------- Navegación entre las 6 secciones ----------
   const VIEW_INFO = {
     create: { title: 'Crear cliente nuevo', subtitle: 'Genera un código de acceso para un cliente' },
@@ -798,7 +725,6 @@
     subadmins: { title: 'Paneles sub administrador', subtitle: 'Dar acceso a este panel a otra persona' }
   };
   let currentView = 'create';
-
   function selectView(name) {
     currentView = name;
     document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
@@ -825,7 +751,6 @@
     closeMenu();
   }
   window.selectView = selectView;
-
   // ---------- Formatear una fecha de Firestore de forma legible ----------
   function formatDate(timestamp) {
     if (!timestamp || !timestamp.toDate) return '-';
@@ -833,14 +758,12 @@
     return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
       ' ' + d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
   }
-
   // ---------- Formatear solo la fecha (sin hora), para el vencimiento ----------
   function formatDateOnly(dateStr) {
     if (!dateStr) return '<span style="color:var(--muted)">Sin vencimiento</span>';
     const d = new Date(dateStr + 'T00:00:00');
     return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
-
   // ---------- Generar un codigo nuevo (6 digitos numericos) ----------
   function generateRandomCode() {
     let code = '';
@@ -849,23 +772,25 @@
     }
     return code;
   }
-
   document.getElementById('generateBtn').addEventListener('click', async () => {
     const clientName = document.getElementById('clientName').value.trim();
     if (!clientName) {
       alert('El nombre del cliente es obligatorio.');
       return;
     }
-
+    const clientPhoneRaw = document.getElementById('clientPhone').value.trim();
+    const sendWhatsapp = document.getElementById('sendWhatsapp').checked;
+    if (sendWhatsapp && !clientPhoneRaw) {
+      alert('Escribe el teléfono del cliente (con código de país), o desmarca la opción de enviar por WhatsApp.');
+      return;
+    }
     const selectedValue = document.getElementById('serverSelect').value;
     if (!selectedValue) {
       alert('Selecciona un servidor, lista o combo de la lista.');
       return;
     }
-
     // ---- Arma la(s) fuente(s) combinadas: 1 normalmente, 2 si se activó la casilla, o las 2 fijas de un combo ----
     const sources = [];
-
     function buildSource(server, usernameFieldId, passwordFieldId) {
       if (server.type === 'm3u') {
         return { type: 'm3u', serverId: server.id, m3uUrl: server.host };
@@ -875,9 +800,7 @@
       if (!username || !password) return null;
       return { type: 'xtream', serverId: server.id, host: server.host, username: username, password: password };
     }
-
     let selectedServer;
-
     if (selectedValue.startsWith('combo::')) {
       const comboId = selectedValue.substring('combo::'.length);
       const combo = combosList.find(c => c.id === comboId);
@@ -889,12 +812,12 @@
       }
       const source1 = buildSource(member1, 'username', 'xtreamPassword');
       if (member1.type !== 'm3u' && !source1) {
-        alert('Completa usuario y contraseña para "' + member1.name + '".');
+        alert('Completa usuario y contraseña del primer servidor del combo.');
         return;
       }
       const source2 = buildSource(member2, 'username2', 'xtreamPassword2');
       if (member2.type !== 'm3u' && !source2) {
-        alert('Completa usuario y contraseña para "' + member2.name + '".');
+        alert('Completa usuario y contraseña del segundo servidor del combo.');
         return;
       }
       sources.push(source1, source2);
@@ -905,14 +828,12 @@
         alert('Selecciona un servidor o lista de la lista.');
         return;
       }
-
       const source1 = buildSource(selectedServer, 'username', 'xtreamPassword');
       if (selectedServer.type !== 'm3u' && !source1) {
-        alert('Completa usuario y contraseña de Xtream Codes.');
+        alert('Completa usuario y contraseña.');
         return;
       }
       sources.push(source1);
-
       const useSecond = document.getElementById('useSecondSource').checked;
       if (useSecond) {
         const selectedHost2 = document.getElementById('serverSelect2').value;
@@ -923,23 +844,22 @@
         }
         const source2 = buildSource(selectedServer2, 'username2', 'xtreamPassword2');
         if (selectedServer2.type !== 'm3u' && !source2) {
-          alert('Completa usuario y contraseña del servidor Xtream adicional.');
+          alert('Completa usuario y contraseña del servidor adicional.');
           return;
         }
         sources.push(source2);
       }
     }
-
     const isDemo = document.getElementById('isDemo').checked;
     const expirationDate = isDemo ? null : (document.getElementById('expirationDate').value || null);
     // Nota: no hay ningún límite acá que impida crear un segundo código para el mismo
     // cliente — si alguien quiere dos cuentas, ambos códigos quedan activos por separado,
     // sin que uno afecte al otro.
     const code = generateRandomCode();
-
     const docData = {
       active: true,
       clientName: clientName,
+      clientPhone: clientPhoneRaw || null,
       // Se guardan también sueltos (mode/host/username/password/m3uUrl) apuntando a la
       // PRIMERA fuente, por compatibilidad con versiones viejas de la app.
       mode: sources[0].type,
@@ -954,14 +874,23 @@
       ownerId: auth.currentUser.uid,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-
     if (isDemo) {
       const expires = new Date(Date.now() + demoHours * 60 * 60 * 1000);
       docData.demoExpiresAt = firebase.firestore.Timestamp.fromDate(expires);
     }
-
     await db.collection('access_codes').doc(code).set(docData);
+
+    // ---- Abre WhatsApp con el mensaje del servicio ya armado, listo para enviar ----
+    if (sendWhatsapp && clientPhoneRaw) {
+      const phoneDigits = clientPhoneRaw.replace(/[^0-9]/g, '');
+      const mensaje = 'Hola ' + clientName + ', tu código de acceso a JetGo es: *' + code +
+        '*. Descarga la app, ábrela e ingresa este código para comenzar a disfrutar tu servicio. ¡Gracias por confiar en nosotros!';
+      const waUrl = 'https://wa.me/' + phoneDigits + '?text=' + encodeURIComponent(mensaje);
+      window.open(waUrl, '_blank');
+    }
+
     document.getElementById('clientName').value = '';
+    document.getElementById('clientPhone').value = '';
     document.getElementById('serverSelect').value = '';
     onServerSelectChange();
     document.getElementById('username').value = '';
@@ -977,10 +906,8 @@
     setDemoHours(3);
     showToast('Codigo generado: ' + code);
   });
-
   // ---------- Listar codigos en tiempo real + estadisticas ----------
   let lastSnapshotDocs = [];
-
   function listenToCodes() {
     // El principal ve todos los códigos; un sub administrador solo ve los que él mismo creó.
     let query = db.collection('access_codes');
@@ -989,7 +916,6 @@
     } else {
       query = query.orderBy('createdAt', 'desc');
     }
-
     query.onSnapshot(snapshot => {
         lastSnapshotDocs = [];
         snapshot.forEach(doc => lastSnapshotDocs.push({ id: doc.id, data: doc.data() }));
@@ -1000,42 +926,35 @@
         }
         renderCodes();
       });
-
     // Vuelve a dibujar cada 15 segundos SIN volver a consultar Firestore, solo para que el
     // "en línea ahora" se vaya poniendo gris solo cuando pasan más de 2 minutos sin aviso.
     setInterval(renderCodes, 15000);
   }
-
   /** Un dispositivo se considera "en línea ahora" si avisó actividad en los últimos 2 minutos */
   function isDeviceOnline(timestamp) {
     if (!timestamp || !timestamp.toDate) return false;
     return (Date.now() - timestamp.toDate().getTime()) < 2 * 60 * 1000;
   }
-
   function countOnline(deviceActivity) {
     if (!deviceActivity) return 0;
     return Object.values(deviceActivity).filter(isDeviceOnline).length;
   }
-
   /** true si la fecha de vencimiento (string "YYYY-MM-DD") ya pasó */
   function isExpired(expirationDate) {
     if (!expirationDate) return false;
     return new Date(expirationDate + 'T23:59:59') < new Date();
   }
-
   /** true si vence dentro de los próximos 7 días (y todavía no venció) */
   function isExpiringSoon(expirationDate) {
     if (!expirationDate) return false;
     const diffDays = (new Date(expirationDate + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24);
     return diffDays >= 0 && diffDays <= 7;
   }
-
   /** true si una demo ya pasó su hora exacta de vencimiento */
   function isDemoExpired(demoExpiresAt) {
     if (!demoExpiresAt || !demoExpiresAt.toDate) return false;
     return demoExpiresAt.toDate() < new Date();
   }
-
   /** Texto legible de cuánto le queda (o hace cuánto venció) a una demo */
   function demoTimeLabel(demoExpiresAt) {
     if (!demoExpiresAt || !demoExpiresAt.toDate) return '-';
@@ -1045,12 +964,10 @@
     const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
     return hours > 0 ? ('Quedan ' + hours + 'h ' + mins + 'm') : ('Quedan ' + mins + ' min');
   }
-
   function renderCodes() {
     const tbody = document.getElementById('codesTableBody');
     let totalCount = 0, activeCount = 0, revokedCount = 0, deviceTotal = 0, onlineTotal = 0;
     let activeNav = 0, expiringNav = 0, expiredNav = 0, demosNav = 0;
-
     lastSnapshotDocs.forEach(({ data }) => {
       const active = data.active !== false;
       if (active && !data.isDemo) activeNav++;
@@ -1062,9 +979,7 @@
     document.getElementById('badge-expiring').textContent = expiringNav;
     document.getElementById('badge-expired').textContent = expiredNav;
     document.getElementById('badge-demos').textContent = demosNav;
-
     const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
-
     const filtered = lastSnapshotDocs.filter(({ id: code, data }) => {
       const active = data.active !== false;
       if (currentView === 'active' && (!active || data.isDemo)) return false;
@@ -1074,7 +989,6 @@
       if (query && !(code + ' ' + (data.clientName || '')).toLowerCase().includes(query)) return false;
       return true;
     });
-
     if (tbody) {
       if (filtered.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">No hay códigos en esta sección.</td></tr>';
@@ -1086,7 +1000,6 @@
           const onlineCount = countOnline(data.deviceActivity);
           const expired = data.isDemo ? isDemoExpired(data.demoExpiresAt) : isExpired(data.expirationDate);
           const expiringSoon = !data.isDemo && isExpiringSoon(data.expirationDate);
-
           let credText = '';
           if (data.mode === 'm3u') {
             credText = 'M3U: ' + (data.m3uUrl || '(sin cargar)');
@@ -1095,7 +1008,6 @@
               ' | Usuario: ' + (data.username || '-') +
               ' | Clave: ' + (data.password || '-');
           }
-
           const deviceIds = Array.isArray(data.deviceIds) ? data.deviceIds : [];
           const deviceNames = data.deviceNames || {};
           const devicesListHtml = deviceIds.length === 0
@@ -1111,14 +1023,12 @@
                   '<button class="danger" style="padding:4px 9px; font-size:11px; flex-shrink:0;" onclick="removeDevice(\'' + code + '\', \'' + id.replace(/'/g, "\\'") + '\')">Quitar</button>' +
                 '</div>';
               }).join('');
-
           const onlineBadge = onlineCount > 0
             ? '<div class="online-badge"><span class="live-dot"></span>' + onlineCount + ' en línea</div>'
             : '';
           const demoBadge = data.isDemo ? ' <span class="badge" style="background:rgba(79,141,253,0.15);color:var(--blue);">Demo</span>' : '';
           const expireColor = expired ? 'var(--red)' : (expiringSoon ? 'var(--orange)' : 'var(--muted)');
           const expireText = data.isDemo ? demoTimeLabel(data.demoExpiresAt) : formatDateOnly(data.expirationDate);
-
           const upgradeBox = data.isDemo ? (
             '<div class="credentials-box upgrade-box">' +
               '<div style="font-size:12px; color:var(--muted); margin-bottom:8px;">Elige el plan a activar:</div>' +
@@ -1130,7 +1040,9 @@
               '</div>' +
             '</div>'
           ) : '';
-
+          const whatsappBtn = data.clientPhone
+            ? '<button class="secondary" onclick="resendWhatsapp(\'' + code + '\', ' + JSON.stringify(data.clientName || '').replace(/"/g, '&quot;') + ', ' + JSON.stringify(data.clientPhone).replace(/"/g, '&quot;') + ')">Reenviar WhatsApp</button>'
+            : '';
           const tr = document.createElement('tr');
           tr.innerHTML =
             '<td class="code-cell">' + code + '</td>' +
@@ -1139,6 +1051,7 @@
             '<td style="color:' + expireColor + '; font-size:12px; font-weight:' + (expired || expiringSoon ? '700' : '400') + ';">' + expireText + '</td>' +
             '<td class="actions-cell">' +
               '<button class="secondary" onclick="copyCode(\'' + code + '\')">Copiar</button>' +
+              whatsappBtn +
               '<button class="secondary" onclick="toggleCreds(this, \'.credentials-box\')">Ver datos</button>' +
               '<button class="secondary" onclick="toggleCreds(this, \'.devices-box\')">Dispositivos (' + deviceCount + ')</button>' +
               (data.isDemo ? '<button class="secondary" onclick="toggleCreds(this, \'.upgrade-box\')">Actualizar plan</button>' : '') +
@@ -1152,7 +1065,6 @@
         });
       }
     }
-
     // Las estadísticas de arriba siempre reflejan TODOS los códigos, sin importar la sección
     lastSnapshotDocs.forEach(({ data }) => {
       totalCount++;
@@ -1162,7 +1074,6 @@
     });
     updateStats(totalCount, activeCount, revokedCount, deviceTotal, onlineTotal);
   }
-
   function updateStats(total, active, revoked, devices, online) {
     document.getElementById('statTotal').textContent = total;
     document.getElementById('statActive').textContent = active;
@@ -1170,16 +1081,20 @@
     document.getElementById('statDevices').textContent = devices;
     document.getElementById('statOnline').textContent = online;
   }
-
   window.toggleCreds = (btn, selector) => {
     const box = btn.closest('td').querySelector(selector || '.credentials-box');
     box.style.display = box.style.display === 'block' ? 'none' : 'block';
   };
-
   window.toggleActive = async (code, currentlyActive) => {
     await db.collection('access_codes').doc(code).update({ active: !currentlyActive });
   };
-
+  window.resendWhatsapp = (code, clientName, clientPhone) => {
+    const phoneDigits = String(clientPhone).replace(/[^0-9]/g, '');
+    const mensaje = 'Hola ' + clientName + ', tu código de acceso a JetGo es: *' + code +
+      '*. Descarga la app, ábrela e ingresa este código para comenzar a disfrutar tu servicio. ¡Gracias por confiar en nosotros!';
+    const waUrl = 'https://wa.me/' + phoneDigits + '?text=' + encodeURIComponent(mensaje);
+    window.open(waUrl, '_blank');
+  };
   // Quita SOLO un dispositivo puntual de la lista (por su id), dejando el resto intactos.
   window.removeDevice = async (code, deviceId) => {
     if (!confirm('¿Quitar este dispositivo del código ' + code + '? Va a dejar de tener acceso hasta que vuelva a ingresar el código.')) return;
@@ -1193,7 +1108,6 @@
     await docRef.update(updates);
     showToast('Dispositivo quitado');
   };
-
   // Convierte una cuenta demo en un plan pago: deja de ser demo y le pone la fecha de
   // vencimiento correspondiente (hoy + los meses elegidos), quedando activa como cliente normal.
   window.upgradeToPlan = async (code, months) => {
@@ -1211,28 +1125,21 @@
     });
     showToast('Plan de ' + labels[months] + ' activado');
   };
-
   window.deleteCode = async (code) => {
     if (!confirm('Eliminar el codigo ' + code + '? Esta accion no se puede deshacer.')) return;
     await db.collection('access_codes').doc(code).delete();
   };
-
   window.copyCode = (code) => {
     navigator.clipboard.writeText(code);
     showToast('Codigo copiado');
   };
-
   // ---------- Crear sub administrador (solo el principal ve este botón) ----------
-  // Los sub administradores inician sesión con "usuario" en vez de correo — por dentro,
-  // Firebase Auth sigue necesitando algo con forma de correo, así que se arma uno interno
-  // pegándole este dominio (el sub administrador nunca lo ve ni lo necesita saber).
   document.getElementById('createSubadminBtn').addEventListener('click', async () => {
     const username = document.getElementById('subadminUsername').value.trim().toLowerCase().replace(/\s+/g, '');
     const password = document.getElementById('subadminPassword').value;
     const assignedServerId = document.getElementById('subadminServerSelect').value;
     const errEl = document.getElementById('subadminError');
     errEl.textContent = '';
-
     if (!username || !password || password.length < 6) {
       errEl.textContent = 'Completa un usuario y una contraseña de al menos 6 caracteres.';
       return;
@@ -1241,9 +1148,7 @@
       errEl.textContent = 'Elige qué servidor/lista va a poder usar este sub administrador.';
       return;
     }
-
     const syntheticEmail = username + SUBADMIN_EMAIL_DOMAIN;
-
     // Se usa una app secundaria de Firebase SOLO para crear la cuenta, así no se cierra
     // tu sesión de administrador principal (crear un usuario con el SDK normalmente
     // inicia sesión como ese usuario nuevo, que es justo lo que queremos evitar acá).
@@ -1253,7 +1158,6 @@
       const cred = await secondaryApp.auth().createUserWithEmailAndPassword(syntheticEmail, password);
       const newUid = cred.user.uid;
       await secondaryApp.auth().signOut();
-
       await db.collection('admins').doc(newUid).set({
         username: username,
         email: syntheticEmail,
@@ -1262,7 +1166,6 @@
         assignedServerId: assignedServerId,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-
       document.getElementById('subadminUsername').value = '';
       document.getElementById('subadminPassword').value = '';
       document.getElementById('subadminServerSelect').value = '';
@@ -1277,7 +1180,6 @@
       if (secondaryApp) await secondaryApp.delete();
     }
   });
-
   // ---------- Listar sub administradores existentes ----------
   async function loadSubadmins() {
     const tbody = document.getElementById('subadminsTableBody');
@@ -1325,21 +1227,17 @@
       tbody.innerHTML = '<tr><td colspan="4" style="color:var(--red)">No se pudo cargar la lista.</td></tr>';
     }
   }
-
   window.toggleSubadminRevoked = async (uid, currentlyRevoked) => {
     await db.collection('admins').doc(uid).update({ revoked: !currentlyRevoked });
     showToast(currentlyRevoked ? 'Acceso reactivado' : 'Acceso revocado');
     loadSubadmins();
   };
-
   window.changeSubadminServer = async (uid, newServerId) => {
     await db.collection('admins').doc(uid).update({ assignedServerId: newServerId || null });
     showToast(newServerId ? 'Servidor asignado actualizado' : 'Servidor quitado');
   };
-
   // ---------- Servidores Xtream guardados por nombre ----------
   let serversList = [];
-
   async function loadServers() {
     try {
       const snapshot = await db.collection('servers').orderBy('name').get();
@@ -1351,7 +1249,6 @@
     renderComboServerDropdowns();
     renderSubadminServerDropdown();
   }
-
   function renderSubadminServerDropdown() {
     const select = document.getElementById('subadminServerSelect');
     if (!select) return;
@@ -1364,7 +1261,6 @@
     select.innerHTML = '<option value="">Selecciona uno...</option>' + serverOptions + comboOptions;
     select.value = currentValue;
   }
-
   function renderServerDropdown() {
     // Un sub administrador solo puede ver/usar el servidor (o combo) que le asignó el
     // principal — ni el resto de la lista, ni otros combos.
@@ -1374,15 +1270,12 @@
     const visibleCombos = currentUserRole === 'subadmin'
       ? combosList.filter(c => ('combo::' + c.id) === currentAssignedServerId)
       : combosList;
-
     const optionsHtml = '<option value="">Selecciona uno...</option>' +
       visibleServers.map(s => '<option value="' + s.host.replace(/"/g, '&quot;') + '">' + s.name.replace(/</g, '&lt;') + (s.type === 'm3u' ? ' (Lista M3U)' : ' (Xtream)') + '</option>').join('');
-
     const comboOptionsHtml = visibleCombos.length === 0 ? '' :
       '<optgroup label="Combos">' +
         visibleCombos.map(c => '<option value="combo::' + c.id + '">' + c.name.replace(/</g, '&lt;') + ' (Combo)</option>').join('') +
       '</optgroup>';
-
     const select = document.getElementById('serverSelect');
     const currentValue = select.value;
     select.innerHTML = optionsHtml + comboOptionsHtml;
@@ -1403,7 +1296,6 @@
       serverSelectRow.style.display = 'block';
     }
     onServerSelectChange();
-
     const select2 = document.getElementById('serverSelect2');
     if (select2) {
       const currentValue2 = select2.value;
@@ -1412,12 +1304,10 @@
       onServerSelect2Change();
     }
   }
-
   function onUseSecondSourceChange() {
     document.getElementById('secondSourceBox').style.display = document.getElementById('useSecondSource').checked ? 'block' : 'none';
   }
   window.onUseSecondSourceChange = onUseSecondSourceChange;
-
   function onServerSelect2Change() {
     const select2 = document.getElementById('serverSelect2');
     const selected = serversList.find(s => s.host === select2.value);
@@ -1425,7 +1315,6 @@
     document.getElementById('xtreamCredFields2').style.display = isXtream ? 'block' : 'none';
   }
   window.onServerSelect2Change = onServerSelect2Change;
-
   function renderServersTable() {
     const tbody = document.getElementById('serversTableBody');
     if (serversList.length === 0) {
@@ -1468,7 +1357,6 @@
       tbody.appendChild(tr);
     });
   }
-
   window.saveHiddenCategories = async (serverId) => {
     const raw = document.getElementById('hiddenCatsInput_' + serverId).value;
     const categories = raw.split('\n').map(c => c.trim()).filter(c => c.length > 0);
@@ -1481,7 +1369,6 @@
     await loadServers();
     renderServersTable();
   };
-
   document.getElementById('createServerBtn').addEventListener('click', async () => {
     const name = document.getElementById('serverName').value.trim();
     const host = document.getElementById('serverHost').value.trim();
@@ -1493,7 +1380,6 @@
     if (document.getElementById('hideTypeLive').checked) hiddenTypes.push('live');
     if (document.getElementById('hideTypeMovie').checked) hiddenTypes.push('movie');
     if (document.getElementById('hideTypeSeries').checked) hiddenTypes.push('series');
-
     await db.collection('servers').add({
       name: name,
       host: host,
@@ -1510,17 +1396,14 @@
     await loadServers();
     renderServersTable();
   });
-
   window.deleteServer = async (id) => {
     if (!confirm('¿Eliminar este servidor? Los códigos que ya lo usan no se ven afectados, solo dejará de aparecer como opción para códigos nuevos.')) return;
     await db.collection('servers').doc(id).delete();
     await loadServers();
     renderServersTable();
   };
-
   // ---------- Combos: 2 servidores/listas ya guardados, combinados con un nombre ----------
   let combosList = [];
-
   async function loadCombos() {
     try {
       const snapshot = await db.collection('combos').orderBy('name').get();
@@ -1532,7 +1415,6 @@
     renderServerDropdown(); // para que los combos aparezcan también en "Crear cliente nuevo"
     renderSubadminServerDropdown();
   }
-
   function renderComboServerDropdowns() {
     const optionsHtml = '<option value="">Selecciona uno...</option>' +
       serversList.map(s => '<option value="' + s.id + '">' + s.name.replace(/</g, '&lt;') + (s.type === 'm3u' ? ' (Lista M3U)' : ' (Xtream)') + '</option>').join('');
@@ -1541,7 +1423,6 @@
     if (sel1) { const v = sel1.value; sel1.innerHTML = optionsHtml; sel1.value = v; }
     if (sel2) { const v = sel2.value; sel2.innerHTML = optionsHtml; sel2.value = v; }
   }
-
   function renderCombosTable() {
     const tbody = document.getElementById('combosTableBody');
     if (!tbody) return;
@@ -1567,7 +1448,6 @@
       tbody.appendChild(tr);
     });
   }
-
   document.getElementById('createComboBtn')?.addEventListener('click', async () => {
     const name = document.getElementById('comboName').value.trim();
     const id1 = document.getElementById('comboServer1').value;
@@ -1592,14 +1472,12 @@
     await loadCombos();
     renderCombosTable();
   });
-
   window.deleteCombo = async (id) => {
     if (!confirm('¿Eliminar este combo? Los códigos que ya lo usan no se ven afectados.')) return;
     await db.collection('combos').doc(id).delete();
     await loadCombos();
     renderCombosTable();
   };
-
   function showToast(msg) {
     const toast = document.getElementById('copyToast');
     toast.textContent = msg;
