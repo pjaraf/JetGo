@@ -642,8 +642,14 @@
       document.getElementById('adminEmail').textContent = currentUsername || user.email || '';
       selectView('create');
       listenToCodes();
-      loadServers();
-      loadCombos();
+      // Se esperan las 2 cargas (servidores y combos) ANTES de dibujar el desplegable de
+      // "Crear cliente nuevo" — si se dibuja antes de que termine de cargar la lista de
+      // combos, un sub administrador con un combo asignado puede quedar sin nada
+      // seleccionado (y por lo tanto, sin pedirle usuario/clave de ningún servidor).
+      Promise.all([loadServers(), loadCombos()]).then(() => {
+        renderServerDropdown();
+        renderSubadminServerDropdown();
+      });
     } else {
       loginScreen.style.display = 'flex';
       appShell.style.display = 'none';
