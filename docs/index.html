@@ -1292,14 +1292,24 @@
         const data = doc.data();
         const revoked = data.revoked === true;
         const createdText = formatDate(data.createdAt);
-        const assignedServer = serversList.find(s => s.id === data.assignedServerId);
+        const isComboAssigned = (data.assignedServerId || '').startsWith('combo::');
+        const assignedComboId = isComboAssigned ? data.assignedServerId.substring('combo::'.length) : null;
+        const assignedServer = isComboAssigned
+          ? combosList.find(c => c.id === assignedComboId)
+          : serversList.find(s => s.id === data.assignedServerId);
+        const assignedName = assignedServer ? assignedServer.name + (isComboAssigned ? ' (Combo)' : '') : null;
         const tr = document.createElement('tr');
+        const serverOptionsHtml = serversList.map(s => '<option value="' + s.id + '"' + (s.id === data.assignedServerId ? ' selected' : '') + '>' + s.name.replace(/</g, '&lt;') + '</option>').join('');
+        const comboOptionsHtml = combosList.length === 0 ? '' :
+          '<optgroup label="Combos">' +
+            combosList.map(c => '<option value="combo::' + c.id + '"' + (('combo::' + c.id) === data.assignedServerId ? ' selected' : '') + '>' + c.name.replace(/</g, '&lt;') + '</option>').join('') +
+          '</optgroup>';
         const serverCellHtml = currentUserRole === 'admin'
           ? '<select onchange="changeSubadminServer(\'' + doc.id + '\', this.value)" style="padding:6px 8px; border-radius:6px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:12px;">' +
               '<option value="">Sin asignar</option>' +
-              serversList.map(s => '<option value="' + s.id + '"' + (s.id === data.assignedServerId ? ' selected' : '') + '>' + s.name.replace(/</g, '&lt;') + '</option>').join('') +
+              serverOptionsHtml + comboOptionsHtml +
             '</select>'
-          : (assignedServer ? assignedServer.name : 'Sin asignar');
+          : (assignedName || 'Sin asignar');
         tr.innerHTML =
           '<td>' + (data.username || data.email) + (revoked ? ' <span class="badge revoked">Revocado</span>' : ' <span class="badge active">Activo</span>') + '</td>' +
           '<td style="color:var(--muted); font-size:12px;">' + createdText + '</td>' +
@@ -1346,18 +1356,24 @@
     const select = document.getElementById('subadminServerSelect');
     if (!select) return;
     const currentValue = select.value;
-    select.innerHTML = '<option value="">Selecciona uno...</option>' +
-      serversList.map(s => '<option value="' + s.id + '">' + s.name.replace(/</g, '&lt;') + (s.type === 'm3u' ? ' (Lista M3U)' : ' (Xtream)') + '</option>').join('');
+    const serverOptions = serversList.map(s => '<option value="' + s.id + '">' + s.name.replace(/</g, '&lt;') + (s.type === 'm3u' ? ' (Lista M3U)' : ' (Xtream)') + '</option>').join('');
+    const comboOptions = combosList.length === 0 ? '' :
+      '<optgroup label="Combos">' +
+        combosList.map(c => '<option value="combo::' + c.id + '">' + c.name.replace(/</g, '&lt;') + ' (Combo)</option>').join('') +
+      '</optgroup>';
+    select.innerHTML = '<option value="">Selecciona uno...</option>' + serverOptions + comboOptions;
     select.value = currentValue;
   }
 
   function renderServerDropdown() {
-    // Un sub administrador solo puede ver/usar el servidor que le asignó el principal —
-    // ni el resto de la lista, ni combos (esos siempre combinan más de un servidor).
+    // Un sub administrador solo puede ver/usar el servidor (o combo) que le asignó el
+    // principal — ni el resto de la lista, ni otros combos.
     const visibleServers = currentUserRole === 'subadmin'
       ? serversList.filter(s => s.id === currentAssignedServerId)
       : serversList;
-    const visibleCombos = currentUserRole === 'subadmin' ? [] : combosList;
+    const visibleCombos = currentUserRole === 'subadmin'
+      ? combosList.filter(c => ('combo::' + c.id) === currentAssignedServerId)
+      : combosList;
 
     const optionsHtml = '<option value="">Selecciona uno...</option>' +
       visibleServers.map(s => '<option value="' + s.host.replace(/"/g, '&quot;') + '">' + s.name.replace(/</g, '&lt;') + (s.type === 'm3u' ? ' (Lista M3U)' : ' (Xtream)') + '</option>').join('');
@@ -1371,13 +1387,17 @@
     const currentValue = select.value;
     select.innerHTML = optionsHtml + comboOptionsHtml;
     select.value = currentValue;
-    // Al sub administrador se le deja su servidor ya elegido de entrada — no tiene sentido
-    // pedirle que "elija" ni mostrarle nada del servidor si solo puede usar uno.
+    // Al sub administrador se le deja su servidor (o combo) ya elegido de entrada — no tiene
+    // sentido pedirle que "elija" ni mostrarle nada del servidor si solo puede usar uno.
     const serverSelectRow = document.getElementById('serverSelectRow');
     if (currentUserRole === 'subadmin') {
       if (serverSelectRow) serverSelectRow.style.display = 'none';
-      if (!currentValue && visibleServers.length === 1) {
-        select.value = visibleServers[0].host;
+      if (!currentValue) {
+        if (visibleServers.length === 1) {
+          select.value = visibleServers[0].host;
+        } else if (visibleCombos.length === 1) {
+          select.value = 'combo::' + visibleCombos[0].id;
+        }
       }
     } else if (serverSelectRow) {
       serverSelectRow.style.display = 'block';
@@ -1510,6 +1530,7 @@
     }
     renderComboServerDropdowns();
     renderServerDropdown(); // para que los combos aparezcan también en "Crear cliente nuevo"
+    renderSubadminServerDropdown();
   }
 
   function renderComboServerDropdowns() {
