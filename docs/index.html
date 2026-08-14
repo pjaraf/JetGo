@@ -339,7 +339,7 @@
         <div class="sub">Panel de administración</div>
       </div>
     </div>
-    <input id="email" type="email" placeholder="Correo de administrador" autocomplete="username" />
+    <input id="email" type="text" placeholder="Correo (principal) o usuario (sub administrador)" autocomplete="username" />
     <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" />
     <button id="loginBtn" class="full">Iniciar sesión</button>
     <div id="error"></div>
@@ -568,7 +568,7 @@
 
         <!-- Se muestra solo si eres el administrador principal -->
         <div id="subadminCreateBox">
-          <input id="subadminEmail" type="email" placeholder="Correo del sub administrador" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+          <input id="subadminUsername" type="text" placeholder="Usuario del sub administrador (sin espacios)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
           <input id="subadminPassword" type="text" placeholder="Contraseña (mínimo 6 caracteres)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
 
           <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor/lista que va a poder usar (solo ese, no ve los demás)</label>
@@ -590,7 +590,7 @@
         <h2>Sub administradores existentes</h2>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Correo</th><th>Creado</th><th>Servidor</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>Usuario</th><th>Creado</th><th>Servidor</th><th>Acciones</th></tr></thead>
             <tbody id="subadminsTableBody">
               <tr><td colspan="4" style="color:var(--muted)">Cargando...</td></tr>
             </tbody>
@@ -628,16 +628,32 @@
   const auth = firebase.auth();
   const db = firebase.firestore();
 
+  // Los sub administradores inician sesión con "usuario" en vez de correo — por dentro,
+  // Firebase Auth sigue necesitando algo con forma de correo, así que se arma uno interno
+  // pegándole este dominio (el sub administrador nunca lo ve ni lo necesita saber).
+  const SUBADMIN_EMAIL_DOMAIN = '@subadmin.jetgo.internal';
+
   const loginScreen = document.getElementById('loginScreen');
   const appShell = document.getElementById('appShell');
   const errorEl = document.getElementById('error');
 
   document.getElementById('loginBtn').addEventListener('click', () => {
-    const email = document.getElementById('email').value.trim();
+    const input = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
     errorEl.textContent = '';
+    // Si lo que escribió no tiene forma de correo (no tiene "@"), es un sub administrador
+    // iniciando con su usuario — se arma el correo interno automáticamente por dentro.
+    const email = input.includes('@') ? input : input.toLowerCase().replace(/\s+/g, '') + SUBADMIN_EMAIL_DOMAIN;
     auth.signInWithEmailAndPassword(email, password)
-      .catch(err => { errorEl.textContent = 'No se pudo iniciar sesion: ' + err.message; });
+      .catch(err => {
+        // Si falla con el correo interno armado a partir del usuario, el mensaje no debe
+        // confundir mencionando "correo" — el sub administrador escribió un usuario.
+        if (!input.includes('@')) {
+          errorEl.textContent = 'Usuario o contraseña incorrectos.';
+        } else {
+          errorEl.textContent = 'No se pudo iniciar sesion: ' + err.message;
+        }
+      });
   });
 
   document.getElementById('logout').addEventListener('click', () => auth.signOut());
@@ -648,6 +664,7 @@
   auth.onAuthStateChanged(async user => {
     if (user) {
       // Revisa si esta cuenta tiene un rol asignado (sub administrador) o si fue revocada
+      let currentUsername = null;
       try {
         const adminDoc = await db.collection('admins').doc(user.uid).get();
         if (adminDoc.exists) {
@@ -659,6 +676,7 @@
           }
           currentUserRole = adminData.role || 'subadmin';
           currentAssignedServerId = adminData.assignedServerId || null;
+          currentUsername = adminData.username || null;
         } else {
           currentUserRole = 'admin'; // cuenta principal (sin documento propio)
           currentAssignedServerId = null;
@@ -683,7 +701,7 @@
 
       loginScreen.style.display = 'none';
       appShell.style.display = 'flex';
-      document.getElementById('adminEmail').textContent = user.email || '';
+      document.getElementById('adminEmail').textContent = currentUsername || user.email || '';
       selectView('create');
       listenToCodes();
       loadServers();
@@ -1205,15 +1223,18 @@
   };
 
   // ---------- Crear sub administrador (solo el principal ve este botón) ----------
+  // Los sub administradores inician sesión con "usuario" en vez de correo — por dentro,
+  // Firebase Auth sigue necesitando algo con forma de correo, así que se arma uno interno
+  // pegándole este dominio (el sub administrador nunca lo ve ni lo necesita saber).
   document.getElementById('createSubadminBtn').addEventListener('click', async () => {
-    const email = document.getElementById('subadminEmail').value.trim();
+    const username = document.getElementById('subadminUsername').value.trim().toLowerCase().replace(/\s+/g, '');
     const password = document.getElementById('subadminPassword').value;
     const assignedServerId = document.getElementById('subadminServerSelect').value;
     const errEl = document.getElementById('subadminError');
     errEl.textContent = '';
 
-    if (!email || !password || password.length < 6) {
-      errEl.textContent = 'Completa un correo válido y una contraseña de al menos 6 caracteres.';
+    if (!username || !password || password.length < 6) {
+      errEl.textContent = 'Completa un usuario y una contraseña de al menos 6 caracteres.';
       return;
     }
     if (!assignedServerId) {
@@ -1221,32 +1242,35 @@
       return;
     }
 
+    const syntheticEmail = username + SUBADMIN_EMAIL_DOMAIN;
+
     // Se usa una app secundaria de Firebase SOLO para crear la cuenta, así no se cierra
     // tu sesión de administrador principal (crear un usuario con el SDK normalmente
     // inicia sesión como ese usuario nuevo, que es justo lo que queremos evitar acá).
     let secondaryApp;
     try {
       secondaryApp = firebase.initializeApp(firebaseConfig, 'SubadminCreation_' + Date.now());
-      const cred = await secondaryApp.auth().createUserWithEmailAndPassword(email, password);
+      const cred = await secondaryApp.auth().createUserWithEmailAndPassword(syntheticEmail, password);
       const newUid = cred.user.uid;
       await secondaryApp.auth().signOut();
 
       await db.collection('admins').doc(newUid).set({
-        email: email,
+        username: username,
+        email: syntheticEmail,
         role: 'subadmin',
         revoked: false,
         assignedServerId: assignedServerId,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
 
-      document.getElementById('subadminEmail').value = '';
+      document.getElementById('subadminUsername').value = '';
       document.getElementById('subadminPassword').value = '';
       document.getElementById('subadminServerSelect').value = '';
       showToast('Sub administrador creado');
       loadSubadmins();
     } catch (e) {
       let msg = e.message;
-      if (e.code === 'auth/email-already-in-use') msg = 'Ese correo ya tiene una cuenta.';
+      if (e.code === 'auth/email-already-in-use') msg = 'Ese usuario ya existe.';
       if (e.code === 'auth/weak-password') msg = 'La contraseña es muy débil (mínimo 6 caracteres).';
       errEl.textContent = msg;
     } finally {
@@ -1277,7 +1301,7 @@
             '</select>'
           : (assignedServer ? assignedServer.name : 'Sin asignar');
         tr.innerHTML =
-          '<td>' + data.email + (revoked ? ' <span class="badge revoked">Revocado</span>' : ' <span class="badge active">Activo</span>') + '</td>' +
+          '<td>' + (data.username || data.email) + (revoked ? ' <span class="badge revoked">Revocado</span>' : ' <span class="badge active">Activo</span>') + '</td>' +
           '<td style="color:var(--muted); font-size:12px;">' + createdText + '</td>' +
           '<td>' + serverCellHtml + '</td>' +
           '<td class="actions-cell">' +
