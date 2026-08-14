@@ -659,7 +659,10 @@
   // ---------- Elegir un servidor o lista del desplegable: muestra usuario/clave solo si es Xtream ----------
   function onServerSelectChange() {
     const select = document.getElementById('serverSelect');
-    const value = select.value;
+    // Para un sub administrador se usa directo lo que tiene asignado (no lo que diga el
+    // <select>, que puede no reflejarlo bien en algunos casos) — así los campos de usuario/
+    // clave siempre se muestran, sin depender de que el desplegable se haya sincronizado bien.
+    const value = currentUserRole === 'subadmin' ? (currentAssignedServerId || '') : select.value;
     if (value.startsWith('combo::')) {
       // Es un combo: se muestran los campos de usuario/clave que correspondan según el tipo
       // de cada uno de los 2 servidores que lo componen, y se oculta la opción manual de
@@ -808,7 +811,11 @@
       alert('Escribe el teléfono del cliente (con código de país), o desmarca la opción de enviar por WhatsApp.');
       return;
     }
-    const selectedValue = document.getElementById('serverSelect').value;
+    // Para un sub administrador se usa directo lo que tiene asignado, sin depender de que
+    // el <select> (que ni siquiera ve) tenga el valor bien puesto.
+    const selectedValue = currentUserRole === 'subadmin'
+      ? (currentAssignedServerId || '')
+      : document.getElementById('serverSelect').value;
     if (!selectedValue) {
       alert('Selecciona un servidor, lista o combo de la lista.');
       return;
