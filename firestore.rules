@@ -74,7 +74,11 @@ service cloud.firestore {
     // Colección "admins": guarda el rol de cada cuenta que puede entrar al panel
     // ('admin' = principal, 'subadmin' = cuenta creada por el principal).
     match /admins/{uid} {
-      allow get, list: if isSignedIn();
+      // Cualquier cuenta con sesión iniciada puede consultar SU PROPIO documento (necesario
+      // al iniciar sesión, para saber su rol y qué servidor tiene asignado) — pero no el de
+      // ningún otro sub administrador. Solo el principal puede ver la lista completa.
+      allow get: if isSignedIn() && (isPrincipalAdmin() || request.auth.uid == uid);
+      allow list: if isSignedIn() && isPrincipalAdmin();
       // Solo el administrador principal puede crear, editar o borrar sub administradores.
       allow create, update, delete: if isSignedIn() && isPrincipalAdmin();
     }
