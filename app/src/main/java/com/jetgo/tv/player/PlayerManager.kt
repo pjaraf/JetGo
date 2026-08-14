@@ -5,9 +5,11 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
@@ -38,12 +40,65 @@ class PlayerManager(context: Context) {
     val exoPlayer: ExoPlayer = ExoPlayer.Builder(context).build()
 
     // =====================================================================================
-    // REPRODUCTOR DE PELÍCULA/SERIE — separado por completo del de Vivo. Acá es donde se
-    // pueden probar ajustes de compatibilidad (decodificadores, etc.) sin ningún riesgo de
-    // que afecten a Vivo, porque literalmente es otro objeto ExoPlayer distinto.
+    // REPRODUCTOR DE PELÍCULA/SERIE — separado por completo del de Vivo.
+    //
+    // El selector de decodificador NUNCA excluye nada de entrada — solo lo hace de forma
+    // REACTIVA: si un intento de reproducción falla y el error confirma que fue justo el
+    // decodificador "c2.mtk.avc.decoder" (con fallas conocidas en algunos chips MediaTek,
+    // como el de varios TV con Google TV de la marca TCL) el que se cayó, recién ahí se
+    // excluye SOLO para el siguiente intento de ESE mismo contenido — nunca de forma
+    // preventiva ni global, porque otros equipos con el mismo chip pueden reproducir bien.
     // =====================================================================================
-    private val vodRenderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(context)
-        .setEnableDecoderFallback(true)
+    private class VodRenderersFactory(context: Context) : DefaultRenderersFactory(context) {
+        /** Nombre del decoder a excluir en el próximo intento — vacío mientras no haya
+         *  ninguna falla confirmada. @Volatile porque se escribe desde el hilo principal
+         *  (al procesar el error) y se lee desde el hilo interno del reproductor. */
+        @Volatile
+        var decoderToExclude: String = ""
+
+        private val selector = MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
+            val decoders = try {
+                MediaCodecSelector.DEFAULT.getDecoderInfos(mimeType, requiresSecureDecoder, requiresTunnelingDecoder)
+            } catch (e: Exception) {
+                emptyList()
+            }
+            val toExclude = decoderToExclude
+            if (toExclude.isNotEmpty() && decoders.size > 1) {
+                val filtered = decoders.filterNot { it.name == toExclude }
+                // Si excluirlo dejara la lista vacía, mejor usar el original (es la única
+                // opción que tiene el equipo) — la reproducción puede fallar igual, pero no
+                // hay que dejarla sin NINGÚN decodificador para probar.
+                if (filtered.isNotEmpty()) filtered else decoders
+            } else {
+                decoders
+            }
+        }
+
+        override fun buildVideoRenderers(
+            context: Context,
+            extensionRendererMode: Int,
+            mediaCodecSelector: MediaCodecSelector,
+            enableDecoderFallback: Boolean,
+            eventHandler: android.os.Handler,
+            eventListener: androidx.media3.exoplayer.video.VideoRendererEventListener,
+            allowedVideoJoiningTimeMs: Long,
+            out: ArrayList<androidx.media3.exoplayer.Renderer>
+        ) {
+            super.buildVideoRenderers(
+                context, extensionRendererMode, selector, enableDecoderFallback,
+                eventHandler, eventListener, allowedVideoJoiningTimeMs, out
+            )
+        }
+    }
+
+    private val vodRenderersFactory = VodRenderersFactory(context).apply {
+        setEnableDecoderFallback(true)
+        // Dejar que Media3 prefiera un decodificador de extensión (si el proyecto llegara a
+        // incluir alguno más adelante) antes que el de plataforma — hoy no cambia nada porque
+        // no hay extensiones agregadas, pero no tiene costo dejarlo listo.
+        setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+    }
+
     val vodExoPlayer: ExoPlayer = ExoPlayer.Builder(context, vodRenderersFactory).build()
 
     private val _stats = mutableStateOf(PlaybackStats())
@@ -64,6 +119,11 @@ class PlayerManager(context: Context) {
     private val _playbackError = mutableStateOf<String?>(null)
     val playbackError: State<String?> get() = _playbackError
 
+    /** Últimos datos técnicos registrados (para diagnóstico, sin credenciales ni URL) —
+     *  fabricante/modelo, decoder usado, código de error y en qué etapa pasó. */
+    private val _lastDiagnostic = mutableStateOf<String>("")
+    val lastDiagnostic: State<String> get() = _lastDiagnostic
+
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     /** Agrupa todo el estado de reconexión/reintento que necesita CADA reproductor por
@@ -75,6 +135,9 @@ class PlayerManager(context: Context) {
         var lastName: String = ""
         var currentUrl: String? = null
         var bufferingTimeoutRunnable: Runnable? = null
+        /** true una vez que ya se reintentó ESTE contenido excluyendo el decoder MTK —
+         *  para no entrar en un bucle si vuelve a fallar igual. */
+        var yaExcluyoDecoder = false
 
         fun cancelBufferingTimeout() {
             bufferingTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
@@ -153,6 +216,39 @@ class PlayerManager(context: Context) {
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                // ---- Diagnóstico: identifica si la falla fue justo del decoder MTK ----
+                val decoderName = extractDecoderName(error)
+                _lastDiagnostic.value = "modelo=${android.os.Build.MANUFACTURER}/${android.os.Build.MODEL} " +
+                    "android=${android.os.Build.VERSION.RELEASE} decoder=${decoderName ?: "?"} " +
+                    "error=${error.errorCodeName} etapa=${if (state.isLive) "vivo" else "vod"}"
+
+                // Si en PELÍCULA/SERIE la falla confirma que fue "c2.mtk.avc.decoder" el que se
+                // cayó, y todavía no se probó excluyéndolo para este contenido puntual, se
+                // reintenta UNA vez sin ese decoder — nunca de forma preventiva ni para Vivo.
+                if (!state.isLive && decoderName == "c2.mtk.avc.decoder" && !state.yaExcluyoDecoder) {
+                    state.yaExcluyoDecoder = true
+                    vodRenderersFactory.decoderToExclude = "c2.mtk.avc.decoder"
+                    val url = state.lastUrl
+                    if (url != null) {
+                        try {
+                            player.stop()
+                            player.clearMediaItems()
+                            player.setMediaSource(
+                                androidx.media3.exoplayer.source.DefaultMediaSourceFactory(
+                                    DefaultHttpDataSource.Factory()
+                                        .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+                                        .setConnectTimeoutMs(15000)
+                                        .setReadTimeoutMs(15000)
+                                        .setAllowCrossProtocolRedirects(true)
+                                ).createMediaSource(MediaItem.fromUri(url))
+                            )
+                            player.prepare()
+                            player.playWhenReady = true
+                            return
+                        } catch (e: Exception) { /* si ni siquiera esto se puede armar, sigue abajo */ }
+                    }
+                }
+
                 val url = state.lastUrl
                 if (url != null && state.retryCount < 2) {
                     // Reintenta un par de veces solo (cortes momentáneos de red/servidor),
@@ -184,6 +280,27 @@ class PlayerManager(context: Context) {
         })
     }
 
+    /** Busca en la cadena de causas del error el nombre del decoder que falló, si el error
+     *  fue justo una falla de inicialización/decodificación (no todos los errores lo traen). */
+    private fun extractDecoderName(error: androidx.media3.common.PlaybackException): String? {
+        var cause: Throwable? = error
+        var vueltas = 0
+        while (cause != null && vueltas < 8) {
+            val mensaje = cause.message
+            if (cause is androidx.media3.exoplayer.mediacodec.MediaCodecRenderer.DecoderInitializationException) {
+                return cause.codecInfo?.name
+            }
+            if (mensaje != null && mensaje.contains("c2.mtk.avc.decoder")) {
+                return "c2.mtk.avc.decoder"
+            }
+            cause = cause.cause
+            vueltas++
+        }
+        return null
+    }
+
+    private var currentUrl: String? = null
+
     /** [isLive] decide cuál de los 2 reproductores se usa — Vivo o Película/Serie. */
     fun playChannel(url: String, name: String, isLive: Boolean = true) {
         val state = if (isLive) liveState else vodState
@@ -198,6 +315,8 @@ class PlayerManager(context: Context) {
         state.lastUrl = url
         state.lastName = name
         state.retryCount = 0; state.bufferingReconnectCount = 0
+        state.yaExcluyoDecoder = false
+        vodRenderersFactory.decoderToExclude = "" // cada contenido nuevo empieza sin exclusiones
         _playbackError.value = null
         _videoQuality.value = null
         state.cancelBufferingTimeout()
