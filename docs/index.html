@@ -649,6 +649,7 @@
       Promise.all([loadServers(), loadCombos()]).then(() => {
         renderServerDropdown();
         renderSubadminServerDropdown();
+        applyAssignedSourceForSubadmin();
       });
     } else {
       loginScreen.style.display = 'flex';
@@ -682,6 +683,23 @@
     document.getElementById('xtreamCredFields').style.display = isXtream ? 'block' : 'none';
   }
   window.onServerSelectChange = onServerSelectChange;
+
+  /** Respaldo explícito para sub administradores: fuerza el valor del servidor/combo que
+   *  tienen asignado directamente (sin depender de que el <select> lo haya "recordado" bien
+   *  entre varios re-dibujados), y muestra los campos de usuario/clave que correspondan. */
+  function applyAssignedSourceForSubadmin() {
+    if (currentUserRole !== 'subadmin' || !currentAssignedServerId) return;
+    const select = document.getElementById('serverSelect');
+    if (!select) return;
+
+    if (currentAssignedServerId.startsWith('combo::')) {
+      select.value = currentAssignedServerId;
+    } else {
+      const server = serversList.find(s => s.id === currentAssignedServerId);
+      if (server) select.value = server.host;
+    }
+    onServerSelectChange();
+  }
   // ---------- Alternar tipo al GUARDAR un servidor/lista nuevo (sección Servidores) ----------
   let newServerType = 'xtream';
   function setServerType(type) {
