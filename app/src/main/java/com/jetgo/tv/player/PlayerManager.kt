@@ -10,7 +10,7 @@ import org.videolan.libvlc.MediaPlayer
 
 /** Una pista de audio o subtítulo disponible para elegir (id interno de VLC + nombre) */
 data class TrackOption(
-    val trackId: String,
+    val trackId: Int,
     val label: String,
     val isSelected: Boolean
 )
@@ -337,10 +337,7 @@ class PlayerManager(context: Context) {
     }
 
     fun selectTrack(option: TrackOption) {
-        try {
-            val id = option.trackId.toIntOrNull() ?: return
-            vodPlayer.setAudioTrack(id)
-        } catch (e: Exception) { /* ignorar */ }
+        try { vodPlayer.setAudioTrack(option.trackId) } catch (e: Exception) { /* ignorar */ }
     }
 
     /** Apaga los subtítulos por completo */
@@ -349,9 +346,6 @@ class PlayerManager(context: Context) {
     }
 
     fun selectSubtitleTrack(option: TrackOption) {
-        try {
-            val id = option.trackId.toIntOrNull() ?: return
-            vodPlayer.setSpuTrack(id)
-        } catch (e: Exception) { /* ignorar */ }
+        try { vodPlayer.setSpuTrack(option.trackId) } catch (e: Exception) { /* ignorar */ }
     }
 }
