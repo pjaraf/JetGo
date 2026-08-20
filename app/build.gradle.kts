@@ -28,7 +28,6 @@ android {
         // puede compararlo con el que trae la última Release y saber si hay que actualizar.
         versionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
         versionName = "1.0.${versionCode}"
-
         buildConfigField("String", "GITHUB_REPO", "\"pjaraf/JetGo\"")
     }
 
@@ -70,7 +69,6 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-
     buildFeatures {
         compose = true
         buildConfig = true
@@ -78,10 +76,14 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
     }
-
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+        // LibVLC trae binarios nativos (.so) para cada arquitectura de procesador — sin esto,
+        // el empaquetado puede fallar por archivos nativos duplicados entre módulos.
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 }
@@ -103,11 +105,9 @@ dependencies {
     implementation("androidx.tv:tv-foundation:1.0.0-alpha11")
     implementation("androidx.tv:tv-material:1.0.0")
 
-    // Reproducción de streams (HLS / TS / MP4) - Media3 ExoPlayer
-    implementation("androidx.media3:media3-exoplayer:1.4.0")
-    implementation("androidx.media3:media3-exoplayer-hls:1.4.0")
-    implementation("androidx.media3:media3-ui:1.4.0")
-    implementation("androidx.media3:media3-datasource-okhttp:1.4.0")
+    // Reproducción de streams (HLS / TS / MP4) — libVLC. Reemplaza por completo a
+    // Media3/ExoPlayer: no queda ninguna dependencia de androidx.media3 en el proyecto.
+    implementation("org.videolan.android:libvlc-all:3.6.4")
 
     // Red: cliente Xtream Codes API + parser M3U
     implementation("com.squareup.retrofit2:retrofit:2.11.0")

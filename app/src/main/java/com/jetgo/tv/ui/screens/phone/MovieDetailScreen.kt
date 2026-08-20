@@ -2,6 +2,7 @@ package com.jetgo.tv.ui.screens.phone
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,22 +11,34 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,18 +48,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.ui.PlayerView
+import org.videolan.libvlc.util.VLCVideoLayout
 import coil.compose.AsyncImage
 import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.data.model.MovieDetail
 import com.jetgo.tv.player.PlayerManager
+import com.jetgo.tv.ui.components.formatDurationLabel
 import com.jetgo.tv.ui.screens.MovieDetailUiState
 import com.jetgo.tv.ui.theme.BackgroundDark
 import com.jetgo.tv.ui.theme.SurfaceDark
+import kotlinx.coroutines.delay
 
 /**
- * Ficha de película para teléfono — mismo estilo e interfaz que la ficha de serie
- * (SeriesDetailScreen): reproductor con controles nativos arriba, info abajo, recomendados.
+ * Ficha de película para teléfono — reproductor arriba, info abajo, recomendados.
+ * VLC no trae una barra de controles nativa como la de Media3/ExoPlayer, así que acá se arma
+ * una simple: tocar el video muestra/oculta play-pausa + barra de progreso.
  */
 @Composable
 fun MovieDetailScreen(
@@ -91,23 +107,98 @@ private fun MovieDetailContent(
     onRecommendationClick: (ContentItem) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-
-        // ---- Reproductor con controles nativos (play/pausa, barra de progreso, tiempo) ----
+        // ---- Reproductor con controles simples propios (play/pausa, barra de progreso) ----
         Box(modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black)) {
+            var videoLayout by remember { mutableStateOf<VLCVideoLayout?>(null) }
+
             AndroidView(
                 factory = { context ->
-                    PlayerView(context).apply {
-                        player = playerManager.vodExoPlayer
-                        useController = true
-                    }
-                },
-                update = { view ->
-                    if (view.player !== playerManager.vodExoPlayer) {
-                        view.player = playerManager.vodExoPlayer
-                    }
+                    VLCVideoLayout(context).also { videoLayout = it }
                 },
                 modifier = Modifier.fillMaxSize()
             )
+
+            DisposableEffect(videoLayout) {
+                val layout = videoLayout
+                if (layout != null) {
+                    try { playerManager.vodPlayer.attachViews(layout, null, true, false) } catch (e: Exception) { /* ignorar */ }
+                }
+                onDispose {
+                    try { playerManager.vodPlayer.detachViews() } catch (e: Exception) { /* ignorar */ }
+                }
+            }
+
+            var controlsVisible by remember { mutableStateOf(true) }
+            var positionMs by remember { mutableStateOf(0L) }
+            var durationMs by remember { mutableStateOf(0L) }
+            var isSeeking by remember { mutableStateOf(false) }
+            var seekPreview by remember { mutableStateOf(0f) }
+            val isPlaying by playerManager.isPlaying
+
+            LaunchedEffect(Unit) {
+                while (true) {
+                    if (!isSeeking) {
+                        positionMs = playerManager.currentPositionMs()
+                        durationMs = playerManager.durationMs()
+                    }
+                    delay(500)
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { controlsVisible = !controlsVisible }
+            ) {
+                if (controlsVisible) {
+                    IconButton(
+                        onClick = { playerManager.togglePlayPause() },
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE5493B))
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                            tint = Color.White,
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .background(Color.Black.copy(alpha = 0.55f))
+                            .padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val sliderPosition = if (isSeeking) seekPreview else positionMs.toFloat()
+                        Text(formatDurationLabel(sliderPosition.toLong()), color = Color.White, fontSize = 11.sp)
+                        Slider(
+                            value = sliderPosition,
+                            onValueChange = { isSeeking = true; seekPreview = it },
+                            onValueChangeFinished = {
+                                playerManager.seekTo(seekPreview.toLong())
+                                isSeeking = false
+                            },
+                            valueRange = 0f..(durationMs.toFloat().coerceAtLeast(1f)),
+                            colors = SliderDefaults.colors(
+                                thumbColor = Color(0xFFE5493B),
+                                activeTrackColor = Color(0xFFE5493B)
+                            ),
+                            modifier = Modifier.weight(1f).padding(horizontal = 6.dp)
+                        )
+                        Text(formatDurationLabel(durationMs), color = Color.White, fontSize = 11.sp)
+                    }
+                }
+            }
+
             IconButton(onClick = onBack, modifier = Modifier.align(Alignment.TopStart).padding(4.dp)) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.White)
             }
@@ -115,10 +206,8 @@ private fun MovieDetailContent(
                 Icon(Icons.Default.Fullscreen, contentDescription = "Pantalla completa", tint = Color.White)
             }
         }
-
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = detail.name, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-
             if (!detail.rating.isNullOrBlank() || !detail.genre.isNullOrBlank() || !detail.releaseDate.isNullOrBlank()) {
                 Text(
                     text = listOfNotNull(
@@ -130,7 +219,6 @@ private fun MovieDetailContent(
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
-
             if (!detail.plot.isNullOrBlank()) {
                 Text(
                     text = detail.plot,
@@ -145,7 +233,6 @@ private fun MovieDetailContent(
             if (!detail.cast.isNullOrBlank()) {
                 Text("Actores: ${detail.cast}", color = Color.Gray, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
             }
-
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
@@ -160,7 +247,6 @@ private fun MovieDetailContent(
                 }
             }
         }
-
         if (recommendations.isNotEmpty()) {
             Text(
                 "También podría gustarte",

@@ -36,7 +36,8 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.ui.PlayerView
+import org.videolan.libvlc.MediaPlayer
+import org.videolan.libvlc.util.VLCVideoLayout
 import com.jetgo.tv.data.model.Category
 import com.jetgo.tv.data.model.Channel
 import com.jetgo.tv.data.model.ContentItem
@@ -121,7 +122,6 @@ fun FullscreenPlayerOverlay(
         val now = System.currentTimeMillis()
         if (now - lastChannelChangeAt < 400) return // evita procesar el mismo cambio dos veces
         lastChannelChangeAt = now
-
         if (allLiveChannels.isEmpty()) return
         val currentIndex = allLiveChannels.indexOfFirst { it.streamId == liveChannelInfo?.channelId }
         val nextIndex = if (currentIndex == -1) 0
@@ -197,28 +197,37 @@ fun FullscreenPlayerOverlay(
                 } else Modifier
             )
     ) {
-        var resizeMode by remember { mutableStateOf(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL) }
+        var fillScreen by remember { mutableStateOf(true) }
         // Esta pantalla se usa tanto para Vivo como para Película/Serie — cada uno con su
-        // propio reproductor completamente separado (ver PlayerManager). Si isVod cambia
+        // propio reproductor VLC completamente separado (ver PlayerManager). Si isVod cambia
         // (ej. sales de una película y vuelves a Vivo), la vista se re-vincula al otro.
-        val activePlayer = if (isVod) playerManager.vodExoPlayer else playerManager.exoPlayer
+        val activePlayer = if (isVod) playerManager.vodPlayer else playerManager.livePlayer
+        var attachedPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
 
         AndroidView(
             factory = { context ->
-                PlayerView(context).apply {
-                    player = activePlayer
-                    useController = false
-                }
+                VLCVideoLayout(context)
             },
-            update = { view ->
-                view.resizeMode = resizeMode
-                if (view.player !== activePlayer) {
-                    view.player = activePlayer
+            update = { layout ->
+                if (attachedPlayer !== activePlayer) {
+                    try { attachedPlayer?.detachViews() } catch (e: Exception) { /* ignorar */ }
+                    try {
+                        activePlayer.attachViews(layout, null, true, false)
+                        attachedPlayer = activePlayer
+                    } catch (e: Exception) { /* ignorar */ }
                 }
+                try {
+                    if (fillScreen) {
+                        activePlayer.aspectRatio = null
+                        activePlayer.scale = 0f
+                    } else {
+                        activePlayer.aspectRatio = null
+                        activePlayer.scale = 0f
+                    }
+                } catch (e: Exception) { /* ignorar */ }
             },
             modifier = Modifier.fillMaxSize()
         )
-
         if (isVod) {
             VodPlayerControls(
                 playerManager = playerManager,
@@ -226,15 +235,8 @@ fun FullscreenPlayerOverlay(
                 title = title,
                 onExit = onExitFullscreen,
                 onOpenLanguageMenu = { showLanguageDialog = true },
-                onToggleAspectRatio = {
-                    resizeMode = if (resizeMode == androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT) {
-                        androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
-                    } else {
-                        androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    }
-                }
+                onToggleAspectRatio = { fillScreen = !fillScreen }
             )
-
             if (showNextEpisodeMessage) {
                 Box(
                     modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)),
@@ -256,7 +258,6 @@ fun FullscreenPlayerOverlay(
                     modifier = Modifier.align(Alignment.BottomCenter)
                 )
             }
-
             LiveZapPanel(
                 mode = zapMode,
                 categories = liveCategories,
@@ -275,7 +276,6 @@ fun FullscreenPlayerOverlay(
             )
         }
     }
-
     if (showLanguageDialog) {
         LanguageTracksDialog(
             audioTracks = playerManager.getAudioTracks(),

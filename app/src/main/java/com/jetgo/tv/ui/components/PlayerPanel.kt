@@ -21,7 +21,11 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,7 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.ui.PlayerView
+import org.videolan.libvlc.util.VLCVideoLayout
 import com.jetgo.tv.player.PlayerManager
 import com.jetgo.tv.ui.theme.FocusOrange
 import com.jetgo.tv.ui.theme.LiveGreen
@@ -58,23 +62,29 @@ fun PlayerPanel(
             )
     ) {
         if (showVideo) {
+            var videoLayout by remember { mutableStateOf<VLCVideoLayout?>(null) }
+
             AndroidView(
                 factory = { context ->
-                    PlayerView(context).apply {
-                        player = playerManager.exoPlayer
-                        useController = false
-                        resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
-                    }
-                },
-                update = { view ->
-                    // Vuelve a conectar el video cada vez (por si venía de pantalla completa):
-                    // sin esto a veces se queda solo el audio con la imagen congelada.
-                    if (view.player !== playerManager.exoPlayer) {
-                        view.player = playerManager.exoPlayer
-                    }
+                    VLCVideoLayout(context).also { videoLayout = it }
                 },
                 modifier = Modifier.fillMaxSize()
             )
+
+            // Se vincula/desvincula el reproductor de Vivo a esta vista chica cada vez que
+            // entra o sale de composición (por ejemplo, al ir y volver de pantalla completa)
+            // — sin esto a veces se queda solo el audio con la imagen congelada.
+            DisposableEffect(videoLayout) {
+                val layout = videoLayout
+                if (layout != null) {
+                    try {
+                        playerManager.livePlayer.attachViews(layout, null, false, false)
+                    } catch (e: Exception) { /* ignorar */ }
+                }
+                onDispose {
+                    try { playerManager.livePlayer.detachViews() } catch (e: Exception) { /* ignorar */ }
+                }
+            }
         }
     }
 }

@@ -33,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -53,7 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.ui.PlayerView
+import org.videolan.libvlc.util.VLCVideoLayout
 import coil.compose.AsyncImage
 import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.data.model.SeriesDetail
@@ -82,7 +83,6 @@ fun TvSeriesDetailScreen(
 ) {
     // Misma lógica que en la ficha de película: "Atrás" vuelve a la grilla de series.
     androidx.activity.compose.BackHandler(enabled = !isFullscreen) { onBack() }
-
     Box(modifier = Modifier.fillMaxSize()) {
         SpaceBackground(modifier = Modifier.fillMaxSize())
         when {
@@ -133,10 +133,8 @@ private fun TvSeriesDetailContent(
     val currentEpisode = detail.episodesBySeason.values.flatten().firstOrNull { it.id == currentEpisodeId }
     var sinopsisExpanded by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
-
     Box(modifier = Modifier.fillMaxSize()) {
         SpaceBackground(modifier = Modifier.fillMaxSize())
-
         // ---- Fondo: la carátula ajustada a 16:9, completa y sin recortes ----
         if (!detail.coverUrl.isNullOrBlank()) {
             AsyncImage(
@@ -158,14 +156,12 @@ private fun TvSeriesDetailContent(
                     )
             )
         }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(start = 28.dp, end = 28.dp, top = 20.dp, bottom = 48.dp)
         ) {
-
             Row(modifier = Modifier.fillMaxWidth()) {
                 // ---- Columna izquierda: info ----
                 Column(modifier = Modifier.weight(1.2f).padding(end = 24.dp)) {
@@ -180,7 +176,6 @@ private fun TvSeriesDetailContent(
                         )
                     }
                 }
-
                 Text(
                     text = listOfNotNull(
                         detail.releaseDate?.takeIf { it.isNotBlank() },
@@ -190,7 +185,6 @@ private fun TvSeriesDetailContent(
                     fontSize = 14.sp,
                     modifier = Modifier.padding(top = 6.dp)
                 )
-
                 if (currentEpisode != null) {
                     Text(
                         "T${currentEpisode.season} - E${currentEpisode.episodeNum}",
@@ -200,7 +194,6 @@ private fun TvSeriesDetailContent(
                         modifier = Modifier.padding(top = 6.dp)
                     )
                 }
-
                 if (!detail.genre.isNullOrBlank()) {
                     Text("Género: ", color = Color.Gray, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp))
                     LazyRow(
@@ -218,7 +211,6 @@ private fun TvSeriesDetailContent(
                         }
                     }
                 }
-
                 if (!detail.director.isNullOrBlank()) {
                     Text(
                         "Director: ${detail.director}",
@@ -235,7 +227,6 @@ private fun TvSeriesDetailContent(
                         modifier = Modifier.padding(top = 6.dp)
                     )
                 }
-
                 if (!detail.plot.isNullOrBlank()) {
                     Column(modifier = Modifier.padding(top = 14.dp)) {
                         Text(
@@ -256,7 +247,6 @@ private fun TvSeriesDetailContent(
                     }
                 }
             }
-
             // ---- Columna derecha: video ----
             Box(
                 modifier = Modifier
@@ -266,20 +256,29 @@ private fun TvSeriesDetailContent(
                     .background(Color.Black)
             ) {
                 if (!isFullscreen) {
+                    var videoLayout by remember { mutableStateOf<VLCVideoLayout?>(null) }
+
                     AndroidView(
                         factory = { context ->
-                            PlayerView(context).apply {
-                                player = playerManager.vodExoPlayer
-                                useController = false
-                            }
-                        },
-                        update = { view ->
-                            if (view.player !== playerManager.vodExoPlayer) {
-                                view.player = playerManager.vodExoPlayer
-                            }
+                            VLCVideoLayout(context).also { videoLayout = it }
                         },
                         modifier = Modifier.fillMaxSize()
                     )
+
+                    // Se vincula/desvincula el reproductor de Película/Serie a esta vista chica
+                    // cada vez que entra o sale de composición.
+                    DisposableEffect(videoLayout) {
+                        val layout = videoLayout
+                        if (layout != null) {
+                            try {
+                                playerManager.vodPlayer.attachViews(layout, null, true, false)
+                            } catch (e: Exception) { /* ignorar */ }
+                        }
+                        onDispose {
+                            try { playerManager.vodPlayer.detachViews() } catch (e: Exception) { /* ignorar */ }
+                        }
+                    }
+
                     if (showNextEpisodeMessage) {
                         Box(
                             modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)),
@@ -296,7 +295,6 @@ private fun TvSeriesDetailContent(
                 }
             }
         }
-
         if (showLanguageDialog) {
             LanguageTracksDialog(
                 audioTracks = playerManager.getAudioTracks(),
@@ -307,7 +305,6 @@ private fun TvSeriesDetailContent(
                 onDismiss = { showLanguageDialog = false }
             )
         }
-
         // ---- Barra de acciones ----
         Row(
             modifier = Modifier.padding(top = 20.dp),
@@ -325,7 +322,6 @@ private fun TvSeriesDetailContent(
                 onClick = { showLanguageDialog = true }
             )
         }
-
         // ---- Selector de temporada ----
         val seasons = detail.episodesBySeason.keys.sorted()
         if (seasons.isNotEmpty()) {
@@ -364,7 +360,6 @@ private fun TvSeriesDetailContent(
                 }
             }
         }
-
         // ---- Capítulos ----
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -378,7 +373,6 @@ private fun TvSeriesDetailContent(
                 )
             }
         }
-
         // ---- Recomendados ----
     }
     }
@@ -394,13 +388,11 @@ private fun ActionChip(
 ) {
     var focused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
-
     if (requestInitialFocus) {
         LaunchedEffect(Unit) {
             try { focusRequester.requestFocus() } catch (e: Exception) { /* ignorar */ }
         }
     }
-
     Row(
         modifier = Modifier
             .focusRequester(focusRequester)
