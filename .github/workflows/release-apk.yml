@@ -45,7 +45,7 @@ jobs:
           EOF
 
       - name: Compilar APK release
-        run: gradle assembleRelease --no-daemon --stacktrace
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Advertencia si no se firmó
         if: steps.check_secrets.outputs.has_keystore != 'true'
