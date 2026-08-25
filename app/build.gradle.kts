@@ -45,10 +45,13 @@ android {
         // aleatoria distinta, y Android rechazaría instalar las "actualizaciones"
         // por conflicto de firma.
         getByName("debug") {
-            storeFile = rootProject.file("debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+            val debugKeystore = rootProject.file("debug.keystore")
+            if (debugKeystore.exists()) {
+                storeFile = debugKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
         }
     }
 
