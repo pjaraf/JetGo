@@ -1,7 +1,7 @@
 name: Build APK (debug)
 
 # Se ejecuta automáticamente al hacer push a main, en cada Pull Request,
-# y también se puede lanzar manualmente desde la pestaña "Actions" de GitHub.
+# y también se puede lanzar manualmente desde la pestaña "Actions" de GitHub. (Permisos gradlew corregidos)
 on:
   push:
     branches: [ "main", "master" ]
