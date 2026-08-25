@@ -33,11 +33,8 @@ jobs:
         with:
           gradle-version: 8.7
 
-      - name: Dar permisos a gradlew
-        run: chmod +x gradlew
-
       - name: Compilar APK debug
-        run: ./gradlew assembleDebug --no-daemon --stacktrace -PversionCode=${{ github.run_number }}
+        run: gradle assembleDebug --no-daemon --stacktrace -PversionCode=${{ github.run_number }}
 
       - name: Subir el APK como artefacto descargable
         uses: actions/upload-artifact@v4
