@@ -29,6 +29,9 @@ jobs:
         with:
           gradle-version: 8.7
 
+      - name: Dar permisos a gradlew
+        run: chmod +x gradlew
+
       - name: Verificar si hay secretos de firma configurados
         id: check_secrets
         run: echo "has_keystore=${{ secrets.KEYSTORE_BASE64 != '' }}" >> "$GITHUB_OUTPUT"
