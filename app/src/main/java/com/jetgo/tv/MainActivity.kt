@@ -27,7 +27,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.data.model.ContentType
-import com.jetgo.tv.ui.screens.AccessCodeScreen
+import com.jetgo.tv.ui.screens.NetflixLoginScreen
 import com.jetgo.tv.ui.screens.CategoryPickerScreen
 import com.jetgo.tv.ui.components.FullscreenPlayerEffect
 import com.jetgo.tv.ui.components.FullscreenPlayerOverlay
@@ -117,7 +117,6 @@ private fun labelForType(type: ContentType): String = when (type) {
 @Composable
 private fun AppRoot(viewModel: HomeViewModel) {
     val uiState by viewModel.uiState.collectAsState()
-    val accessState by viewModel.accessState.collectAsState()
     val isFullscreen by viewModel.isFullscreenPlayer.collectAsState()
     val updateInfo by viewModel.updateInfo.collectAsState()
     val context = LocalContext.current
@@ -152,39 +151,13 @@ private fun AppRoot(viewModel: HomeViewModel) {
 
             Box(modifier = Modifier.weight(1f)) {
                 when {
-                    accessState.isChecking -> {
-                        SplashLoadingScreen()
-                    }
-                    !accessState.isGranted -> {
-                        // ---- Filtro de código de acceso: se muestra ANTES que todo lo demás ----
-                        AccessCodeScreen(
-                            isChecking = false,
-                            errorMessage = accessState.errorMessage,
-                            onSubmitCode = { viewModel.submitAccessCode(it) }
-                        )
-                    }
-                    uiState.isLoading -> {
-                        SplashLoadingScreen()
-                    }
                     !uiState.isConfigured -> {
-                        // El código es válido, pero no se pudo conectar todavía. Esto puede ser
-                        // un problema real (servidor caído) O solo el instante justo al arrancar
-                        // la app (antes de que termine de conectar) — para no mostrar el aviso
-                        // de error en ese instante normal, se espera un par de segundos con el
-                        // logo antes de escalar al aviso de "reintentar".
-                        var showConnectionIssue by remember { mutableStateOf(false) }
-                        LaunchedEffect(Unit) {
-                            delay(4000)
-                            showConnectionIssue = true
-                        }
-                        if (showConnectionIssue) {
-                            ConnectionIssueScreen(
-                                onRetry = { viewModel.retryConnection() },
-                                debugDetail = uiState.debugDetail
-                            )
-                        } else {
-                            SplashLoadingScreen()
-                        }
+                        // ---- Pantalla de login estilo Netflix con usuario y clave y fondo con carátulas ----
+                        NetflixLoginScreen(
+                            isLoading = uiState.isLoading,
+                            errorMessage = uiState.errorMessage,
+                            onLogin = { config -> viewModel.connectXtream(config) }
+                        )
                     }
                     isTv -> {
                         // ---- Interfaz original para Android TV / Google TV / TV Box (sin cambios) ----

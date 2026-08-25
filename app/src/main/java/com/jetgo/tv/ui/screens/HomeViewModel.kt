@@ -4,7 +4,6 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.jetgo.tv.BuildConfig
-import com.jetgo.tv.data.local.AccessStore
 import com.jetgo.tv.data.local.ConfigStore
 import com.jetgo.tv.data.local.FavoritesStore
 import com.jetgo.tv.data.local.LastPlayingStore
@@ -22,11 +21,7 @@ import com.jetgo.tv.data.model.SeriesDetail
 import com.jetgo.tv.data.model.SeriesEpisode
 import com.jetgo.tv.data.repository.StreamRepository
 import com.jetgo.tv.player.PlayerManager
-import com.jetgo.tv.util.AccessCodeChecker
-import com.jetgo.tv.util.AccessCodeResult
 import com.jetgo.tv.util.AdultContentFilter
-import com.jetgo.tv.util.getDeviceDisplayName
-import com.jetgo.tv.util.getDeviceId
 import com.jetgo.tv.util.UpdateChecker
 import com.jetgo.tv.util.UpdateInfo
 import kotlinx.coroutines.Dispatchers
@@ -45,12 +40,6 @@ data class HomeUiState(
     val liveChannels: List<Channel> = emptyList(),
     val errorMessage: String? = null,
     val debugDetail: String? = null
-)
-
-data class AccessUiState(
-    val isChecking: Boolean = true, // empieza en true: revisando si ya hay un código guardado
-    val isGranted: Boolean = false,
-    val errorMessage: String? = null
 )
 
 data class CategoryPickerUiState(
@@ -98,11 +87,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = StreamRepository()
     private val configStore = ConfigStore(application)
     private val favoritesStore = FavoritesStore(application)
-    private val accessStore = AccessStore(application)
     val playerManager = PlayerManager(application)
-
-    private val _accessState = MutableStateFlow(AccessUiState())
-    val accessState: StateFlow<AccessUiState> = _accessState.asStateFlow()
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -156,16 +141,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Cierra la sesión por completo: pide el código de acceso de nuevo la próxima vez */
+    /** Cierra la sesión por completo: pide el usuario y contraseña de nuevo la próxima vez */
     fun logout() {
         viewModelScope.launch {
             playerManager.stopAll()
             configStore.clear()
-            accessStore.clear()
             currentConfig = null
             _uiState.value = HomeUiState()
             _settingsInfo.value = SettingsInfo()
-            _accessState.value = AccessUiState(isChecking = false, isGranted = false)
         }
     }
 
@@ -364,7 +347,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
         }
         android.util.Log.e("JetGo_DIAG", "HomeViewModel se está creando de nuevo", Exception("rastro de diagnóstico"))
-        checkStoredAccess()
 
         viewModelScope.launch {
             configStore.mode.collect { currentMode = it }
@@ -372,223 +354,24 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             configStore.config.collect { config ->
                 currentConfig = config
-                if (config != null && currentMode == "xtream") connectXtream(config)
+                if (config != null) connectXtream(config)
             }
         }
         viewModelScope.launch {
             favoritesStore.favorites.collect { _favorites.value = it }
         }
 
-        // Cada cierto tiempo, mientras la app esté abierta y conectada, avisa "estoy en línea
-        // ahora mismo" — así el panel admin puede mostrar qué dispositivos están usando la
-        // app en tiempo real. Si falla (sin internet, etc.) no afecta nada más.
-        viewModelScope.launch {
-            val context = getApplication<Application>()
-            while (true) {
-                delay(45_000)
-                val code = try { accessStore.savedCode.first() } catch (e: Exception) { null }
-                if (!code.isNullOrBlank()) {
-                    withContext(Dispatchers.IO) {
-                        try {
-                            val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
-                            val deviceId = getDeviceId(context)
-                            AccessCodeChecker.sendHeartbeat(projectId, code, deviceId)
-                        } catch (e: Exception) { /* silencioso */ }
-                    }
-                }
-            }
-        }
-
-        // Revisa cada cierto tiempo si el código sigue siendo válido: si una demo ya venció,
-        // si el administrador revocó el código, o si el panel mandó la señal de "cerrar la
-        // app ahora" (por ejemplo, justo al renovar un plan) — la app se cierra sola, aunque
-        // el cliente esté viendo contenido en ese momento. El código guardado NO se borra, así
-        // que si se trata de una renovación, la próxima vez que se abra la app vuelve a entrar
-        // sola, sin que el cliente tenga que volver a escribir el código.
-        viewModelScope.launch {
-            val context = getApplication<Application>()
-            while (true) {
-                delay(60_000)
-                val code = try { accessStore.savedCode.first() } catch (e: Exception) { null }
-                if (code.isNullOrBlank()) continue
-                withContext(Dispatchers.IO) {
-                    try {
-                        val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
-                        val result = AccessCodeChecker.checkStillValid(projectId, code)
-                        if (!result.stillValid) {
-                            _forceCloseApp.value = true
-                            return@withContext
-                        }
-                        val signal = result.forceCloseSignalMs
-                        if (signal != null) {
-                            val lastSeen = accessStore.getLastForceCloseSignal()
-                            if (signal > lastSeen) {
-                                accessStore.saveLastForceCloseSignal(signal)
-                                _forceCloseApp.value = true
-                            }
-                        }
-                    } catch (e: Exception) { /* silencioso: si falla la consulta, no se cierra la app */ }
-                }
-            }
-        }
-
         checkForUpdate()
     }
 
-    /** Al abrir la app: si ya había un código guardado, lo re-valida contra Firestore
-     *  (así una revocación hecha desde el panel de administración sí toma efecto), y
-     *  refresca la conexión por si el administrador cambió el servidor de ese código. */
-    private fun checkStoredAccess() {
-        viewModelScope.launch {
-            val context = getApplication<Application>()
-            val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
-            val deviceId = getDeviceId(context)
-
-            val savedCode = accessStore.savedCode.first()
-            if (savedCode.isNullOrBlank()) {
-                _accessState.value = AccessUiState(isChecking = false, isGranted = false)
-                return@launch
-            }
-
-            // Camino rápido: si ya había credenciales del servidor guardadas de antes, se
-            // conecta de una sin esperar a Firestore — así una reconexión (por ejemplo si el
-            // sistema recreó la app) es casi instantánea, sin mostrar el logo de carga.
-            val savedMode = configStore.mode.first()
-            val savedConfig = configStore.config.first()
-            val savedM3u = configStore.m3uUrl.first()
-            if (savedMode == "xtream" && savedConfig != null) {
-                _accessState.value = AccessUiState(isChecking = false, isGranted = true)
-                connectXtream(savedConfig, silent = true)
-            } else if (savedMode == "m3u" && !savedM3u.isNullOrBlank()) {
-                _accessState.value = AccessUiState(isChecking = false, isGranted = true)
-                connectM3u(savedM3u, silent = true)
-            }
-
-            // Validación real contra Firestore, en segundo plano y en silencio: si el código
-            // ya no es válido (revocado, etc.), ahí sí se cierra la sesión.
-            val result = withContext(Dispatchers.IO) {
-                AccessCodeChecker.checkCodeAndRegisterDevice(projectId, savedCode, deviceId, getDeviceDisplayName(context))
-            }
-            if (result.valid) {
-                applyAccessCodeResult(result, savedCode, silent = true)
-                _accessState.value = AccessUiState(isChecking = false, isGranted = true)
-            } else {
-                accessStore.clear()
-                _accessState.value = AccessUiState(isChecking = false, isGranted = false, errorMessage = null)
-            }
-        }
-    }
-
-    fun submitAccessCode(code: String) {
-        _accessState.value = _accessState.value.copy(isChecking = true, errorMessage = null)
-        viewModelScope.launch {
-            val context = getApplication<Application>()
-            val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
-            val deviceId = getDeviceId(context)
-            val result = withContext(Dispatchers.IO) {
-                AccessCodeChecker.checkCodeAndRegisterDevice(projectId, code, deviceId, getDeviceDisplayName(context))
-            }
-            if (result.valid) {
-                accessStore.saveCode(code.trim().uppercase())
-                applyAccessCodeResult(result, code)
-                _accessState.value = AccessUiState(isChecking = false, isGranted = true)
-            } else {
-                val message = if (result.deviceLimitReached) {
-                    "Este código ya alcanzó el máximo de 3 dispositivos"
-                } else {
-                    "Código inválido o inactivo"
-                }
-                _accessState.value = AccessUiState(
-                    isChecking = false,
-                    isGranted = false,
-                    errorMessage = message
-                )
-            }
-        }
-    }
-
-    /** Arma la fuente única "de compatibilidad" para códigos viejos (sin el arreglo sources) */
-    private fun buildLegacySource(result: AccessCodeResult): com.jetgo.tv.util.ContentSource =
-        com.jetgo.tv.util.ContentSource(
-            type = result.mode ?: "xtream",
-            serverId = null,
-            host = result.host,
-            username = result.username,
-            password = result.password,
-            m3uUrl = result.m3uUrl
-        )
-
-    /** Conecta automáticamente al servidor cargado por el administrador para ese código,
-     *  sin que el cliente tenga que ver ni escribir host/usuario/contraseña. */
-    private fun applyAccessCodeResult(result: AccessCodeResult, code: String, silent: Boolean = false) {
-        _settingsInfo.value = SettingsInfo(
-            clientName = result.clientName,
-            accessCode = code.trim().uppercase(),
-            deviceCount = result.deviceCount,
-            maxDevices = result.maxDevices
-        )
-
-        val sources = if (result.sources.isNotEmpty()) result.sources else listOf(buildLegacySource(result))
-        val fallbackConfig = Pair(
-            result.hiddenCategories.map { it.trim().lowercase() }.toSet(),
-            result.hiddenTypes.map { it.trim().lowercase() }.toSet()
-        )
-
-        // Valor de partida inmediato (del código, sin esperar Firestore) — así "currentConfig"
-        // queda listo YA, y el cliente no ve "sin configuración de servidor" si toca Películas
-        // o Series apenas entra, mientras la consulta en vivo de categorías ocultas (más abajo)
-        // todavía no termina.
-        sourceHiddenConfigs = sources.map { fallbackConfig }
-        _hiddenTypes.value = fallbackConfig.second
-        hiddenCategoryNames = fallbackConfig.first
-
-        if (sources.size > 1) {
-            connectMultiSource(sources, silent = silent)
-        } else if (result.mode == "m3u" && !result.m3uUrl.isNullOrBlank()) {
-            connectM3u(result.m3uUrl, silent = silent)
-        } else if (!result.host.isNullOrBlank() && !result.username.isNullOrBlank() && !result.password.isNullOrBlank()) {
-            connectXtream(ServerConfig(result.host, result.username, result.password), silent = silent)
-        }
-        // Si el código es válido pero el administrador no cargó credenciales todavía,
-        // simplemente no se auto-conecta nada (uiState.isConfigured queda en false).
-
-        // Por cada fuente combinada, se consulta EN VIVO contra Firestore qué tiene oculto
-        // AHORA MISMO (si tiene un servidor guardado) — esto corre EN PARALELO, sin retrasar
-        // la conexión real — así, si el administrador oculta o reactiva algo, se aplica de
-        // inmediato a todos los clientes que usan ese servidor.
-        val serverIds = sources.mapNotNull { it.serverId }
-        if (serverIds.isNotEmpty()) {
-            viewModelScope.launch {
-                val perSourceConfigs = sources.map { source ->
-                    if (source.serverId != null) {
-                        try {
-                            withContext(Dispatchers.IO) {
-                                val context = getApplication<Application>()
-                                val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
-                                val live = AccessCodeChecker.fetchServerLiveConfig(projectId, source.serverId)
-                                Pair(
-                                    live.hiddenCategories.map { it.trim().lowercase() }.toSet(),
-                                    live.hiddenTypes.map { it.trim().lowercase() }.toSet()
-                                )
-                            }
-                        } catch (e: Exception) {
-                            fallbackConfig
-                        }
-                    } else {
-                        fallbackConfig
-                    }
-                }
-                sourceHiddenConfigs = perSourceConfigs
-                _hiddenTypes.value = if (perSourceConfigs.isEmpty()) emptySet()
-                    else perSourceConfigs.map { it.second }.reduce { a, b -> a.intersect(b) }
-                hiddenCategoryNames = perSourceConfigs.flatMap { it.first }.toSet()
-            }
-        }
-    }
-
-    /** Vuelve a intentar la conexión con el código ya guardado (sin pedirle nada al cliente) */
+    /** Vuelve a intentar la conexión con la configuración ya guardada */
     fun retryConnection() {
-        checkStoredAccess()
+        viewModelScope.launch {
+            val config = configStore.config.first()
+            if (config != null) {
+                connectXtream(config)
+            }
+        }
     }
 
     /** Consulta en segundo plano si hay una versión más nueva publicada en GitHub Releases */
