@@ -82,7 +82,7 @@ fun PlayerPanel(
                     } catch (e: Exception) { /* ignorar */ }
                 }
                 onDispose {
-                    try { playerManager.livePlayer.detachViews() } catch (e: Exception) { /* ignorar */ }
+                    // No detachViews aquí para evitar conflicto con FullscreenPlayerOverlay al expandir
                 }
             }
         }

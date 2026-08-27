@@ -275,7 +275,7 @@ private fun TvSeriesDetailContent(
                             } catch (e: Exception) { /* ignorar */ }
                         }
                         onDispose {
-                            try { playerManager.vodPlayer.detachViews() } catch (e: Exception) { /* ignorar */ }
+                            // No detachViews aquí para evitar conflicto con FullscreenPlayerOverlay al expandir
                         }
                     }
 
