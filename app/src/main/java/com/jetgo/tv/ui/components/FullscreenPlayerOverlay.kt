@@ -36,6 +36,10 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.util.VLCVideoLayout
 import com.jetgo.tv.data.model.Category
@@ -203,6 +207,32 @@ fun FullscreenPlayerOverlay(
         // (ej. sales de una película y vuelves a Vivo), la vista se re-vincula al otro.
         val activePlayer = if (isVod) playerManager.vodPlayer else playerManager.livePlayer
         var attachedPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+
+        // Fondo instantáneo con el logo/póster del canal y degradado Netflix para evitar pantalla negra al expandir
+        if (!isVod) {
+            Box(modifier = Modifier.fillMaxSize().background(Color(0xFF141414))) {
+                if (!liveChannelInfo?.channelLogo.isNullOrBlank()) {
+                    AsyncImage(
+                        model = liveChannelInfo?.channelLogo,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().blur(30.dp)
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.65f),
+                                    Color.Black.copy(alpha = 0.88f)
+                                )
+                            )
+                        )
+                )
+            }
+        }
 
         AndroidView(
             factory = { context ->

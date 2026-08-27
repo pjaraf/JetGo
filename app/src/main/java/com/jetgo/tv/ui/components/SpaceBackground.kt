@@ -1,44 +1,78 @@
 package com.jetgo.tv.ui.components
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import kotlin.random.Random
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 
-private val SpaceTop = Color(0xFF05060C)
-private val SpaceBottom = Color(0xFF0B0D1A)
+private val NetflixDark1 = Color(0xFF141414)
+private val NetflixDark2 = Color(0xFF070709)
+
+private val SampleBackdrops = listOf(
+    "https://image.tmdb.org/t/p/w500/8cdWjvZQUExUUTzyp4t6EDMubfO.jpg",
+    "https://image.tmdb.org/t/p/w500/qNBAXBIQlnOThrVvA6mA2B5ggV6.jpg",
+    "https://image.tmdb.org/t/p/w500/rktDFPbfHfUbArZ6OOOKsXcv0Bm.jpg",
+    "https://image.tmdb.org/t/p/w500/vpnVM9B6NMmQpWeZvzLvDESb2QY.jpg",
+    "https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg"
+)
 
 /**
- * Fondo con temática espacial: degradado oscuro tipo cielo nocturno + estrellitas sutiles y
- * estáticas de distinto tamaño y brillo. Liviano (no se anima) para no gastar batería/CPU de más.
+ * Fondo estilo Netflix con imágenes de pósters cinematográficos y gradientes oscuros en toda la aplicación.
  */
 @Composable
-fun SpaceBackground(modifier: Modifier = Modifier) {
-    val stars = remember {
-        List(90) {
-            Triple(Random.nextFloat(), Random.nextFloat(), Random.nextFloat())
-        }
-    }
+fun NetflixBackground(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(SpaceTop, SpaceBottom)))
+            .background(NetflixDark1)
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            stars.forEach { (xFrac, yFrac, brightness) ->
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.15f + brightness * 0.55f),
-                    radius = 1.5f + brightness * 3f,
-                    center = Offset(size.width * xFrac, size.height * yFrac)
-                )
+        // Collage sutil de imágenes de fondo estilo Netflix
+        Column(
+            modifier = Modifier.fillMaxSize().alpha(0.18f),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                SampleBackdrops.take(3).forEach { url ->
+                    AsyncImage(
+                        model = url,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.weight(1f).fillMaxSize().blur(24.dp)
+                    )
+                }
             }
         }
+
+        // Gradiente cinemático oscuro y viñeta estilo Netflix
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            NetflixDark1.copy(alpha = 0.85f),
+                            NetflixDark2.copy(alpha = 0.95f),
+                            Color.Black.copy(alpha = 0.99f)
+                        )
+                    )
+                )
+        )
     }
+}
+
+@Composable
+fun SpaceBackground(modifier: Modifier = Modifier) {
+    NetflixBackground(modifier = modifier)
 }
