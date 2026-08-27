@@ -49,8 +49,8 @@ private val SelectedRed = Color(0xFFE53935)
 /**
  * Pantalla principal exclusiva para Android TV inspirada en Netflix:
  * - Banner lateral izquierdo con iconos limpios sin nombre (Vivo, Series, Películas, Seguir viendo, Ajustes, Buscar).
- * - Mini reproductor de canal en vivo al lado de la barra lateral.
- * - Banner principal (Hero) junto a un carrusel de películas y series 2026.
+ * - Mini reproductor de canal en vivo ubicado donde estaba el banner principal (Hero).
+ * - Carrusel de estrenos 2026 de una sola carátula que rota automáticamente.
  * - Carruseles horizontales de pósters en la parte inferior.
  */
 @Composable
@@ -83,7 +83,18 @@ fun TvHomeScreen(
     }
 
     val featuredItem = newestItems.firstOrNull()
-    val release2026Items = newestItems.drop(1)
+    val release2026Items = newestItems.drop(1).ifEmpty { newestItems }
+
+    var currentReleaseIndex by remember { mutableStateOf(0) }
+    LaunchedEffect(release2026Items) {
+        if (release2026Items.isNotEmpty()) {
+            while (true) {
+                delay(4000L)
+                currentReleaseIndex = (currentReleaseIndex + 1) % release2026Items.size
+            }
+        }
+    }
+    val currentRelease = release2026Items.getOrNull(currentReleaseIndex) ?: featuredItem
 
     Box(modifier = Modifier.fillMaxSize()) {
         SpaceBackground(modifier = Modifier.fillMaxSize())
@@ -147,37 +158,7 @@ fun TvHomeScreen(
                 )
             }
 
-            // ---- 2. MINI REPRODUCTOR EN VIVO AL LADO DE LA BARRA LATERAL ----
-            Box(
-                modifier = Modifier
-                    .width(160.dp)
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color.Black)
-                    .clickable { onLiveClick() }
-            ) {
-                PlayerPanel(
-                    playerManager = playerManager,
-                    modifier = Modifier.fillMaxSize(),
-                    onTap = onLiveClick
-                )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(8.dp)
-                        .background(Color.Red, RoundedCornerShape(4.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "EN VIVO",
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            // ---- 3. CONTENIDO PRINCIPAL DE TV (ESTILO NETFLIX) ----
+            // ---- 2. CONTENIDO PRINCIPAL DE TV ----
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -199,94 +180,47 @@ fun TvHomeScreen(
                     )
                 }
 
-                // ---- HERO BANNER + CARRUSEL 2026 AL LADO ----
+                // ---- MINI REPRODUCTOR EN VIVO (DONDE ESTABA EL HERO) + CARÁTULA 2026 AUTOMÁTICA ----
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(240.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Imagen grande / Hero Banner
+                    // Mini reproductor en vivo (reemplaza al Hero / Original Netflix)
                     Box(
                         modifier = Modifier
-                            .weight(1f)
+                            .weight(1.3f)
                             .fillMaxHeight()
                             .clip(RoundedCornerShape(16.dp))
-                            .background(SurfaceDark)
+                            .background(Color.Black)
+                            .clickable { onLiveClick() }
                     ) {
-                        if (featuredItem?.imageUrl != null) {
-                            AsyncImage(
-                                model = featuredItem.imageUrl,
-                                contentDescription = featuredItem.name,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-
-                        // Gradiente cinemático estilo Netflix
+                        PlayerPanel(
+                            playerManager = playerManager,
+                            modifier = Modifier.fillMaxSize(),
+                            onTap = onLiveClick
+                        )
                         Box(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.horizontalGradient(
-                                        colors = listOf(
-                                            Color.Black.copy(alpha = 0.95f),
-                                            Color.Black.copy(alpha = 0.6f),
-                                            Color.Transparent
-                                        ),
-                                        startX = 0f,
-                                        endX = 1000f
-                                    )
-                                )
-                        )
-
-                        // Información del Hero
-                        Column(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .fillMaxWidth(0.7f)
-                                .padding(24.dp),
-                            verticalArrangement = Arrangement.Center
+                                .align(Alignment.TopStart)
+                                .padding(12.dp)
+                                .background(Color.Red, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                text = "ORIGINAL NETFLIX",
-                                color = Color.Red,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 2.sp
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = featuredItem?.name ?: "JetGo Creador Cinematográfico",
+                                text = "EN VIVO",
                                 color = Color.White,
-                                fontSize = 26.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(text = "★ 4.9", color = Color(0xFFFFD700), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Text(text = "2026", color = Color.LightGray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Text(text = "ULTRA HD", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(Color.DarkGray, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp))
-                                Text(text = "5.1", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(Color.DarkGray, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp))
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = featuredItem?.categoryName ?: "Una experiencia de entretenimiento inmersiva con calidad de cine en tu televisor.",
-                                color = Color.White.copy(alpha = 0.8f),
-                                fontSize = 12.sp,
-                                maxLines = 2
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
 
-                    // Carrusel lateral de películas y series 2026
+                    // Carrusel de Estrenos 2026: una sola carátula cambiando automáticamente
                     Column(
                         modifier = Modifier
-                            .width(220.dp)
+                            .weight(0.9f)
                             .fillMaxHeight(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -296,47 +230,54 @@ fun TvHomeScreen(
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        LazyRow(
-                            modifier = Modifier.fillMaxSize(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(SurfaceDark)
+                                .clickable {
+                                    if (currentRelease != null) {
+                                        onItemClick(currentRelease)
+                                    }
+                                }
                         ) {
-                            items(release2026Items) { item ->
-                                Box(
-                                    modifier = Modifier
-                                        .width(110.dp)
-                                        .fillMaxHeight()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(SurfaceDark)
-                                        .clickable { onItemClick(item) }
+                            if (currentRelease?.imageUrl != null) {
+                                AsyncImage(
+                                    model = currentRelease.imageUrl,
+                                    contentDescription = currentRelease.name,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
+                                            startY = 120f
+                                        )
+                                    ),
+                                contentAlignment = Alignment.BottomStart
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp)
                                 ) {
-                                    if (!item.imageUrl.isNullOrBlank()) {
-                                        AsyncImage(
-                                            model = item.imageUrl,
-                                            contentDescription = item.name,
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(
-                                                Brush.verticalGradient(
-                                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
-                                                    startY = 120f
-                                                )
-                                            ),
-                                        contentAlignment = Alignment.BottomStart
-                                    ) {
-                                        Text(
-                                            text = item.name,
-                                            color = Color.White,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            modifier = Modifier.padding(6.dp)
-                                        )
-                                    }
+                                    Text(
+                                        text = "2026",
+                                        color = Color.Red,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 1.sp
+                                    )
+                                    Text(
+                                        text = currentRelease?.name ?: "Estreno",
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1
+                                    )
                                 }
                             }
                         }
