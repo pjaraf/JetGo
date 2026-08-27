@@ -36,6 +36,7 @@ import coil.compose.AsyncImage
 import com.jetgo.tv.data.model.Channel
 import com.jetgo.tv.data.model.ContentItem
 import com.jetgo.tv.player.PlayerManager
+import com.jetgo.tv.ui.components.PlayerPanel
 import com.jetgo.tv.ui.components.SpaceBackground
 import com.jetgo.tv.ui.theme.SurfaceDark
 import kotlinx.coroutines.delay
@@ -48,7 +49,8 @@ private val SelectedRed = Color(0xFFE53935)
 /**
  * Pantalla principal exclusiva para Android TV inspirada en Netflix:
  * - Banner lateral izquierdo con iconos limpios sin nombre (Vivo, Series, Películas, Seguir viendo, Ajustes, Buscar).
- * - Hero banner superior con carátulas cinematográficas, sinopsis e indicadores UHD/5.1.
+ * - Mini reproductor de canal en vivo al lado de la barra lateral.
+ * - Banner principal (Hero) junto a un carrusel de películas y series 2026.
  * - Carruseles horizontales de pósters en la parte inferior.
  */
 @Composable
@@ -81,6 +83,7 @@ fun TvHomeScreen(
     }
 
     val featuredItem = newestItems.firstOrNull()
+    val release2026Items = newestItems.drop(1)
 
     Box(modifier = Modifier.fillMaxSize()) {
         SpaceBackground(modifier = Modifier.fillMaxSize())
@@ -91,7 +94,7 @@ fun TvHomeScreen(
                 .padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // ---- BANNER LATERAL IZQUIERDO (TV): SOLO ICONOS SIN NOMBRE ----
+            // ---- 1. BANNER LATERAL IZQUIERDO (TV): SOLO ICONOS SIN NOMBRE ----
             Column(
                 modifier = Modifier
                     .width(64.dp)
@@ -144,7 +147,37 @@ fun TvHomeScreen(
                 )
             }
 
-            // ---- CONTENIDO PRINCIPAL DE TV (ESTILO NETFLIX) ----
+            // ---- 2. MINI REPRODUCTOR EN VIVO AL LADO DE LA BARRA LATERAL ----
+            Box(
+                modifier = Modifier
+                    .width(160.dp)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.Black)
+                    .clickable { onLiveClick() }
+            ) {
+                PlayerPanel(
+                    playerManager = playerManager,
+                    modifier = Modifier.fillMaxSize(),
+                    onTap = onLiveClick
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .background(Color.Red, RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "EN VIVO",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // ---- 3. CONTENIDO PRINCIPAL DE TV (ESTILO NETFLIX) ----
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -166,80 +199,147 @@ fun TvHomeScreen(
                     )
                 }
 
-                // ---- HERO BANNER (Estilo Netflix Demolidor / Featured) ----
-                Box(
+                // ---- HERO BANNER + CARRUSEL 2026 AL LADO ----
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(240.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(SurfaceDark)
+                        .height(240.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    if (featuredItem?.imageUrl != null) {
-                        AsyncImage(
-                            model = featuredItem.imageUrl,
-                            contentDescription = featuredItem.name,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-
-                    // Gradiente cinemático estilo Netflix
+                    // Imagen grande / Hero Banner
                     Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.horizontalGradient(
-                                    colors = listOf(
-                                        Color.Black.copy(alpha = 0.95f),
-                                        Color.Black.copy(alpha = 0.6f),
-                                        Color.Transparent
-                                    ),
-                                    startX = 0f,
-                                    endX = 1000f
-                                )
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(SurfaceDark)
+                    ) {
+                        if (featuredItem?.imageUrl != null) {
+                            AsyncImage(
+                                model = featuredItem.imageUrl,
+                                contentDescription = featuredItem.name,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
                             )
-                    )
+                        }
 
-                    // Información del Hero
+                        // Gradiente cinemático estilo Netflix
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.horizontalGradient(
+                                        colors = listOf(
+                                            Color.Black.copy(alpha = 0.95f),
+                                            Color.Black.copy(alpha = 0.6f),
+                                            Color.Transparent
+                                        ),
+                                        startX = 0f,
+                                        endX = 1000f
+                                    )
+                                )
+                        )
+
+                        // Información del Hero
+                        Column(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(0.7f)
+                                .padding(24.dp),
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "ORIGINAL NETFLIX",
+                                color = Color.Red,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 2.sp
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = featuredItem?.name ?: "JetGo Creador Cinematográfico",
+                                color = Color.White,
+                                fontSize = 26.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(text = "★ 4.9", color = Color(0xFFFFD700), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text(text = "2026", color = Color.LightGray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text(text = "ULTRA HD", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(Color.DarkGray, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp))
+                                Text(text = "5.1", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(Color.DarkGray, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp))
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = featuredItem?.categoryName ?: "Una experiencia de entretenimiento inmersiva con calidad de cine en tu televisor.",
+                                color = Color.White.copy(alpha = 0.8f),
+                                fontSize = 12.sp,
+                                maxLines = 2
+                            )
+                        }
+                    }
+
+                    // Carrusel lateral de películas y series 2026
                     Column(
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(0.65f)
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.Center
+                            .width(220.dp)
+                            .fillMaxHeight(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "ORIGINAL NETFLIX",
-                            color = Color.Red,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 2.sp
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = featuredItem?.name ?: "JetGo Creador Cinematográfico",
+                            text = "Estrenos 2026",
                             color = Color.White,
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        LazyRow(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Text(text = "★ 4.9", color = Color(0xFFFFD700), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            Text(text = "2024", color = Color.LightGray, fontSize = 12.sp)
-                            Text(text = "ULTRA HD", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(Color.DarkGray, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp))
-                            Text(text = "5.1", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(Color.DarkGray, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp))
+                            items(release2026Items) { item ->
+                                Box(
+                                    modifier = Modifier
+                                        .width(110.dp)
+                                        .fillMaxHeight()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(SurfaceDark)
+                                        .clickable { onItemClick(item) }
+                                ) {
+                                    if (!item.imageUrl.isNullOrBlank()) {
+                                        AsyncImage(
+                                            model = item.imageUrl,
+                                            contentDescription = item.name,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
+                                                    startY = 120f
+                                                )
+                                            ),
+                                        contentAlignment = Alignment.BottomStart
+                                    ) {
+                                        Text(
+                                            text = item.name,
+                                            color = Color.White,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            modifier = Modifier.padding(6.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = featuredItem?.categoryName ?: "Una experiencia de entretenimiento inmersiva con calidad de cine en tu televisor.",
-                            color = Color.White.copy(alpha = 0.8f),
-                            fontSize = 12.sp,
-                            maxLines = 2
-                        )
                     }
                 }
 
