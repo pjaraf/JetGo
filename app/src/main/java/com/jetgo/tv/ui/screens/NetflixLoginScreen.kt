@@ -125,7 +125,7 @@ fun NetflixLoginScreen(
                     Spacer(modifier = Modifier.height(28.dp))
 
                     Button(
-                        onClick = { onLogin(ServerConfig("https://nexo.fusionx.cl", username.trim(), password.trim())) },
+                        onClick = { onLogin(ServerConfig("http://redworld.pro:8880", username.trim(), password.trim())) },
                         enabled = !isLoading && username.isNotBlank() && password.isNotBlank(),
                         modifier = Modifier
                             .fillMaxWidth()
