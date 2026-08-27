@@ -13,7 +13,8 @@ local.properties
 keystore.properties
 *.jks
 *.keystore
-# Excepción: el keystore de DEBUG sí se sube a propósito (contraseña pública "android",
+# Excepción: el keystore de DEBUG y su respaldo base64 sí se suben a propósito (contraseña pública "android",
 # estándar de Android) para que todas las compilaciones de GitHub Actions firmen igual
 # y las actualizaciones automáticas funcionen sin conflicto de firma.
 !debug.keystore
+!debug.keystore.base64

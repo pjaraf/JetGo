@@ -42,6 +42,13 @@ object UpdateInstaller {
         }
     }
 
+    private fun getUpdateDir(context: Context): File {
+        val external = context.getExternalFilesDir(SUB_DIR)
+        val dir = external ?: File(context.filesDir, SUB_DIR)
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
     /**
      * Descarga el APK manejando el progreso NOSOTROS MISMOS (no depende del cajón de
      * notificaciones del sistema, que en muchos TV Box no se ve ni se puede tocar).
@@ -68,8 +75,7 @@ object UpdateInstaller {
                     }
 
                     val totalBytes = body.contentLength()
-                    val dir = File(context.getExternalFilesDir(SUB_DIR)?.path ?: context.filesDir.path)
-                    if (!dir.exists()) dir.mkdirs()
+                    val dir = getUpdateDir(context)
                     val outFile = File(dir, FILE_NAME)
 
                     body.byteStream().use { input ->
@@ -111,14 +117,16 @@ object UpdateInstaller {
 
     private fun installDownloadedApk(context: Context): Boolean {
         return try {
-            val file = File(context.getExternalFilesDir(SUB_DIR), FILE_NAME)
+            val file = File(getUpdateDir(context), FILE_NAME)
             if (!file.exists()) return false
 
             val apkUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
 
             val installIntent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(apkUri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             }
             context.startActivity(installIntent)
             true

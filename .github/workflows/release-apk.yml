@@ -29,29 +29,16 @@ jobs:
         with:
           gradle-version: 8.7
 
-      - name: Verificar si hay secretos de firma configurados
-        id: check_secrets
-        run: echo "has_keystore=${{ secrets.KEYSTORE_BASE64 != '' }}" >> "$GITHUB_OUTPUT"
-
-      - name: Decodificar el keystore desde el secreto
-        if: steps.check_secrets.outputs.has_keystore == 'true'
+      - name: Garantizar Keystore Fijo
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.jks
-          cat > keystore.properties << EOF
-          storeFile=release.jks
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          EOF
+          if [ -f "debug.keystore.base64" ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+          fi
+          mkdir -p ~/.android
+          cp debug.keystore ~/.android/debug.keystore || true
 
       - name: Compilar APK release
         run: gradle assembleRelease --no-daemon --stacktrace
-
-      - name: Advertencia si no se firmó
-        if: steps.check_secrets.outputs.has_keystore != 'true'
-        run: |
-          echo "::warning::No se configuraron los secretos KEYSTORE_BASE64/KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD."
-          echo "::warning::El APK generado NO está firmado y no se podrá instalar hasta firmarlo manualmente."
 
       - name: Subir el APK como artefacto descargable
         uses: actions/upload-artifact@v4
@@ -61,7 +48,6 @@ jobs:
           if-no-files-found: error
 
       - name: Publicar como GitHub Release
-        if: steps.check_secrets.outputs.has_keystore == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/release/app-release.apk

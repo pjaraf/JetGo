@@ -1,14 +1,24 @@
 import java.util.Properties
 import java.io.FileInputStream
+import java.util.Base64
 
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
 
-// Lee las credenciales de firma desde keystore.properties (generado en CI a partir de
-// secrets de GitHub, o creado localmente por ti). Si no existe, el build de release
-// simplemente queda sin firmar (útil para compilar sin publicar).
+// Lee las credenciales de firma desde keystore.properties o utiliza el keystore fijo (debug.keystore).
+val debugKeystore = rootProject.file("debug.keystore")
+val base64Keystore = rootProject.file("debug.keystore.base64")
+if (!debugKeystore.exists() && base64Keystore.exists()) {
+    try {
+        val bytes = Base64.getDecoder().decode(base64Keystore.readText().trim())
+        debugKeystore.writeBytes(bytes)
+    } catch (e: Exception) {
+        println("Warning: could not restore debug.keystore from base64: ${e.message}")
+    }
+}
+
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties()
 val hasKeystore = keystorePropertiesFile.exists()
@@ -33,32 +43,32 @@ android {
 
     signingConfigs {
         create("releaseSigning") {
-            val debugKeystore = rootProject.file("debug.keystore")
-            if (hasKeystore) {
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-            } else if (debugKeystore.exists()) {
-                storeFile = debugKeystore
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
-            }
-        }
-        // Firma de debug FIJA (el mismo keystore siempre, incluído en el repo).
-        getByName("debug") {
-            val debugKeystore = rootProject.file("debug.keystore")
             if (debugKeystore.exists()) {
                 storeFile = debugKeystore
                 storePassword = "android"
                 keyAlias = "androiddebugkey"
                 keyPassword = "android"
             }
+            enableV1Signing = true
+            enableV2Signing = true
+        }
+        // Firma fija garantizada en debug y release (evita conflictos de actualización)
+        getByName("debug") {
+            if (debugKeystore.exists()) {
+                storeFile = debugKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+            enableV1Signing = true
+            enableV2Signing = true
         }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
