@@ -2,6 +2,7 @@ package com.jetgo.tv.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material3.Icon
@@ -23,6 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.delay
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -202,36 +206,14 @@ fun FullscreenPlayerOverlay(
             )
     ) {
         var fillScreen by remember { mutableStateOf(true) }
-        // Esta pantalla se usa tanto para Vivo como para Película/Serie — cada uno con su
-        // propio reproductor VLC completamente separado (ver PlayerManager). Si isVod cambia
-        // (ej. sales de una película y vuelves a Vivo), la vista se re-vincula al otro.
         val activePlayer = if (isVod) playerManager.vodPlayer else playerManager.livePlayer
         var attachedPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
 
-        // Fondo instantáneo con el logo/póster del canal y degradado Netflix para evitar pantalla negra al expandir
-        if (!isVod) {
-            Box(modifier = Modifier.fillMaxSize().background(Color(0xFF141414))) {
-                if (!liveChannelInfo?.channelLogo.isNullOrBlank()) {
-                    AsyncImage(
-                        model = liveChannelInfo?.channelLogo,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().blur(30.dp)
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = 0.65f),
-                                    Color.Black.copy(alpha = 0.88f)
-                                )
-                            )
-                        )
-                )
-            }
+        var isVideoReady by remember { mutableStateOf(false) }
+        LaunchedEffect(activePlayer) {
+            isVideoReady = false
+            delay(900L) // Oculta el fondo negro/buffer mientras VLC renderiza el primer frame
+            isVideoReady = true
         }
 
         AndroidView(
@@ -258,6 +240,62 @@ fun FullscreenPlayerOverlay(
             },
             modifier = Modifier.fillMaxSize()
         )
+
+        // Backdrop temporal mientras VLC renderiza el primer frame para evitar pantalla negra al expandir
+        if (!isVideoReady) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                val bgImage = if (isVod) posterUrl else liveChannelInfo?.channelLogo
+                if (!bgImage.isNullOrBlank()) {
+                    AsyncImage(
+                        model = bgImage,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().blur(30.dp)
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.5f),
+                                    Color.Black.copy(alpha = 0.88f)
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(24.dp)
+                    ) {
+                        if (!bgImage.isNullOrBlank()) {
+                            AsyncImage(
+                                model = bgImage,
+                                contentDescription = null,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .size(130.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                            )
+                        }
+                        Text(
+                            text = if (isVod) title else (liveChannelInfo?.channelName ?: "Cargando..."),
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
         if (isVod) {
             VodPlayerControls(
                 playerManager = playerManager,
