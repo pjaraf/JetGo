@@ -56,13 +56,17 @@ fun PhoneCategoryScreen(
     onCategorySelected: (String) -> Unit,
     onItemSelected: (ContentItem) -> Unit
 ) {
-    var selectedCategoryId by remember { mutableStateOf<String?>(null) }
+    var selectedCategoryId by remember(typeLabel) { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) { onLoadCategories() }
-    LaunchedEffect(categories) {
-        if (selectedCategoryId == null && categories.isNotEmpty()) {
-            selectedCategoryId = categories.first().id
-            onCategorySelected(categories.first().id)
+    LaunchedEffect(typeLabel) { onLoadCategories() }
+    LaunchedEffect(categories, typeLabel) {
+        if (categories.isNotEmpty()) {
+            val matching = categories.find { it.id == selectedCategoryId }
+            val target = matching ?: categories.first()
+            selectedCategoryId = target.id
+            if (matching == null) {
+                onCategorySelected(target.id)
+            }
         }
     }
 

@@ -79,16 +79,16 @@ fun TvCategoryGridScreen(
     isFavorite: (ContentItem) -> Boolean,
     onToggleFavorite: (ContentItem) -> Unit
 ) {
-    var selectedCategoryId by remember { mutableStateOf<String?>(null) }
-    var selectedCategoryName by remember { mutableStateOf("") }
-    var sidebarVisible by remember { mutableStateOf(false) }
-    var sidebarIndex by remember { mutableStateOf(0) }
-    var focusedIndex by remember { mutableStateOf(0) }
+    var selectedCategoryId by remember(typeLabel) { mutableStateOf<String?>(null) }
+    var selectedCategoryName by remember(typeLabel) { mutableStateOf("") }
+    var sidebarVisible by remember(typeLabel) { mutableStateOf(false) }
+    var sidebarIndex by remember(typeLabel) { mutableStateOf(0) }
+    var focusedIndex by remember(typeLabel) { mutableStateOf(0) }
     val gridColumns = 6
     val keyInterceptFocusRequester = remember { FocusRequester() }
     val firstItemFocusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(typeLabel) {
         onLoadCategories()
     }
     // Apenas hay algo en la grilla, el foco va directo a la primera carátula (no al
@@ -100,12 +100,16 @@ fun TvCategoryGridScreen(
             try { keyInterceptFocusRequester.requestFocus() } catch (e: Exception) { /* ignorar */ }
         }
     }
-    LaunchedEffect(categories) {
-        if (selectedCategoryId == null && categories.isNotEmpty()) {
-            sidebarIndex = 0
-            selectedCategoryId = categories.first().id
-            selectedCategoryName = categories.first().name
-            onCategorySelected(categories.first().id)
+    LaunchedEffect(categories, typeLabel) {
+        if (categories.isNotEmpty()) {
+            val matching = categories.find { it.id == selectedCategoryId }
+            val target = matching ?: categories.first()
+            selectedCategoryId = target.id
+            selectedCategoryName = target.name
+            sidebarIndex = categories.indexOf(target).coerceAtLeast(0)
+            if (matching == null) {
+                onCategorySelected(target.id)
+            }
         }
     }
 

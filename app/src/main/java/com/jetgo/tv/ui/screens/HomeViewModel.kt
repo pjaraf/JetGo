@@ -605,6 +605,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     /** Paso 1: lista las subcategorías disponibles para el tipo tocado (Vivo/Serie/Película/Anime/Especial) */
     fun loadCategoriesForType(type: ContentType) {
         _categoryPickerState.value = CategoryPickerUiState(isLoading = true)
+        _categoryContentState.value = CategoryContentUiState(isLoading = true)
 
         // Vivo con lista M3U pura, o con 2 fuentes combinadas: las categorías salen del propio
         // listado de canales ya cargado (no hay una sola API de categorías para todo junto).
@@ -624,6 +625,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         if (currentMode == "m3u") {
             // Lista M3U pura (sin combinar) y no es Vivo: no maneja categorías de películas/series
             _categoryPickerState.value = CategoryPickerUiState(categories = emptyList())
+            _categoryContentState.value = CategoryContentUiState(items = emptyList())
             return
         }
 
@@ -670,12 +672,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     allCategories.filterNot { AdultContentFilter.isAdult(it.name) }
                 } else allCategories
                 _categoryPickerState.value = CategoryPickerUiState(categories = filtered)
+                if (filtered.isNotEmpty()) {
+                    loadCategoryContent(type, filtered.first().id)
+                }
             }
             return
         }
 
         val config = currentConfig ?: run {
             _categoryPickerState.value = CategoryPickerUiState(errorMessage = "Sin configuración de servidor")
+            _categoryContentState.value = CategoryContentUiState(errorMessage = "Sin configuración de servidor")
             return
         }
 
@@ -699,12 +705,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 _categoryPickerState.value = CategoryPickerUiState(categories = filtered)
 
-                // Para Vivo: siempre se queda mostrando la categoría que quedó por defecto
-                // (la última elegida), y no la primera de la lista cada vez.
-                if (type == ContentType.LIVE && filtered.isNotEmpty()) {
-                    val target = _phoneLiveCategoryId.value?.takeIf { id -> filtered.any { it.id == id } }
-                        ?: filtered.first().id
-                    loadCategoryContent(ContentType.LIVE, target)
+                if (filtered.isNotEmpty()) {
+                    if (type == ContentType.LIVE) {
+                        val target = _phoneLiveCategoryId.value?.takeIf { id -> filtered.any { it.id == id } }
+                            ?: filtered.first().id
+                        loadCategoryContent(ContentType.LIVE, target)
+                    } else {
+                        loadCategoryContent(type, filtered.first().id)
+                    }
                 }
             } catch (e: Exception) {
                 _categoryPickerState.value = CategoryPickerUiState(errorMessage = "Error al cargar categorías: ${e.message}")
