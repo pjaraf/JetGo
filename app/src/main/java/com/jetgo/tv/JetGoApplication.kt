@@ -13,6 +13,15 @@ import okhttp3.OkHttpClient
  */
 class JetGoApplication : Application(), ImageLoaderFactory {
 
+    override fun onCreate() {
+        super.onCreate()
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            android.util.Log.e("JetGo_Crash", "Excepción no capturada en ${thread.name}: ${throwable.message}", throwable)
+            defaultHandler?.uncaughtException(thread, throwable)
+        }
+    }
+
     override fun newImageLoader(): ImageLoader {
         val client = OkHttpClient.Builder()
             .addInterceptor { chain ->

@@ -2,6 +2,7 @@ package com.jetgo.tv.util
 
 import android.app.UiModeManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 
 /**
@@ -11,5 +12,19 @@ import android.content.res.Configuration
  */
 fun isTelevision(context: Context): Boolean {
     val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
-    return uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
+    if (uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION) {
+        return true
+    }
+    val pm = context.packageManager
+    if (pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
+        pm.hasSystemFeature("android.hardware.type.television")
+    ) {
+        return true
+    }
+    // Para TV Boxes chinos o AOSP sin perfil oficial Leanback pero sin pantalla táctil
+    if (!pm.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)) {
+        return true
+    }
+    return false
 }
+

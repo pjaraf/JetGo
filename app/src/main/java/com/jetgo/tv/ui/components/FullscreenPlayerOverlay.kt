@@ -40,7 +40,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
@@ -255,7 +255,7 @@ fun FullscreenPlayerOverlay(
                         model = bgImage,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().blur(30.dp)
+                        modifier = Modifier.fillMaxSize().alpha(0.25f)
                     )
                 }
                 Box(

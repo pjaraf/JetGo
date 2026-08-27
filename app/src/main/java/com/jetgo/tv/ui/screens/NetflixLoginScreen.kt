@@ -11,17 +11,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.jetgo.tv.data.model.ServerConfig
 
 @Composable
@@ -34,59 +31,20 @@ fun NetflixLoginScreen(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Fondo con carátulas estilo Netflix (pósters de cine y series de fondo con desenfoque)
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFF0A0A0C)),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val backgroundPosters = listOf(
-                "https://image.tmdb.org/t/p/w500/qNBAXBIQlnOThrVvA6mA2B5ggV6.jpg",
-                "https://image.tmdb.org/t/p/w500/suaEOtk1N1sgg2MTM7oZd2cfVp3.jpg",
-                "https://image.tmdb.org/t/p/w500/vpnVM9B6NMmQpWeZvzLvDESb2QY.jpg",
-                "https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg",
-                "https://image.tmdb.org/t/p/w500/d5iIlFn5s0ImszYzBPb8JPIfbXD.jpg",
-                "https://image.tmdb.org/t/p/w500/8cdWjvZQUExUUTzyp4t6EDMubfO.jpg"
-            )
-            repeat(3) {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    backgroundPosters.shuffled().forEach { url ->
-                        AsyncImage(
-                            model = url,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(240.dp)
-                                .blur(16.dp),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
-                }
-            }
-        }
-
-        // Viñeta / Gradiente oscuro estilo Netflix
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.75f),
-                            Color.Black.copy(alpha = 0.92f),
-                            Color.Black.copy(alpha = 0.98f)
-                        )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF1B1B1E),
+                        Color(0xFF0F0F12),
+                        Color(0xFF050507),
+                        Color.Black
                     )
                 )
-        )
-
+            )
+    ) {
         // Tarjeta central de inicio de sesión
         Box(
             modifier = Modifier
@@ -99,7 +57,7 @@ fun NetflixLoginScreen(
                     .widthIn(max = 440.dp)
                     .fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF141419).copy(alpha = 0.94f)),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF141419).copy(alpha = 0.96f)),
                 elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
             ) {
                 Column(
@@ -203,3 +161,4 @@ fun NetflixLoginScreen(
         }
     }
 }
+

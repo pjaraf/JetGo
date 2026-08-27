@@ -25,31 +25,39 @@ data class TrackOption(
  */
 class PlayerManager(context: Context) {
 
-    /** Motor de VLC — uno solo, compartido por los 2 reproductores (esto es normal en VLC,
-     *  no significa que compartan estado de reproducción; cada MediaPlayer es independiente). */
-    private val libVLC = LibVLC(
-        context,
-        arrayListOf(
-            "--no-drop-late-frames",
-            "--no-skip-frames",
-            "--rtsp-tcp",
-            "--network-caching=3000"
-        )
-    )
+    /** Motor de VLC — optimizado para TV Boxes y hardware limitado */
+    private val libVLC: LibVLC by lazy {
+        try {
+            LibVLC(
+                context,
+                arrayListOf(
+                    "--network-caching=3000",
+                    "--clock-jitter=0",
+                    "--clock-synchro=0",
+                    "--drop-late-frames",
+                    "--skip-frames",
+                    "--rtsp-tcp"
+                )
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("JetGo_Player", "Error al iniciar LibVLC con opciones personalizadas", e)
+            LibVLC(context)
+        }
+    }
 
     // =====================================================================================
     // REPRODUCTOR DE VIVO — configuración simple, sin ningún ajuste especial de decodificador.
     // No se debe tocar esta parte para probar cosas nuevas: para eso está el reproductor de
     // Película/Serie de más abajo, que es completamente independiente.
     // =====================================================================================
-    val livePlayer: MediaPlayer = MediaPlayer(libVLC)
+    val livePlayer: MediaPlayer by lazy { MediaPlayer(libVLC) }
 
     // =====================================================================================
     // REPRODUCTOR DE PELÍCULA/SERIE — separado por completo del de Vivo. Acá es donde se
     // puede forzar decodificación por software si el hardware de un TV Box puntual falla,
     // sin ningún riesgo de que afecte a Vivo (es otro objeto MediaPlayer distinto).
     // =====================================================================================
-    val vodPlayer: MediaPlayer = MediaPlayer(libVLC)
+    val vodPlayer: MediaPlayer by lazy { MediaPlayer(libVLC) }
 
     private val _stats = mutableStateOf(PlaybackStats())
     val stats: State<PlaybackStats> get() = _stats
