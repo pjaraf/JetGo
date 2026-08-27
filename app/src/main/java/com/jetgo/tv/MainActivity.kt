@@ -41,7 +41,6 @@ import com.jetgo.tv.ui.screens.ChannelListScreen
 import com.jetgo.tv.ui.screens.ContinueWatchingScreen
 import com.jetgo.tv.ui.screens.ConnectionIssueScreen
 import com.jetgo.tv.ui.screens.FavoritesScreen
-import com.jetgo.tv.ui.screens.HomeScreen
 import com.jetgo.tv.ui.screens.TvHomeScreen
 import com.jetgo.tv.ui.screens.HomeViewModel
 import com.jetgo.tv.ui.screens.SearchScreen
@@ -306,7 +305,7 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                 }
 
                 val newestItems = (homeCatalog.movies + homeCatalog.series).shuffled().take(10)
-                HomeScreen(
+                TvHomeScreen(
                     playerManager = viewModel.playerManager,
                     liveChannels = uiState.liveChannels,
                     newestItems = newestItems,
