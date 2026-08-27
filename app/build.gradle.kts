@@ -32,18 +32,21 @@ android {
     }
 
     signingConfigs {
-        if (hasKeystore) {
-            create("release") {
+        create("releaseSigning") {
+            val debugKeystore = rootProject.file("debug.keystore")
+            if (hasKeystore) {
                 storeFile = file(keystoreProperties["storeFile"] as String)
                 storePassword = keystoreProperties["storePassword"] as String
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
+            } else if (debugKeystore.exists()) {
+                storeFile = debugKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
             }
         }
         // Firma de debug FIJA (el mismo keystore siempre, incluído en el repo).
-        // Sin esto, cada compilación en GitHub Actions se firmaría con una llave
-        // aleatoria distinta, y Android rechazaría instalar las "actualizaciones"
-        // por conflicto de firma.
         getByName("debug") {
             val debugKeystore = rootProject.file("debug.keystore")
             if (debugKeystore.exists()) {
@@ -59,9 +62,7 @@ android {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            if (hasKeystore) {
-                signingConfig = signingConfigs.getByName("release")
-            }
+            signingConfig = signingConfigs.getByName("releaseSigning")
         }
     }
 
