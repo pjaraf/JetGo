@@ -984,10 +984,18 @@
           lastSnapshotDocs.sort((a, b) => (b.data.createdAt?.seconds || 0) - (a.data.createdAt?.seconds || 0));
         }
         renderCodes();
+        if (currentView === 'online') {
+          renderOnlineUsers();
+        }
       });
     // Vuelve a dibujar cada 15 segundos SIN volver a consultar Firestore, solo para que el
     // "en línea ahora" se vaya poniendo gris solo cuando pasan más de 2 minutos sin aviso.
-    setInterval(renderCodes, 15000);
+    setInterval(() => {
+      renderCodes();
+      if (currentView === 'online') {
+        renderOnlineUsers();
+      }
+    }, 15000);
   }
   /** Un dispositivo se considera "en línea ahora" si avisó actividad en los últimos 2 minutos */
   function isDeviceOnline(timestamp) {

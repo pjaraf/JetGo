@@ -348,6 +348,23 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
         }
+        
+        // Corrutina para avisar que el dispositivo está activo (Heartbeat)
+        viewModelScope.launch {
+            while (true) {
+                val savedCode = configStore.accessCode.first()
+                if (!savedCode.isNullOrBlank() && _uiState.value.isConfigured) {
+                    val context = getApplication<Application>()
+                    val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
+                    val deviceId = com.jetgo.tv.util.getDeviceId(context)
+                    withContext(Dispatchers.IO) {
+                        AccessCodeChecker.sendHeartbeat(projectId, savedCode, deviceId)
+                    }
+                }
+                kotlinx.coroutines.delay(60_000L) // Avisa cada 1 minuto
+            }
+        }
+
         android.util.Log.e("JetGo_DIAG", "HomeViewModel se está creando de nuevo", Exception("rastro de diagnóstico"))
 
         viewModelScope.launch {
