@@ -384,6 +384,56 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun loginWithCode(code: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            val servers = listOf("http://redworld.pro:8880", "http://xmtv.eu:8080")
+            var success = false
+            for (host in servers) {
+                val config = ServerConfig(host, code, code)
+                try {
+                    val userInfo = repository.login(config)
+                    if (userInfo != null) {
+                        success = true
+                        configStore.saveXtream(config.host, config.username, config.password)
+                        currentConfig = config
+                        currentMode = "xtream"
+
+                        val expirationText = userInfo.expDate?.toLongOrNull()?.let { unixSeconds ->
+                            try {
+                                java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+                                    .format(java.util.Date(unixSeconds * 1000))
+                            } catch (e: Exception) { null }
+                        }
+                        _settingsInfo.value = _settingsInfo.value.copy(expirationDate = expirationText)
+                        val channels = repository.getLiveChannels(config, categoryId = null)
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isConfigured = true,
+                            liveChannels = channels
+                        )
+                        val lastId = try { configStore.getLastChannelId() } catch (e: Exception) { null }
+                        val startingChannel = channels.firstOrNull { it.streamId == lastId } ?: channels.firstOrNull()
+                        startingChannel?.let { playChannel(it) }
+                        ensureHomeCatalogLoaded()
+                        refreshContinueWatching()
+                        refreshParentalState()
+                        checkForAutoResume()
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    // Try next server
+                }
+            }
+            if (!success) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "Código incorrecto o servidor no disponible."
+                )
+            }
+        }
+    }
+
     fun connectXtream(config: ServerConfig, silent: Boolean = false) {
         viewModelScope.launch {
             if (!silent) {

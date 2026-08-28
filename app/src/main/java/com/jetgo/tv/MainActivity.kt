@@ -155,7 +155,7 @@ private fun AppRoot(viewModel: HomeViewModel) {
                         NetflixLoginScreen(
                             isLoading = uiState.isLoading,
                             errorMessage = uiState.errorMessage,
-                            onLogin = { config -> viewModel.connectXtream(config) }
+                            onLogin = { code -> viewModel.loginWithCode(code) }
                         )
                     }
                     isTv -> {
