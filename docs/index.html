@@ -332,7 +332,8 @@
       <div class="name">JetGo</div>
     </div>
     <nav>
-      <div class="nav-item" id="nav-create" onclick="selectView('create')"><span class="dot"></span> Inicio / Crear cliente</div>
+      <div class="nav-item" id="nav-home" onclick="selectView('home')"><span class="dot"></span> Inicio</div>
+      <div class="nav-item" id="nav-create" onclick="selectView('create')"><span class="dot"></span> Crear cliente</div>
       <div class="nav-item" id="nav-active" onclick="selectView('active')"><span class="dot"></span> Clientes activos<span class="nav-badge" id="badge-active">0</span></div>
       <div class="nav-item" id="nav-expiring" onclick="selectView('expiring')"><span class="dot"></span> Clientes por vencer<span class="nav-badge" id="badge-expiring">0</span></div>
       <div class="nav-item" id="nav-expired" onclick="selectView('expired')"><span class="dot"></span> Clientes vencidos<span class="nav-badge" id="badge-expired">0</span></div>
@@ -349,8 +350,8 @@
     <div class="topbar">
       <button class="hamburger-btn" onclick="openMenu()">☰</button>
       <div>
-        <h1 id="viewTitle">Inicio / Crear cliente</h1>
-        <p id="viewSubtitle">Genera un código de acceso para un cliente</p>
+        <h1 id="viewTitle">Inicio</h1>
+        <p id="viewSubtitle">Panel general y estadísticas</p>
       </div>
     </div>
     <div class="content">
@@ -640,7 +641,7 @@
       loginScreen.style.display = 'none';
       appShell.style.display = 'flex';
       document.getElementById('adminEmail').textContent = currentUsername || user.email || '';
-      selectView('create');
+      selectView('home');
       listenToCodes();
       // Se esperan las 2 cargas (servidores y combos) ANTES de dibujar el desplegable de
       // "Crear cliente nuevo" — si se dibuja antes de que termine de cargar la lista de
@@ -741,9 +742,10 @@
   }
   window.openMenu = openMenu;
   window.closeMenu = closeMenu;
-  // ---------- Navegación entre las 6 secciones ----------
+  // ---------- Navegación entre las secciones ----------
   const VIEW_INFO = {
-    create: { title: 'Inicio / Crear cliente', subtitle: 'Estadísticas y generación de códigos de acceso' },
+    home: { title: 'Inicio', subtitle: 'Panel general y estadísticas' },
+    create: { title: 'Crear cliente', subtitle: 'Genera un código de acceso para un cliente' },
     active: { title: 'Clientes activos', subtitle: 'Códigos que están funcionando ahora mismo' },
     expiring: { title: 'Clientes por vencer', subtitle: 'Vencen dentro de los próximos 7 días' },
     expired: { title: 'Clientes vencidos', subtitle: 'La fecha de vencimiento ya pasó' },
@@ -751,18 +753,20 @@
     servers: { title: 'Servidores', subtitle: 'Servidores Xtream guardados por nombre' },
     subadmins: { title: 'Paneles sub administrador', subtitle: 'Dar acceso a este panel a otra persona' }
   };
-  let currentView = 'create';
+  let currentView = 'home';
   function selectView(name) {
     currentView = name;
     document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
     
-    // Mostrar estadísticas SOLO en la pantalla de inicio (create)
+    // Mostrar estadísticas SOLO en la pantalla de inicio (home)
     const statsGrid = document.getElementById('statsGrid');
     if (statsGrid) {
-      statsGrid.style.display = (name === 'create') ? 'grid' : 'none';
+      statsGrid.style.display = (name === 'home') ? 'grid' : 'none';
     }
 
-    if (name === 'create') {
+    if (name === 'home') {
+      // La vista 'home' solo muestra las estadísticas
+    } else if (name === 'create') {
       document.getElementById('view-create').style.display = 'block';
     } else if (name === 'subadmins') {
       document.getElementById('view-subadmins').style.display = 'block';
