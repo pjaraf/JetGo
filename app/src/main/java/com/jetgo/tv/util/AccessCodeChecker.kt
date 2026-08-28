@@ -257,6 +257,37 @@ object AccessCodeChecker {
         }
     }
 
+    fun sendOffline(projectId: String, code: String, deviceId: String) {
+        if (projectId.isBlank() || code.isBlank() || deviceId.isBlank()) return
+        try {
+            val normalizedCode = code.trim().uppercase()
+            val docPath = "projects/$projectId/databases/(default)/documents/access_codes/$normalizedCode"
+            val docUrl = "https://firestore.googleapis.com/v1/$docPath"
+            val payload = JSONObject().put(
+                "fields", JSONObject().put(
+                    "deviceActivity", JSONObject().put(
+                        "mapValue", JSONObject().put(
+                            "fields", JSONObject().put(
+                                deviceId, JSONObject().put("timestampValue", "1970-01-01T00:00:00Z")
+                            )
+                        )
+                    )
+                )
+            )
+            val patchUrl = "$docUrl?updateMask.fieldPaths=deviceActivity.$deviceId"
+            val requestBody = payload.toString().toRequestBody("application/json".toMediaType())
+            val patchRequest = Request.Builder().url(patchUrl).patch(requestBody).build()
+            val response = client.newCall(patchRequest).execute()
+            if (!response.isSuccessful) {
+                val errorBody = response.body?.string()
+                android.util.Log.e("JetGo_DIAG", "Offline signal failed: ${response.code} $errorBody")
+            }
+            response.close()
+        } catch (e: Exception) {
+            android.util.Log.e("JetGo_DIAG", "Offline signal exception", e)
+        }
+    }
+
     private fun nowIsoUtc(): String {
         val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US)
         sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")

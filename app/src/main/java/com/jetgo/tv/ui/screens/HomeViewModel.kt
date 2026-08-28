@@ -111,6 +111,35 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun enterFullscreenPlayer() { _isFullscreenPlayer.value = true }
     fun exitFullscreenPlayer() { _isFullscreenPlayer.value = false }
 
+    var isAppInForeground = true
+        private set
+
+    fun setAppForegroundState(inForeground: Boolean) {
+        isAppInForeground = inForeground
+        if (!inForeground) {
+            viewModelScope.launch(Dispatchers.IO) {
+                val savedCode = configStore.accessCode.first()
+                if (!savedCode.isNullOrBlank()) {
+                    val context = getApplication<Application>()
+                    val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
+                    val deviceId = com.jetgo.tv.util.getDeviceId(context)
+                    AccessCodeChecker.sendOffline(projectId, savedCode, deviceId)
+                }
+            }
+        } else {
+            // Cuando vuelve a primer plano, envía el latido de inmediato para que se refleje rápido
+            viewModelScope.launch(Dispatchers.IO) {
+                val savedCode = configStore.accessCode.first()
+                if (!savedCode.isNullOrBlank()) {
+                    val context = getApplication<Application>()
+                    val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
+                    val deviceId = com.jetgo.tv.util.getDeviceId(context)
+                    AccessCodeChecker.sendHeartbeat(projectId, savedCode, deviceId)
+                }
+            }
+        }
+    }
+
     fun disconnect() {
         viewModelScope.launch {
             configStore.clear()
@@ -356,11 +385,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             configStore.accessCode.collectLatest { savedCode ->
                 if (!savedCode.isNullOrBlank()) {
                     while (isActive) {
-                        val context = getApplication<Application>()
-                        val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
-                        val deviceId = com.jetgo.tv.util.getDeviceId(context)
-                        withContext(Dispatchers.IO) {
-                            AccessCodeChecker.sendHeartbeat(projectId, savedCode, deviceId)
+                        if (isAppInForeground) {
+                            val context = getApplication<Application>()
+                            val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
+                            val deviceId = com.jetgo.tv.util.getDeviceId(context)
+                            withContext(Dispatchers.IO) {
+                                AccessCodeChecker.sendHeartbeat(projectId, savedCode, deviceId)
+                            }
                         }
                         kotlinx.coroutines.delay(60_000L) // Avisa cada 1 minuto
                     }
@@ -369,6 +400,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         android.util.Log.e("JetGo_DIAG", "HomeViewModel se está creando de nuevo", Exception("rastro de diagnóstico"))
+
 
         viewModelScope.launch {
             configStore.mode.collect { currentMode = it }

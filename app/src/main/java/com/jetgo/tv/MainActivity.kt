@@ -97,12 +97,14 @@ class MainActivity : ComponentActivity() {
         // La app no debe seguir reproduciendo cuando queda en segundo plano (se minimiza,
         // se apaga la pantalla, o se cambia a otra app) — se pausan ambos reproductores.
         viewModel.playerManager.pauseAll()
+        viewModel.setAppForegroundState(false)
     }
 
     override fun onStart() {
         super.onStart()
         // Al volver al primer plano, retoma automáticamente lo que se estaba viendo.
         viewModel.playerManager.playAll()
+        viewModel.setAppForegroundState(true)
     }
 }
 
