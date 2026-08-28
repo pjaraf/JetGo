@@ -332,7 +332,7 @@
       <div class="name">JetGo</div>
     </div>
     <nav>
-      <div class="nav-item" id="nav-create" onclick="selectView('create')"><span class="dot"></span> Crear cliente nuevo</div>
+      <div class="nav-item" id="nav-create" onclick="selectView('create')"><span class="dot"></span> Inicio / Crear cliente</div>
       <div class="nav-item" id="nav-active" onclick="selectView('active')"><span class="dot"></span> Clientes activos<span class="nav-badge" id="badge-active">0</span></div>
       <div class="nav-item" id="nav-expiring" onclick="selectView('expiring')"><span class="dot"></span> Clientes por vencer<span class="nav-badge" id="badge-expiring">0</span></div>
       <div class="nav-item" id="nav-expired" onclick="selectView('expired')"><span class="dot"></span> Clientes vencidos<span class="nav-badge" id="badge-expired">0</span></div>
@@ -349,13 +349,13 @@
     <div class="topbar">
       <button class="hamburger-btn" onclick="openMenu()">☰</button>
       <div>
-        <h1 id="viewTitle">Crear cliente nuevo</h1>
+        <h1 id="viewTitle">Inicio / Crear cliente</h1>
         <p id="viewSubtitle">Genera un código de acceso para un cliente</p>
       </div>
     </div>
     <div class="content">
-      <!-- ---------- Estadísticas: siempre visibles arriba, sin importar la sección ---------- -->
-      <div class="stats-grid">
+      <!-- ---------- Estadísticas: visibles solo en Inicio ---------- -->
+      <div class="stats-grid" id="statsGrid">
         <div class="stat-card">
           <div class="stat-label">Códigos totales</div>
           <div class="stat-value" id="statTotal">0</div>
@@ -743,7 +743,7 @@
   window.closeMenu = closeMenu;
   // ---------- Navegación entre las 6 secciones ----------
   const VIEW_INFO = {
-    create: { title: 'Crear cliente nuevo', subtitle: 'Genera un código de acceso para un cliente' },
+    create: { title: 'Inicio / Crear cliente', subtitle: 'Estadísticas y generación de códigos de acceso' },
     active: { title: 'Clientes activos', subtitle: 'Códigos que están funcionando ahora mismo' },
     expiring: { title: 'Clientes por vencer', subtitle: 'Vencen dentro de los próximos 7 días' },
     expired: { title: 'Clientes vencidos', subtitle: 'La fecha de vencimiento ya pasó' },
@@ -755,6 +755,13 @@
   function selectView(name) {
     currentView = name;
     document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
+    
+    // Mostrar estadísticas SOLO en la pantalla de inicio (create)
+    const statsGrid = document.getElementById('statsGrid');
+    if (statsGrid) {
+      statsGrid.style.display = (name === 'create') ? 'grid' : 'none';
+    }
+
     if (name === 'create') {
       document.getElementById('view-create').style.display = 'block';
     } else if (name === 'subadmins') {
