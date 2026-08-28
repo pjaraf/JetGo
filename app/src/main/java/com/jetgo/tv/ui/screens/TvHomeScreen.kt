@@ -127,22 +127,28 @@ fun TvHomeScreen(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                SidebarIconButton(
-                    icon = Icons.Default.PlayCircle,
-                    contentDescription = "Vivo",
-                    focusRequester = vivoFocusRequester,
-                    onClick = onLiveClick
-                )
-                SidebarIconButton(
-                    icon = Icons.Default.Tv,
-                    contentDescription = "Series",
-                    onClick = { onCategoryClick("SERIES") }
-                )
-                SidebarIconButton(
-                    icon = Icons.Default.Movie,
-                    contentDescription = "Películas",
-                    onClick = { onCategoryClick("MOVIE") }
-                )
+                if (!hiddenTypes.contains("live")) {
+                    SidebarIconButton(
+                        icon = Icons.Default.PlayCircle,
+                        contentDescription = "Vivo",
+                        focusRequester = vivoFocusRequester,
+                        onClick = onLiveClick
+                    )
+                }
+                if (!hiddenTypes.contains("series")) {
+                    SidebarIconButton(
+                        icon = Icons.Default.Tv,
+                        contentDescription = "Series",
+                        onClick = { onCategoryClick("SERIES") }
+                    )
+                }
+                if (!hiddenTypes.contains("movie")) {
+                    SidebarIconButton(
+                        icon = Icons.Default.Movie,
+                        contentDescription = "Películas",
+                        onClick = { onCategoryClick("MOVIE") }
+                    )
+                }
                 SidebarIconButton(
                     icon = Icons.Default.History,
                     contentDescription = "Seguir viendo",

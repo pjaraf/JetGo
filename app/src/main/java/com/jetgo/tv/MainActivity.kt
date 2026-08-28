@@ -287,6 +287,7 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
     val homeCatalog by viewModel.homeCatalog.collectAsState()
     val isFullscreen by viewModel.isFullscreenPlayer.collectAsState()
     val showNextEpisodeMessage by viewModel.showNextEpisodeMessage.collectAsState()
+    val hiddenTypes by viewModel.hiddenTypes.collectAsState()
 
     // Manejador único: si es una serie o película, abre su ficha; si no (Vivo), reproduce directo.
     val handleItemSelected: (ContentItem) -> Unit = { item ->
@@ -368,7 +369,8 @@ private fun DashboardNavHost(navController: NavHostController, viewModel: HomeVi
                         viewModel.pausePreviewPlayer()
                         navController.navigate("settings")
                     },
-                    isFullscreen = isFullscreen
+                    isFullscreen = isFullscreen,
+                    hiddenTypes = hiddenTypes
                 )
             }
             // Mientras isFullscreen es true, esta pantalla NO se dibuja (ni oculta): así el
@@ -577,6 +579,7 @@ private fun PhoneApp(viewModel: HomeViewModel) {
     val homeCatalog by viewModel.homeCatalog.collectAsState()
     val seriesDetailState by viewModel.seriesDetailState.collectAsState()
     val movieDetailState by viewModel.movieDetailState.collectAsState()
+    val hiddenTypes by viewModel.hiddenTypes.collectAsState()
 
     // Serie: abre la ficha con temporadas/capítulos. Película: abre su propia ficha, mismo
     // estilo que la de serie. Cualquier otra cosa (canal en vivo, etc.): reproduce directo.
@@ -731,6 +734,6 @@ private fun PhoneApp(viewModel: HomeViewModel) {
             }
         }
 
-        PhoneBottomNav(selected = selectedTab, onSelect = { selectedTab = it })
+        PhoneBottomNav(selected = selectedTab, onSelect = { selectedTab = it }, hiddenTypes = hiddenTypes)
     }
 }

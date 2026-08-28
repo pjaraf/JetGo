@@ -424,6 +424,31 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             
             configStore.saveAccessCode(code)
 
+            withContext(Dispatchers.IO) {
+                if (result.sources.isNotEmpty()) {
+                    sourceHiddenConfigs = result.sources.map { source ->
+                        if (!source.serverId.isNullOrBlank()) {
+                            val liveCfg = AccessCodeChecker.fetchServerLiveConfig(projectId, source.serverId)
+                            liveCfg.hiddenCategories.map { it.trim().lowercase() }.toSet() to liveCfg.hiddenTypes.toSet()
+                        } else {
+                            emptySet<String>() to emptySet<String>()
+                        }
+                    }
+                    val allHiddenTypes = sourceHiddenConfigs.map { it.second }
+                    _hiddenTypes.value = if (allHiddenTypes.isNotEmpty()) {
+                        allHiddenTypes.reduce { acc, set -> acc.intersect(set) }
+                    } else emptySet()
+                    
+                    val allHiddenCats = sourceHiddenConfigs.map { it.first }
+                    hiddenCategoryNames = if (allHiddenCats.isNotEmpty()) {
+                        allHiddenCats.reduce { acc, set -> acc.intersect(set) }
+                    } else emptySet()
+                } else {
+                    hiddenCategoryNames = result.hiddenCategories.map { it.trim().lowercase() }.toSet()
+                    _hiddenTypes.value = result.hiddenTypes.toSet()
+                }
+            }
+
             val expWarning = if (isExpiringWithin24Hours(result.expirationDate)) {
                 "⚠️ Aviso importante: Su suscripción vence en menos de 24 horas. Comuníquese con su proveedor para renovar."
             } else {
