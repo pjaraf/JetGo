@@ -31,9 +31,18 @@ jobs:
 
       - name: Preparar el Keystore desde Secretos
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > my-release-key.keystore
-          # Si el usuario no configuró el secreto KEYSTORE_BASE64, caerá en modo "debug fijo" 
-          # gracias a la validación en build.gradle.kts.
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > my-release-key.keystore
+          else
+            echo "Secreto KEYSTORE_BASE64 vacío. Intentando usar debug.keystore para compilación fija."
+          fi
+          
+          # Garantizar que existe el debug.keystore como respaldo
+          if [ -f "debug.keystore.base64" ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+          fi
+          mkdir -p ~/.android
+          cp debug.keystore ~/.android/debug.keystore || true
 
       - name: Compilar APK (Release)
         env:
