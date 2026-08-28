@@ -32,9 +32,7 @@ fun NetflixLoginScreen(
     errorMessage: String?,
     onLogin: (ServerConfig) -> Unit
 ) {
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
+    var accessCode by remember { mutableStateOf("") }
     var selectedServer by remember { mutableStateOf("http://redworld.pro:8880") }
 
     Box(
@@ -117,7 +115,7 @@ fun NetflixLoginScreen(
                         letterSpacing = 2.sp
                     )
                     Text(
-                        text = "Inicia sesión con tu cuenta",
+                        text = "Inicia sesión con tu código",
                         color = Color.White.copy(alpha = 0.8f),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
@@ -159,41 +157,11 @@ fun NetflixLoginScreen(
                     }
 
                     OutlinedTextField(
-                        value = username,
-                        onValueChange = { username = it },
-                        label = { Text("Usuario", color = Color.White.copy(alpha = 0.7f)) },
+                        value = accessCode,
+                        onValueChange = { if (it.length <= 6 && it.all { char -> char.isDigit() }) accessCode = it },
+                        label = { Text("Código de 6 dígitos", color = Color.White.copy(alpha = 0.7f)) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.Black.copy(alpha = 0.25f),
-                            unfocusedContainerColor = Color.Black.copy(alpha = 0.15f),
-                            disabledContainerColor = Color.Transparent,
-                            errorContainerColor = Color.Transparent,
-                            focusedBorderColor = Color(0xFFE50914),
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
-                            focusedLabelColor = Color(0xFFE50914),
-                            unfocusedLabelColor = Color.White.copy(alpha = 0.7f),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("Contraseña", color = Color.White.copy(alpha = 0.7f)) },
-                        singleLine = true,
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        trailingIcon = {
-                            val image = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(imageVector = image, contentDescription = null, tint = Color.White.copy(alpha = 0.7f))
-                            }
-                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = Color.Black.copy(alpha = 0.25f),
@@ -213,8 +181,8 @@ fun NetflixLoginScreen(
                     Spacer(modifier = Modifier.height(28.dp))
 
                     Button(
-                        onClick = { onLogin(ServerConfig(selectedServer, username.trim(), password.trim())) },
-                        enabled = !isLoading && username.isNotBlank() && password.isNotBlank(),
+                        onClick = { onLogin(ServerConfig(selectedServer, accessCode.trim(), accessCode.trim())) },
+                        enabled = !isLoading && accessCode.length == 6,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
