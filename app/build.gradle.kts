@@ -41,6 +41,11 @@ android {
         val propVersion = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 0
         versionCode = maxOf(timeVersion, propVersion)
         versionName = "1.0.$versionCode"
+        
+        // Escribe el versionCode exacto en un archivo para que GitHub Actions lo suba como version.txt
+        val versionFile = rootProject.file("app_version.txt")
+        versionFile.writeText(versionCode.toString())
+        
         buildConfigField("String", "GITHUB_REPO", "\"pjaraf/JetGo\"")
 
         // Limita las librerías nativas de VLC solo a ARM (Teléfonos y TVs comunes). 

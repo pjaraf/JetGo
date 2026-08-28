@@ -55,7 +55,7 @@ jobs:
       #      para detectar automáticamente que hay una versión nueva ----
       - name: Preparar archivo de versión
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        run: echo "${{ github.run_number }}" > version.txt
+        run: mv app_version.txt version.txt
 
       - name: Eliminar el Release 'latest' anterior (si existe)
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
