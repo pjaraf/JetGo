@@ -14,6 +14,7 @@ private val Context.dataStore by preferencesDataStore(name = "stream_config")
 class ConfigStore(private val context: Context) {
 
     companion object {
+        private val KEY_ACCESS_CODE = stringPreferencesKey("access_code")
         private val KEY_HOST = stringPreferencesKey("host")
         private val KEY_USER = stringPreferencesKey("username")
         private val KEY_PASS = stringPreferencesKey("password")
@@ -40,6 +41,11 @@ class ConfigStore(private val context: Context) {
 
     val mode: Flow<String> = context.dataStore.data.map { it[KEY_MODE] ?: "xtream" }
     val m3uUrl: Flow<String?> = context.dataStore.data.map { it[KEY_M3U_URL] }
+    val accessCode: Flow<String?> = context.dataStore.data.map { it[KEY_ACCESS_CODE] }
+
+    suspend fun saveAccessCode(code: String) {
+        context.dataStore.edit { prefs -> prefs[KEY_ACCESS_CODE] = code }
+    }
 
     suspend fun saveXtream(host: String, username: String, password: String) {
         context.dataStore.edit { prefs ->

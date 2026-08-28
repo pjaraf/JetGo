@@ -354,9 +354,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             configStore.mode.collect { currentMode = it }
         }
         viewModelScope.launch {
-            configStore.config.collect { config ->
-                currentConfig = config
-                if (config != null) connectXtream(config)
+            val savedCode = configStore.accessCode.first()
+            if (!savedCode.isNullOrBlank()) {
+                loginWithCode(savedCode)
+            } else {
+                configStore.config.collect { config ->
+                    currentConfig = config
+                    if (config != null) connectXtream(config)
+                }
             }
         }
         viewModelScope.launch {
@@ -369,9 +374,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     /** Vuelve a intentar la conexión con la configuración ya guardada */
     fun retryConnection() {
         viewModelScope.launch {
-            val config = configStore.config.first()
-            if (config != null) {
-                connectXtream(config)
+            val savedCode = configStore.accessCode.first()
+            if (!savedCode.isNullOrBlank()) {
+                loginWithCode(savedCode)
+            } else {
+                val config = configStore.config.first()
+                if (config != null) {
+                    connectXtream(config)
+                }
             }
         }
     }
@@ -386,9 +396,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun loginWithCode(code: String) {
+    fun loginWithCode(code: String, silent: Boolean = false) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null, expirationWarning = null)
+            if (!silent) {
+                _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null, expirationWarning = null)
+            }
             val context = getApplication<Application>()
             val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
             val deviceId = com.jetgo.tv.util.getDeviceId(context)
@@ -399,14 +411,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             if (!result.valid) {
-                val errorMsg = if (result.deviceLimitReached) {
-                    "Límite de dispositivos alcanzado (máximo ${result.maxDevices})"
-                } else {
-                    "Código incorrecto o inactivo"
+                if (!silent) {
+                    val errorMsg = if (result.deviceLimitReached) {
+                        "Límite de dispositivos alcanzado (máximo ${result.maxDevices})"
+                    } else {
+                        "Código incorrecto o inactivo"
+                    }
+                    _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = errorMsg)
                 }
-                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = errorMsg)
                 return@launch
             }
+            
+            configStore.saveAccessCode(code)
 
             val expWarning = if (isExpiringWithin24Hours(result.expirationDate)) {
                 "⚠️ Aviso importante: Su suscripción vence en menos de 24 horas. Comuníquese con su proveedor para renovar."
