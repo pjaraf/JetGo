@@ -43,7 +43,12 @@ android {
 
     signingConfigs {
         create("releaseSigning") {
-            if (debugKeystore.exists()) {
+            if (System.getenv("KEYSTORE_FILE_PATH") != null) {
+                storeFile = file(System.getenv("KEYSTORE_FILE_PATH")!!)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            } else if (debugKeystore.exists()) {
                 storeFile = debugKeystore
                 storePassword = "android"
                 keyAlias = "androiddebugkey"
