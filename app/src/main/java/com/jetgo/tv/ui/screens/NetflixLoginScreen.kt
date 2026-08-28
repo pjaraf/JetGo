@@ -35,6 +35,7 @@ fun NetflixLoginScreen(
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var selectedServer by remember { mutableStateOf("http://redworld.pro:8880") }
 
     Box(
         modifier = Modifier
@@ -120,8 +121,42 @@ fun NetflixLoginScreen(
                         color = Color.White.copy(alpha = 0.8f),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 28.dp)
+                        modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
                     )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val servers = listOf(
+                            "http://redworld.pro:8880" to "Servidor 1",
+                            "http://xmtv.eu:8080" to "Servidor 2"
+                        )
+                        servers.forEach { (url, label) ->
+                            val isSelected = selectedServer == url
+                            OutlinedButton(
+                                onClick = { selectedServer = url },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = if (isSelected) Color(0xFFE50914).copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.2f),
+                                    contentColor = Color.White
+                                ),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isSelected) Color(0xFFE50914) else Color.White.copy(alpha = 0.3f)
+                                )
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
 
                     OutlinedTextField(
                         value = username,
@@ -178,7 +213,7 @@ fun NetflixLoginScreen(
                     Spacer(modifier = Modifier.height(28.dp))
 
                     Button(
-                        onClick = { onLogin(ServerConfig("http://redworld.pro:8880", username.trim(), password.trim())) },
+                        onClick = { onLogin(ServerConfig(selectedServer, username.trim(), password.trim())) },
                         enabled = !isLoading && username.isNotBlank() && password.isNotBlank(),
                         modifier = Modifier
                             .fillMaxWidth()
