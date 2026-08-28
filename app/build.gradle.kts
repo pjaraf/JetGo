@@ -42,6 +42,12 @@ android {
         versionCode = maxOf(timeVersion, propVersion)
         versionName = "1.0.$versionCode"
         buildConfigField("String", "GITHUB_REPO", "\"pjaraf/JetGo\"")
+
+        // Limita las librerías nativas de VLC solo a ARM (Teléfonos y TVs comunes). 
+        // Esto reduce el tamaño del APK de ~100MB a ~30MB al descartar binarios x86/x86_64.
+        ndk {
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
+        }
     }
 
     signingConfigs {
@@ -80,6 +86,7 @@ android {
         }
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("releaseSigning")
         }

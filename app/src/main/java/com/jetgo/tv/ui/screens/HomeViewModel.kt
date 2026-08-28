@@ -439,7 +439,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             } else if (result.mode == "m3u" && !result.m3uUrl.isNullOrBlank()) {
                 connectM3u(result.m3uUrl)
             } else {
-                val host = result.host ?: "http://redworld.pro:8880"
+                val host = result.host ?: return@launch
                 val username = result.username ?: code
                 val password = result.password ?: code
                 connectXtream(ServerConfig(host, username, password))
