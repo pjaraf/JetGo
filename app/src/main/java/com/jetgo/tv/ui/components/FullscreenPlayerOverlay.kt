@@ -209,13 +209,6 @@ fun FullscreenPlayerOverlay(
         val activePlayer = if (isVod) playerManager.vodPlayer else playerManager.livePlayer
         var attachedPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
 
-        var isVideoReady by remember { mutableStateOf(false) }
-        LaunchedEffect(activePlayer) {
-            isVideoReady = false
-            delay(900L) // Oculta el fondo negro/buffer mientras VLC renderiza el primer frame
-            isVideoReady = true
-        }
-
         AndroidView(
             factory = { context ->
                 VLCVideoLayout(context)
@@ -241,61 +234,6 @@ fun FullscreenPlayerOverlay(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Backdrop temporal mientras VLC renderiza el primer frame para evitar pantalla negra al expandir
-        if (!isVideoReady) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black),
-                contentAlignment = Alignment.Center
-            ) {
-                val bgImage = if (isVod) posterUrl else liveChannelInfo?.channelLogo
-                if (!bgImage.isNullOrBlank()) {
-                    AsyncImage(
-                        model = bgImage,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().alpha(0.25f)
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = 0.5f),
-                                    Color.Black.copy(alpha = 0.88f)
-                                )
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.padding(24.dp)
-                    ) {
-                        if (!bgImage.isNullOrBlank()) {
-                            AsyncImage(
-                                model = bgImage,
-                                contentDescription = null,
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier
-                                    .size(130.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                            )
-                        }
-                        Text(
-                            text = if (isVod) title else (liveChannelInfo?.channelName ?: "Cargando..."),
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
         if (isVod) {
             VodPlayerControls(
                 playerManager = playerManager,
