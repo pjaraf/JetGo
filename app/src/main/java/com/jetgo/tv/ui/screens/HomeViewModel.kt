@@ -31,7 +31,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -351,17 +353,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         
         // Corrutina para avisar que el dispositivo está activo (Heartbeat)
         viewModelScope.launch {
-            while (true) {
-                val savedCode = configStore.accessCode.first()
-                if (!savedCode.isNullOrBlank() && _uiState.value.isConfigured) {
-                    val context = getApplication<Application>()
-                    val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
-                    val deviceId = com.jetgo.tv.util.getDeviceId(context)
-                    withContext(Dispatchers.IO) {
-                        AccessCodeChecker.sendHeartbeat(projectId, savedCode, deviceId)
+            configStore.accessCode.collectLatest { savedCode ->
+                if (!savedCode.isNullOrBlank()) {
+                    while (isActive) {
+                        val context = getApplication<Application>()
+                        val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
+                        val deviceId = com.jetgo.tv.util.getDeviceId(context)
+                        withContext(Dispatchers.IO) {
+                            AccessCodeChecker.sendHeartbeat(projectId, savedCode, deviceId)
+                        }
+                        kotlinx.coroutines.delay(60_000L) // Avisa cada 1 minuto
                     }
                 }
-                kotlinx.coroutines.delay(60_000L) // Avisa cada 1 minuto
             }
         }
 

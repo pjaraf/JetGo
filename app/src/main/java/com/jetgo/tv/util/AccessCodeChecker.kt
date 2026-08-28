@@ -232,7 +232,6 @@ object AccessCodeChecker {
             val normalizedCode = code.trim().uppercase()
             val docPath = "projects/$projectId/databases/(default)/documents/access_codes/$normalizedCode"
             val docUrl = "https://firestore.googleapis.com/v1/$docPath"
-
             val payload = JSONObject().put(
                 "fields", JSONObject().put(
                     "deviceActivity", JSONObject().put(
@@ -247,9 +246,14 @@ object AccessCodeChecker {
             val patchUrl = "$docUrl?updateMask.fieldPaths=deviceActivity.$deviceId"
             val requestBody = payload.toString().toRequestBody("application/json".toMediaType())
             val patchRequest = Request.Builder().url(patchUrl).patch(requestBody).build()
-            client.newCall(patchRequest).execute().close()
+            val response = client.newCall(patchRequest).execute()
+            if (!response.isSuccessful) {
+                val errorBody = response.body?.string()
+                android.util.Log.e("JetGo_DIAG", "Heartbeat failed: ${response.code} $errorBody")
+            }
+            response.close()
         } catch (e: Exception) {
-            // Silencioso: si falla el aviso de "estoy en línea", no afecta nada más
+            android.util.Log.e("JetGo_DIAG", "Heartbeat exception", e)
         }
     }
 

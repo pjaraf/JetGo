@@ -999,8 +999,17 @@
   }
   /** Un dispositivo se considera "en línea ahora" si avisó actividad en los últimos 2 minutos */
   function isDeviceOnline(timestamp) {
-    if (!timestamp || !timestamp.toDate) return false;
-    return (Date.now() - timestamp.toDate().getTime()) < 2 * 60 * 1000;
+    if (!timestamp) return false;
+    let timeMs = 0;
+    if (timestamp.toDate) {
+      timeMs = timestamp.toDate().getTime();
+    } else if (typeof timestamp === 'string') {
+      timeMs = new Date(timestamp).getTime();
+    } else if (timestamp.seconds) {
+      timeMs = timestamp.seconds * 1000;
+    }
+    if (!timeMs) return false;
+    return (Date.now() - timeMs) < 2 * 60 * 1000;
   }
   function countOnline(deviceActivity) {
     if (!deviceActivity) return 0;
