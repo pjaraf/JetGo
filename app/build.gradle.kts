@@ -34,10 +34,13 @@ android {
         applicationId = "com.jetgo.tvplayer"
         minSdk = 21          // cubre teléfonos, tablets, TV box y Android TV/Google TV
         targetSdk = 34
-        // El número de build de GitHub Actions se usa como versionCode, así la app
-        // puede compararlo con el que trae la última Release y saber si hay que actualizar.
-        versionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
-        versionName = "1.0.${versionCode}"
+        // versionCode se incrementa automáticamente garantizando que cada compilación sea superior a la anterior
+        val baseTimestamp = 1700000000
+        val currentSeconds = (System.currentTimeMillis() / 1000).toInt()
+        val timeVersion = currentSeconds - baseTimestamp
+        val propVersion = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 0
+        versionCode = maxOf(timeVersion, propVersion)
+        versionName = "1.0.$versionCode"
         buildConfigField("String", "GITHUB_REPO", "\"pjaraf/JetGo\"")
     }
 
