@@ -373,11 +373,16 @@
           <div class="stat-label">Dispositivos registrados</div>
           <div class="stat-value" id="statDevices">0</div>
         </div>
-        <div class="stat-card accent-green">
+        <div class="stat-card accent-green" style="cursor:pointer;" onclick="selectView('online')">
           <div class="stat-label"><span class="live-dot"></span> En línea ahora</div>
           <div class="stat-value" id="statOnline">0</div>
         </div>
       </div>
+      <!-- ---------- Vista: Usuarios en línea ---------- -->
+      <div class="card view-section" id="view-online" style="display:none;">
+        <div id="view-online-content"></div>
+      </div>
+
       <!-- ---------- Vista: Crear cliente nuevo ---------- -->
       <div class="card view-section" id="view-create">
         <h2>Generar nuevo código</h2>
@@ -745,6 +750,7 @@
   // ---------- Navegación entre las secciones ----------
   const VIEW_INFO = {
     home: { title: 'Inicio', subtitle: 'Panel general y estadísticas' },
+    online: { title: 'Usuarios en línea', subtitle: 'Dispositivos conectados agrupados por servidor o combo' },
     create: { title: 'Crear cliente', subtitle: 'Genera un código de acceso para un cliente' },
     active: { title: 'Clientes activos', subtitle: 'Códigos que están funcionando ahora mismo' },
     expiring: { title: 'Clientes por vencer', subtitle: 'Vencen dentro de los próximos 7 días' },
@@ -766,6 +772,9 @@
 
     if (name === 'home') {
       // La vista 'home' solo muestra las estadísticas
+    } else if (name === 'online') {
+      document.getElementById('view-online').style.display = 'block';
+      renderOnlineUsers();
     } else if (name === 'create') {
       document.getElementById('view-create').style.display = 'block';
     } else if (name === 'subadmins') {
@@ -1145,6 +1154,69 @@
     document.getElementById('statRevoked').textContent = revoked;
     document.getElementById('statDevices').textContent = devices;
     document.getElementById('statOnline').textContent = online;
+  }
+
+  function renderOnlineUsers() {
+    const container = document.getElementById('view-online-content');
+    if (!container) return;
+    container.innerHTML = '';
+    const onlineByGroup = {};
+    lastSnapshotDocs.forEach(({ id: code, data }) => {
+      const onlineCount = countOnline(data.deviceActivity);
+      if (onlineCount > 0) {
+        let groupName = 'Desconocido';
+        if (Array.isArray(data.sources) && data.sources.length > 0) {
+          const serverNames = data.sources.map(src => {
+            const s = serversList.find(x => x.id === src.serverId);
+            return s ? s.name : (src.host || 'Servidor');
+          });
+          if (data.sources.length === 2) {
+             const matchingCombo = combosList.find(c => c.memberIds.includes(data.sources[0].serverId) && c.memberIds.includes(data.sources[1].serverId));
+             groupName = matchingCombo ? matchingCombo.name : serverNames.join(' + ');
+          } else {
+             groupName = serverNames.join(' + ');
+          }
+        } else if (data.host) {
+          const s = serversList.find(x => x.host === data.host);
+          groupName = s ? s.name : data.host;
+        }
+        if (!onlineByGroup[groupName]) onlineByGroup[groupName] = [];
+        onlineByGroup[groupName].push({ code, data, onlineCount });
+      }
+    });
+    if (Object.keys(onlineByGroup).length === 0) {
+      container.innerHTML = '<div style="padding:40px; text-align:center; color:var(--muted); background:var(--surface); border-radius:12px;">No hay ningún dispositivo conectado en este momento.</div>';
+      return;
+    }
+    for (const groupName in onlineByGroup) {
+      const users = onlineByGroup[groupName];
+      const groupOnlineCount = users.reduce((sum, u) => sum + u.onlineCount, 0);
+      const section = document.createElement('div');
+      section.style.marginBottom = '20px';
+      section.innerHTML = '<h3 style="color:var(--text); margin-bottom:10px; padding:10px 14px; background:var(--surface); border-radius:8px; display:flex; justify-content:space-between; font-size:15px; align-items:center;">' +
+        '<span>' + groupName + '</span>' +
+        '<span class="nav-badge" style="background:rgba(255,122,46,0.1); color:var(--orange); position:static; transform:none; font-size:11px;">' + groupOnlineCount + ' en línea</span></h3>' +
+        '<table class="table" style="margin-top:0;">' +
+          '<thead><tr><th>CLIENTE</th><th>CÓDIGO</th><th>DISPOSITIVOS CONECTADOS</th></tr></thead>' +
+          '<tbody>' + users.map(u => {
+            let devicesHtml = '';
+            if (u.data.deviceActivity) {
+              Object.keys(u.data.deviceActivity).forEach(deviceId => {
+                if (isDeviceOnline(u.data.deviceActivity[deviceId])) {
+                  const deviceName = (u.data.deviceNames && u.data.deviceNames[deviceId]) ? u.data.deviceNames[deviceId] : deviceId;
+                  devicesHtml += '<div style="font-size:12px; color:var(--muted); padding:4px 0;">' +
+                    '<span class="live-dot" style="margin-right:6px;"></span>' + deviceName.replace(/</g, '&lt;') + '</div>';
+                }
+              });
+            }
+            return '<tr>' +
+              '<td><div style="font-weight:500;">' + (u.data.clientName || '-') + '</div><div style="font-size:12px; color:var(--muted);">' + (u.data.clientPhone || '') + '</div></td>' +
+              '<td style="font-family:ui-monospace,monospace; font-size:13px;">' + u.code + '</td>' +
+              '<td>' + devicesHtml + '</td>' +
+            '</tr>';
+          }).join('') + '</tbody></table>';
+      container.appendChild(section);
+    }
   }
   window.toggleCreds = (btn, selector) => {
     const box = btn.closest('td').querySelector(selector || '.credentials-box');
