@@ -22,6 +22,7 @@ import com.jetgo.tv.data.model.SeriesEpisode
 import com.jetgo.tv.data.repository.StreamRepository
 import com.jetgo.tv.player.PlayerManager
 import com.jetgo.tv.util.AdultContentFilter
+import com.jetgo.tv.util.AccessCodeChecker
 import com.jetgo.tv.util.UpdateChecker
 import com.jetgo.tv.util.UpdateInfo
 import kotlinx.coroutines.Dispatchers
@@ -387,49 +388,34 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun loginWithCode(code: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
-            val servers = listOf("http://redworld.pro:8880", "http://xmtv.eu:8080")
-            var success = false
-            for (host in servers) {
-                val config = ServerConfig(host, code, code)
-                try {
-                    val userInfo = repository.login(config)
-                    if (userInfo != null) {
-                        success = true
-                        configStore.saveXtream(config.host, config.username, config.password)
-                        currentConfig = config
-                        currentMode = "xtream"
+            val context = getApplication<Application>()
+            val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
+            val deviceId = com.jetgo.tv.util.getDeviceId(context)
+            val deviceName = com.jetgo.tv.util.getDeviceDisplayName(context)
 
-                        val expirationText = userInfo.expDate?.toLongOrNull()?.let { unixSeconds ->
-                            try {
-                                java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
-                                    .format(java.util.Date(unixSeconds * 1000))
-                            } catch (e: Exception) { null }
-                        }
-                        _settingsInfo.value = _settingsInfo.value.copy(expirationDate = expirationText)
-                        val channels = repository.getLiveChannels(config, categoryId = null)
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            isConfigured = true,
-                            liveChannels = channels
-                        )
-                        val lastId = try { configStore.getLastChannelId() } catch (e: Exception) { null }
-                        val startingChannel = channels.firstOrNull { it.streamId == lastId } ?: channels.firstOrNull()
-                        startingChannel?.let { playChannel(it) }
-                        ensureHomeCatalogLoaded()
-                        refreshContinueWatching()
-                        refreshParentalState()
-                        checkForAutoResume()
-                        return@launch
-                    }
-                } catch (e: Exception) {
-                    // Try next server
-                }
+            val result = withContext(Dispatchers.IO) {
+                AccessCodeChecker.checkCodeAndRegisterDevice(projectId, code, deviceId, deviceName)
             }
-            if (!success) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = "Código incorrecto o servidor no disponible."
-                )
+
+            if (!result.valid) {
+                val errorMsg = if (result.deviceLimitReached) {
+                    "Límite de dispositivos alcanzado (máximo ${result.maxDevices})"
+                } else {
+                    "Código incorrecto o inactivo"
+                }
+                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = errorMsg)
+                return@launch
+            }
+
+            if (result.sources.isNotEmpty()) {
+                connectMultiSource(result.sources)
+            } else if (result.mode == "m3u" && !result.m3uUrl.isNullOrBlank()) {
+                connectM3u(result.m3uUrl)
+            } else {
+                val host = result.host ?: "http://redworld.pro:8880"
+                val username = result.username ?: code
+                val password = result.password ?: code
+                connectXtream(ServerConfig(host, username, password))
             }
         }
     }
