@@ -6,10 +6,21 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
@@ -230,6 +241,31 @@ private fun AppRoot(viewModel: HomeViewModel) {
                     onDismiss = { updateDismissed = true },
                     onUpdateStarted = { viewModel.dismissUpdateBanner() }
                 )
+            }
+        }
+
+        uiState.expirationWarning?.let { warningText ->
+            androidx.compose.ui.window.Dialog(onDismissRequest = { viewModel.dismissExpirationWarning() }) {
+                Column(
+                    modifier = Modifier
+                        .width(420.dp)
+                        .background(com.jetgo.tv.ui.theme.SurfaceDark, RoundedCornerShape(16.dp))
+                        .padding(24.dp)
+                ) {
+                    Text("Aviso de Vencimiento", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        warningText,
+                        color = Color.Gray,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 20.dp)
+                    )
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { viewModel.dismissExpirationWarning() }
+                    ) {
+                        Text("Entendido")
+                    }
+                }
             }
         }
     }

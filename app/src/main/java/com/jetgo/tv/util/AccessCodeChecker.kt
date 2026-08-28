@@ -30,6 +30,7 @@ data class AccessCodeResult(
     val m3uUrl: String? = null,
     val deviceLimitReached: Boolean = false,
     val clientName: String? = null,
+    val expirationDate: String? = null,
     val deviceCount: Int = 0,
     val maxDevices: Int = 3,
     /** Nombres de categorías que el administrador ocultó para este servidor/lista — la app
@@ -105,6 +106,7 @@ object AccessCodeChecker {
                     password = textField("password"),
                     m3uUrl = textField("m3uUrl"),
                     clientName = textField("clientName"),
+                    expirationDate = textField("expirationDate"),
                     deviceCount = if (deviceIds.contains(deviceId)) deviceIds.size else deviceIds.size + 1,
                     maxDevices = MAX_DEVICES_PER_CODE,
                     hiddenCategories = parseStringArray(fields, "hiddenCategories"),

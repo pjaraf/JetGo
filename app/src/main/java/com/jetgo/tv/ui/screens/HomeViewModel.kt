@@ -40,7 +40,8 @@ data class HomeUiState(
     val isConfigured: Boolean = false,
     val liveChannels: List<Channel> = emptyList(),
     val errorMessage: String? = null,
-    val debugDetail: String? = null
+    val debugDetail: String? = null,
+    val expirationWarning: String? = null
 )
 
 data class CategoryPickerUiState(
@@ -387,7 +388,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loginWithCode(code: String) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null, expirationWarning = null)
             val context = getApplication<Application>()
             val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
             val deviceId = com.jetgo.tv.util.getDeviceId(context)
@@ -407,6 +408,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
+            val expWarning = if (isExpiringWithin24Hours(result.expirationDate)) {
+                "⚠️ Aviso importante: Su suscripción vence en menos de 24 horas. Comuníquese con su proveedor para renovar."
+            } else {
+                null
+            }
+
+            if (expWarning != null) {
+                _uiState.value = _uiState.value.copy(expirationWarning = expWarning)
+            }
+
             if (result.sources.isNotEmpty()) {
                 connectMultiSource(result.sources)
             } else if (result.mode == "m3u" && !result.m3uUrl.isNullOrBlank()) {
@@ -417,6 +428,24 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val password = result.password ?: code
                 connectXtream(ServerConfig(host, username, password))
             }
+        }
+    }
+
+    fun dismissExpirationWarning() {
+        _uiState.value = _uiState.value.copy(expirationWarning = null)
+    }
+
+    private fun isExpiringWithin24Hours(expirationDateStr: String?): Boolean {
+        if (expirationDateStr.isNullOrBlank()) return false
+        return try {
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+            val date = sdf.parse(expirationDateStr) ?: return false
+            val expiryTime = date.time + 24 * 60 * 60 * 1000 - 1
+            val diffMs = expiryTime - System.currentTimeMillis()
+            val diffHours = diffMs / (1000.0 * 60.0 * 60.0)
+            diffHours in 0.0..24.0
+        } catch (e: Exception) {
+            false
         }
     }
 

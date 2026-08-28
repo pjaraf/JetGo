@@ -989,6 +989,13 @@
     const diffDays = (new Date(expirationDate + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24);
     return diffDays >= 0 && diffDays <= 7;
   }
+  /** true si vence en menos de 24 horas (y todavía no venció) */
+  function isExpiringWithin24Hours(expirationDate) {
+    if (!expirationDate) return false;
+    const diffMs = new Date(expirationDate + 'T23:59:59') - new Date();
+    const diffHours = diffMs / (1000 * 60 * 60);
+    return diffHours >= 0 && diffHours <= 24;
+  }
   /** true si una demo ya pasó su hora exacta de vencimiento */
   function isDemoExpired(demoExpiresAt) {
     if (!demoExpiresAt || !demoExpiresAt.toDate) return false;
@@ -1039,6 +1046,7 @@
           const onlineCount = countOnline(data.deviceActivity);
           const expired = data.isDemo ? isDemoExpired(data.demoExpiresAt) : isExpired(data.expirationDate);
           const expiringSoon = !data.isDemo && isExpiringSoon(data.expirationDate);
+          const expiring24h = !data.isDemo && isExpiringWithin24Hours(data.expirationDate);
           let credText = '';
           if (data.mode === 'm3u') {
             credText = 'M3U: ' + (data.m3uUrl || '(sin cargar)');
@@ -1066,23 +1074,30 @@
             ? '<div class="online-badge"><span class="live-dot"></span>' + onlineCount + ' en línea</div>'
             : '';
           const demoBadge = data.isDemo ? ' <span class="badge" style="background:rgba(79,141,253,0.15);color:var(--blue);">Demo</span>' : '';
-          const expireColor = expired ? 'var(--red)' : (expiringSoon ? 'var(--orange)' : 'var(--muted)');
-          const expireText = data.isDemo ? demoTimeLabel(data.demoExpiresAt) : formatDateOnly(data.expirationDate);
+          const expireColor = expired ? 'var(--red)' : (expiring24h ? 'var(--red)' : (expiringSoon ? 'var(--orange)' : 'var(--muted)'));
+          const alertBadge = expiring24h 
+            ? ' <span style="background:rgba(229,9,20,0.18); color:var(--red); padding:3px 8px; border-radius:4px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px; margin-left:6px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> ¡Vence < 24h!</span>' 
+            : '';
+          const expireText = (data.isDemo ? demoTimeLabel(data.demoExpiresAt) : formatDateOnly(data.expirationDate)) + alertBadge;
           const upgradeBox = data.isDemo ? (
-            '<div class="credentials-box upgrade-box">' +
-              '<div style="font-size:12px; color:var(--muted); margin-bottom:8px;">Elige el plan a activar:</div>' +
-              '<div style="display:flex; flex-wrap:wrap; gap:6px;">' +
-                '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 1)">1 mes</button>' +
-                '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 3)">3 meses</button>' +
-                '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 6)">6 meses</button>' +
-                '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 12)">1 año</button>' +
-              '</div>' +
-            '</div>'
-          ) : '';
+             '<div class="credentials-box upgrade-box">' +
+               '<div style="font-size:12px; color:var(--muted); margin-bottom:8px;">Elige el plan a activar:</div>' +
+               '<div style="display:flex; flex-wrap:wrap; gap:6px;">' +
+                 '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 1)">1 mes</button>' +
+                 '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 3)">3 meses</button>' +
+                 '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 6)">6 meses</button>' +
+                 '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 12)">1 año</button>' +
+               '</div>' +
+             '</div>'
+           ) : '';
           const whatsappBtn = data.clientPhone
             ? '<button class="secondary" onclick="resendWhatsapp(\'' + code + '\', ' + JSON.stringify(data.clientName || '').replace(/"/g, '&quot;') + ', ' + JSON.stringify(data.clientPhone).replace(/"/g, '&quot;') + ')">Reenviar WhatsApp</button>'
             : '';
           const tr = document.createElement('tr');
+          if (expiring24h) {
+            tr.style.background = 'rgba(229, 9, 20, 0.06)';
+            tr.style.borderLeft = '4px solid var(--red)';
+          }
           tr.innerHTML =
             '<td class="code-cell">' + code + '</td>' +
             '<td>' + (data.clientName || '<span style="color:var(--muted)">-</span>') + demoBadge + '</td>' +
