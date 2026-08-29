@@ -7,15 +7,15 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-// Lee las credenciales de firma desde keystore.properties o utiliza el keystore fijo (debug.keystore).
-val debugKeystore = rootProject.file("debug.keystore")
-val base64Keystore = rootProject.file("debug.keystore.base64")
-if (!debugKeystore.exists() && base64Keystore.exists()) {
+// Lee las credenciales de firma desde keystore.properties o utiliza el keystore fijo (jetgo.keystore).
+val releaseKeystore = rootProject.file("jetgo.keystore")
+val base64ReleaseKeystore = rootProject.file("jetgo.keystore.base64")
+if (!releaseKeystore.exists() && base64ReleaseKeystore.exists()) {
     try {
-        val bytes = Base64.getDecoder().decode(base64Keystore.readText().trim())
-        debugKeystore.writeBytes(bytes)
+        val bytes = Base64.getDecoder().decode(base64ReleaseKeystore.readText().trim())
+        releaseKeystore.writeBytes(bytes)
     } catch (e: Exception) {
-        println("Warning: could not restore debug.keystore from base64: ${e.message}")
+        println("Warning: could not restore jetgo.keystore from base64: ${e.message}")
     }
 }
 
@@ -56,13 +56,13 @@ android {
     }
 
     signingConfigs {
-        // Firma fija única garantizada en debug y release (evita conflictos de actualización por firma distinta)
-        getByName("debug") {
-            if (debugKeystore.exists()) {
-                storeFile = debugKeystore
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
+        // Firma fija única permanente garantizada en debug y release (evita conflictos de actualización por firma distinta)
+        create("releaseConfig") {
+            if (releaseKeystore.exists()) {
+                storeFile = releaseKeystore
+                storePassword = "android123"
+                keyAlias = "jetgoalias"
+                keyPassword = "android123"
             }
             enableV1Signing = true
             enableV2Signing = true
@@ -71,13 +71,13 @@ android {
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("releaseConfig")
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("releaseConfig")
         }
     }
 
