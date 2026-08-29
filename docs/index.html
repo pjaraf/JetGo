@@ -1152,17 +1152,15 @@
             ? ' <span style="background:rgba(229,9,20,0.18); color:var(--red); padding:3px 8px; border-radius:4px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px; margin-left:6px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> ¡Vence < 24h!</span>' 
             : '';
           const expireText = (data.isDemo ? demoTimeLabel(data.demoExpiresAt) : formatDateOnly(data.expirationDate)) + alertBadge;
-          const upgradeBox = data.isDemo ? (
-             '<div class="credentials-box upgrade-box">' +
-               '<div style="font-size:12px; color:var(--muted); margin-bottom:8px;">Elige el plan a activar:</div>' +
-               '<div style="display:flex; flex-wrap:wrap; gap:6px;">' +
-                 '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 1)">1 mes</button>' +
-                 '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 3)">3 meses</button>' +
-                 '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 6)">6 meses</button>' +
-                 '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 12)">1 año</button>' +
-               '</div>' +
-             '</div>'
-           ) : '';
+          const upgradeBox = '<div class="credentials-box upgrade-box">' +
+            '<div style="font-size:12px; color:var(--muted); margin-bottom:8px;">Actualizar plan o renovar:</div>' +
+            '<div style="display:flex; flex-wrap:wrap; gap:6px;">' +
+              '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 1)">1 mes</button>' +
+              '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 3)">3 meses</button>' +
+              '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 6)">6 meses</button>' +
+              '<button class="secondary" style="padding:6px 10px; font-size:12px;" onclick="upgradeToPlan(\'' + code + '\', 12)">1 año</button>' +
+            '</div>' +
+          '</div>';
           const whatsappBtn = data.clientPhone
             ? '<button class="secondary" onclick="resendWhatsapp(\'' + code + '\', ' + JSON.stringify(data.clientName || '').replace(/"/g, '&quot;') + ', ' + JSON.stringify(data.clientPhone).replace(/"/g, '&quot;') + ')">Reenviar WhatsApp</button>'
             : '';
@@ -1179,12 +1177,11 @@
             '<td class="actions-cell">' +
               '<button class="secondary" onclick="copyCode(\'' + code + '\')">Copiar</button>' +
               whatsappBtn +
-              '<button class="secondary" onclick="toggleCreds(this, \'.credentials-box\')">Ver datos</button>' +
+              '<button class="secondary" onclick="openEditClientModal(\'' + code + '\')">Editar cliente</button>' +
               '<button class="secondary" onclick="toggleCreds(this, \'.devices-box\')">Dispositivos (' + deviceCount + ')</button>' +
-              (data.isDemo ? '<button class="secondary" onclick="toggleCreds(this, \'.upgrade-box\')">Actualizar plan</button>' : '') +
+              '<button class="secondary" onclick="toggleCreds(this, \'.upgrade-box\')">Actualizar plan</button>' +
               '<button class="' + (active ? 'danger' : 'secondary') + '" onclick="toggleActive(\'' + code + '\', ' + active + ')">' + (active ? 'Revocar' : 'Reactivar') + '</button>' +
               '<button class="danger" onclick="deleteCode(\'' + code + '\')">Eliminar</button>' +
-              '<div class="credentials-box">' + credText + '</div>' +
               '<div class="credentials-box devices-box">' + devicesListHtml + '</div>' +
               upgradeBox +
             '</td>';
@@ -1302,18 +1299,25 @@
   // vencimiento correspondiente (hoy + los meses elegidos), quedando activa como cliente normal.
   window.upgradeToPlan = async (code, months) => {
     const labels = { 1: '1 mes', 3: '3 meses', 6: '6 meses', 12: '1 año' };
-    if (!confirm('¿Activar el plan de ' + labels[months] + ' para el código ' + code + '? Dejará de ser una cuenta demo y la app del cliente se va a cerrar sola para aplicar el cambio.')) return;
-    const expires = new Date();
-    expires.setMonth(expires.getMonth() + months);
-    const expirationDate = expires.toISOString().slice(0, 10);
-    await db.collection('access_codes').doc(code).update({
+    if (!confirm('¿Extender o activar el plan de ' + labels[months] + ' para el código ' + code + '?')) return;
+    const docRef = db.collection('access_codes').doc(code);
+    const snap = await docRef.get();
+    const data = snap.data() || {};
+    let baseDate = new Date();
+    if (!data.isDemo && data.expirationDate) {
+      const exp = new Date(data.expirationDate + 'T00:00:00');
+      if (exp > baseDate) baseDate = exp;
+    }
+    baseDate.setMonth(baseDate.getMonth() + months);
+    const expirationDate = baseDate.toISOString().slice(0, 10);
+    await docRef.update({
       isDemo: false,
       demoExpiresAt: firebase.firestore.FieldValue.delete(),
       expirationDate: expirationDate,
       active: true,
       forceCloseSignal: firebase.firestore.FieldValue.serverTimestamp()
     });
-    showToast('Plan de ' + labels[months] + ' activado');
+    showToast('Plan de ' + labels[months] + ' aplicado');
   };
   window.deleteCode = async (code) => {
     if (!confirm('Eliminar el codigo ' + code + '? Esta accion no se puede deshacer.')) return;
@@ -1869,6 +1873,89 @@
     toast.style.display = 'block';
     setTimeout(() => { toast.style.display = 'none'; }, 2000);
   }
+
+  window.openEditClientModal = async (code) => {
+    const doc = await db.collection('access_codes').doc(code).get();
+    if (!doc.exists) return;
+    const data = doc.data();
+    document.getElementById('editCode').value = code;
+    document.getElementById('editClientName').value = data.clientName || '';
+    document.getElementById('editClientPhone').value = data.clientPhone || '';
+    document.getElementById('editExpirationDate').value = data.expirationDate || '';
+    if (data.mode === 'm3u') {
+      document.getElementById('editXtreamSection').style.display = 'none';
+      document.getElementById('editM3uSection').style.display = 'block';
+      document.getElementById('editM3uUrl').value = data.m3uUrl || '';
+    } else {
+      document.getElementById('editXtreamSection').style.display = 'block';
+      document.getElementById('editM3uSection').style.display = 'none';
+      document.getElementById('editHost').value = data.host || '';
+      document.getElementById('editUsername').value = data.username || '';
+      document.getElementById('editPassword').value = data.password || '';
+    }
+    document.getElementById('editClientModal').style.display = 'flex';
+  };
+
+  window.closeEditClientModal = () => {
+    document.getElementById('editClientModal').style.display = 'none';
+  };
+
+  window.saveEditClient = async () => {
+    const code = document.getElementById('editCode').value;
+    const clientName = document.getElementById('editClientName').value.trim();
+    const clientPhone = document.getElementById('editClientPhone').value.trim();
+    const expirationDate = document.getElementById('editExpirationDate').value;
+    
+    const updates = {
+      clientName: clientName,
+      clientPhone: clientPhone,
+      expirationDate: expirationDate
+    };
+
+    const doc = await db.collection('access_codes').doc(code).get();
+    const data = doc.data() || {};
+    if (data.mode === 'm3u') {
+      updates.m3uUrl = document.getElementById('editM3uUrl').value.trim();
+    } else {
+      updates.host = document.getElementById('editHost').value.trim();
+      updates.username = document.getElementById('editUsername').value.trim();
+      updates.password = document.getElementById('editPassword').value.trim();
+    }
+
+    await db.collection('access_codes').doc(code).update(updates);
+    closeEditClientModal();
+    showToast('Cliente actualizado correctamente');
+  };
 </script>
-</body>
-</html>
+
+<!-- Modal de Edición de Cliente -->
+<div id="editClientModal" class="menu-overlay" style="display:none; align-items:center; justify-content:center; z-index:1000;">
+  <div class="card" style="width:100%; max-width:440px; margin:20px; max-height:90vh; overflow-y:auto; position:relative; background:var(--surface); border:1px solid var(--border);">
+    <h2 style="margin-top:0; font-size:18px;">Editar Cliente</h2>
+    <input type="hidden" id="editCode" />
+    <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Nombre del cliente</label>
+    <input id="editClientName" type="text" placeholder="Nombre" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" />
+    <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Teléfono (WhatsApp)</label>
+    <input id="editClientPhone" type="tel" placeholder="Teléfono" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" />
+    <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Fecha de vencimiento</label>
+    <input id="editExpirationDate" type="date" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" />
+    
+    <div id="editXtreamSection">
+      <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Host del Servidor</label>
+      <input id="editHost" type="text" placeholder="http://servidor.com:8080" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" />
+      <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Usuario</label>
+      <input id="editUsername" type="text" placeholder="Usuario" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" />
+      <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Contraseña</label>
+      <input id="editPassword" type="text" placeholder="Contraseña" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:16px;" />
+    </div>
+    <div id="editM3uUrlSection" style="display:none;">
+      <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">URL M3U</label>
+      <input id="editM3uUrl" type="text" placeholder="http://..." style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:16px;" />
+    </div>
+
+    <div style="display:flex; gap:10px;">
+      <button class="secondary" style="flex:1;" onclick="closeEditClientModal()">Cancelar</button>
+      <button class="full" style="flex:1; margin-top:0;" onclick="saveEditClient()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
