@@ -339,17 +339,27 @@ object AccessCodeChecker {
             val successIds = client.newCall(reqIds).execute().use { it.isSuccessful }
 
             // 2. Update deviceNames
-            val payloadNames = JSONObject().put("fields", JSONObject().put("deviceNames", JSONObject().put("mapValue", JSONObject().put("fields", namesFields))))
+            val mapNamesVal = if (namesFields.length() > 0) {
+                JSONObject().put("mapValue", JSONObject().put("fields", namesFields))
+            } else {
+                JSONObject().put("mapValue", JSONObject())
+            }
+            val payloadNames = JSONObject().put("fields", JSONObject().put("deviceNames", mapNamesVal))
             val reqNames = Request.Builder().url("$docUrl?updateMask.fieldPaths=deviceNames").patch(payloadNames.toString().toRequestBody("application/json".toMediaType())).build()
             val successNames = client.newCall(reqNames).execute().use { it.isSuccessful }
 
             // 3. Update deviceActivity
-            val payloadActivity = JSONObject().put("fields", JSONObject().put("deviceActivity", JSONObject().put("mapValue", JSONObject().put("fields", activityFields))))
+            val mapActivityVal = if (activityFields.length() > 0) {
+                JSONObject().put("mapValue", JSONObject().put("fields", activityFields))
+            } else {
+                JSONObject().put("mapValue", JSONObject())
+            }
+            val payloadActivity = JSONObject().put("fields", JSONObject().put("deviceActivity", mapActivityVal))
             val reqActivity = Request.Builder().url("$docUrl?updateMask.fieldPaths=deviceActivity").patch(payloadActivity.toString().toRequestBody("application/json".toMediaType())).build()
             val successActivity = client.newCall(reqActivity).execute().use { it.isSuccessful }
 
             android.util.Log.d("JetGo_DIAG", "removeDevice results - ids: $successIds, names: $successNames, activity: $successActivity")
-            successIds
+            successIds || successNames
         } catch (e: Exception) {
             android.util.Log.e("JetGo_DIAG", "removeDevice exception", e)
             false
