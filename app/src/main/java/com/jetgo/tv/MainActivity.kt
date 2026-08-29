@@ -163,6 +163,9 @@ private fun AppRoot(viewModel: HomeViewModel) {
 
             Box(modifier = Modifier.weight(1f)) {
                 when {
+                    uiState.isCheckingSession -> {
+                        SplashLoadingScreen()
+                    }
                     !uiState.isConfigured -> {
                         // ---- Pantalla de login estilo Netflix con usuario y clave y fondo con carátulas ----
                         NetflixLoginScreen(

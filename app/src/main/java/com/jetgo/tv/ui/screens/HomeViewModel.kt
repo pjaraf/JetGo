@@ -42,6 +42,7 @@ import kotlinx.coroutines.withContext
 data class HomeUiState(
     val isLoading: Boolean = false,
     val isConfigured: Boolean = false,
+    val isCheckingSession: Boolean = true,
     val liveChannels: List<Channel> = emptyList(),
     val errorMessage: String? = null,
     val debugDetail: String? = null,
@@ -145,7 +146,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             configStore.clear()
             playerManager.stopAll()
             currentConfig = null
-            _uiState.value = HomeUiState()
+            _uiState.value = HomeUiState(isCheckingSession = false)
         }
     }
 
@@ -407,12 +408,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             val savedCode = configStore.accessCode.first()
+            val savedConfig = configStore.config.first()
             if (!savedCode.isNullOrBlank()) {
+                _uiState.value = _uiState.value.copy(isLoading = true, isCheckingSession = true)
                 loginWithCode(savedCode)
+            } else if (savedConfig != null) {
+                _uiState.value = _uiState.value.copy(isLoading = true, isCheckingSession = true)
+                connectXtream(savedConfig)
             } else {
+                _uiState.value = _uiState.value.copy(isLoading = false, isCheckingSession = false)
                 configStore.config.collect { config ->
                     currentConfig = config
-                    if (config != null) connectXtream(config)
+                    if (config != null && !uiState.value.isConfigured) connectXtream(config)
                 }
             }
         }
@@ -473,7 +480,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     if (result.deviceLimitReached) {
                         fetchRegisteredDevicesForLimit(code)
                     } else {
-                        _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "Código incorrecto o inactivo")
+                        _uiState.value = _uiState.value.copy(isLoading = false, isCheckingSession = false, errorMessage = "Código incorrecto o inactivo")
                     }
                 }
                 return@launch
@@ -549,6 +556,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 limitReachedCode = code,
                 registeredDevices = devices,
                 isLoading = false,
+                isCheckingSession = false,
                 errorMessage = "Ya tienes activos los 3 dispositivos permitidos. Elimina uno para continuar."
             )
         }
@@ -610,7 +618,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val userInfo = repository.login(config)
                 if (userInfo == null) {
-                    _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "No se pudo autenticar con el servidor")
+                    _uiState.value = _uiState.value.copy(isLoading = false, isCheckingSession = false, errorMessage = "No se pudo autenticar con el servidor")
                     return@launch
                 }
                 val expirationText = userInfo.expDate?.toLongOrNull()?.let { unixSeconds ->
@@ -624,6 +632,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     isConfigured = true,
+                    isCheckingSession = false,
                     liveChannels = channels
                 )
                 // En una reconexión silenciosa, si YA está reproduciendo algo (por ejemplo el
@@ -641,6 +650,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
+                    isCheckingSession = false,
                     errorMessage = "No se pudo conectar al servidor. Verifica el host, usuario y contraseña.",
                     debugDetail = "${e.javaClass.simpleName}: ${e.message}"
                 )
@@ -660,6 +670,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 if (result.channels.isEmpty()) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
+                        isCheckingSession = false,
                         errorMessage = "La lista M3U está vacía o no se pudo leer. Verifica la URL."
                     )
                     return@launch
@@ -667,6 +678,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     isConfigured = true,
+                    isCheckingSession = false,
                     liveChannels = result.channels
                 )
                 if (!silent || !isCurrentlyShowingLive) {
@@ -678,6 +690,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
+                    isCheckingSession = false,
                     errorMessage = "No se pudo cargar la lista M3U. Verifica la URL o tu conexión a internet.",
                     debugDetail = "${e.javaClass.simpleName}: ${e.message}"
                 )
@@ -747,6 +760,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             if (!anySourceWorked) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
+                    isCheckingSession = false,
                     errorMessage = "No se pudo conectar con ninguno de los servidores configurados para este código."
                 )
                 return@launch
@@ -755,6 +769,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 isConfigured = true,
+                isCheckingSession = false,
                 liveChannels = allLiveChannels
             )
             if (!silent || !isCurrentlyShowingLive) {
