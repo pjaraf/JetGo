@@ -313,22 +313,28 @@ object AccessCodeChecker {
             val docUrl = "https://firestore.googleapis.com/v1/$docPath"
 
             val getRequest = Request.Builder().url(docUrl).build()
-            val (deviceIds, namesFields, activityFields) = client.newCall(getRequest).execute().use { response ->
+            val (deviceIds, namesFields, activityFields, hasNames, hasActivity) = client.newCall(getRequest).execute().use { response ->
                 if (!response.isSuccessful) {
                     android.util.Log.e("JetGo_DIAG", "removeDevice GET failed: ${response.code}")
-                    return@use Triple(emptyList<String>(), JSONObject(), JSONObject())
+                    return@use Quintuple(emptyList<String>(), JSONObject(), JSONObject(), false, false)
                 }
-                val body = response.body?.string() ?: return@use Triple(emptyList<String>(), JSONObject(), JSONObject())
+                val body = response.body?.string() ?: return@use Quintuple(emptyList<String>(), JSONObject(), JSONObject(), false, false)
                 val json = JSONObject(body)
-                val fields = json.optJSONObject("fields") ?: return@use Triple(emptyList<String>(), JSONObject(), JSONObject())
+                val fields = json.optJSONObject("fields") ?: return@use Quintuple(emptyList<String>(), JSONObject(), JSONObject(), false, false)
 
                 val ids = parseDeviceIds(fields).filter { it != deviceIdToRemove }
-                val nFields = fields.optJSONObject("deviceNames")?.optJSONObject("mapValue")?.optJSONObject("fields") ?: JSONObject()
-                nFields.remove(deviceIdToRemove)
-                val aFields = fields.optJSONObject("deviceActivity")?.optJSONObject("mapValue")?.optJSONObject("fields") ?: JSONObject()
-                aFields.remove(deviceIdToRemove)
+                
+                val namesObj = fields.optJSONObject("deviceNames")
+                val nFields = namesObj?.optJSONObject("mapValue")?.optJSONObject("fields")
+                val hasN = nFields != null
+                nFields?.remove(deviceIdToRemove)
 
-                Triple(ids, nFields, aFields)
+                val activityObj = fields.optJSONObject("deviceActivity")
+                val aFields = activityObj?.optJSONObject("mapValue")?.optJSONObject("fields")
+                val hasA = aFields != null
+                aFields?.remove(deviceIdToRemove)
+
+                Quintuple(ids, nFields ?: JSONObject(), aFields ?: JSONObject(), namesObj != null, activityObj != null)
             }
 
             val valuesArray = JSONArray()
@@ -336,11 +342,20 @@ object AccessCodeChecker {
 
             val payloadFields = JSONObject()
                 .put("deviceIds", JSONObject().put("arrayValue", JSONObject().put("values", valuesArray)))
-                .put("deviceNames", JSONObject().put("mapValue", JSONObject().put("fields", namesFields)))
-                .put("deviceActivity", JSONObject().put("mapValue", JSONObject().put("fields", activityFields)))
+
+            val fieldPaths = mutableListOf("deviceIds")
+            if (hasNames) {
+                payloadFields.put("deviceNames", JSONObject().put("mapValue", JSONObject().put("fields", namesFields)))
+                fieldPaths.add("deviceNames")
+            }
+            if (hasActivity) {
+                payloadFields.put("deviceActivity", JSONObject().put("mapValue", JSONObject().put("fields", activityFields)))
+                fieldPaths.add("deviceActivity")
+            }
 
             val payload = JSONObject().put("fields", payloadFields)
-            val patchUrl = "$docUrl?updateMask.fieldPaths=deviceIds&updateMask.fieldPaths=deviceNames&updateMask.fieldPaths=deviceActivity"
+            val maskQuery = fieldPaths.joinToString("&") { "updateMask.fieldPaths=$it" }
+            val patchUrl = "$docUrl?$maskQuery"
             val requestBody = payload.toString().toRequestBody("application/json".toMediaType())
             val patchRequest = Request.Builder().url(patchUrl).patch(requestBody).build()
             val success = client.newCall(patchRequest).execute().use { response ->
@@ -357,6 +372,14 @@ object AccessCodeChecker {
             false
         }
     }
+
+    private data class Quintuple<A, B, C, D, E>(
+        val first: A,
+        val second: B,
+        val third: C,
+        val fourth: D,
+        val fifth: E
+    )
 
     private fun nowIsoUtc(): String {
         val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US)
