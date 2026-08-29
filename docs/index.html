@@ -340,6 +340,7 @@
       <div class="nav-item" id="nav-demos" onclick="selectView('demos')"><span class="dot"></span> Demos<span class="nav-badge" id="badge-demos">0</span></div>
       <div class="nav-item" id="nav-servers" onclick="selectView('servers')"><span class="dot"></span> Servidores</div>
       <div class="nav-item" id="nav-subadmins" onclick="selectView('subadmins')"><span class="dot"></span> Paneles sub administrador</div>
+      <div class="nav-item" id="nav-whatsapp" onclick="selectView('whatsapp')"><span class="dot"></span> WhatsApp Automático</div>
     </nav>
     <div class="sidebar-footer">
       <div class="admin-email" id="adminEmail"></div>
@@ -555,6 +556,34 @@
           </table>
         </div>
       </div>
+      <div class="card view-section" id="view-whatsapp" style="display:none;">
+        <h2>Plantilla y configuración de WhatsApp automático (Vencimiento en 3 días)</h2>
+        <p style="color:var(--muted); font-size:13px; margin-top:-10px; margin-bottom:16px;">
+          Configura el mensaje de WhatsApp que se enviará a los clientes cuya suscripción vencerá exactamente en 3 días.
+        </p>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); margin: 4px 0 16px; cursor:pointer; font-weight:600;">
+          <input type="checkbox" id="whatsappAutoEnabled" style="width:auto; margin:0;" />
+          Activar recordatorios automáticos de WhatsApp para vencimiento en 3 días
+        </label>
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Plantilla del mensaje</label>
+        <textarea id="whatsappTemplate" rows="5" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px; resize:vertical; font-family:inherit;"></textarea>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:16px; line-height:1.5;">
+          Variables disponibles: <code>{clientName}</code>, <code>{code}</code>, <code>{expirationDate}</code>, <code>{daysLeft}</code>
+        </div>
+        <button id="saveWhatsappConfigBtn" class="full" style="margin-bottom:24px;">Guardar configuración</button>
+
+        <h3 style="font-size:15px; margin:0 0 12px; color:var(--text);">Clientes que vencen en 3 días</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Código</th><th>Cliente</th><th>Teléfono</th><th>Vence</th><th>Acción WhatsApp</th></tr>
+            </thead>
+            <tbody id="whatsappExpiringTableBody">
+              <tr><td colspan="5" style="color:var(--muted)">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -757,7 +786,8 @@
     expired: { title: 'Clientes vencidos', subtitle: 'La fecha de vencimiento ya pasó' },
     demos: { title: 'Demos', subtitle: 'Cuentas marcadas como demo' },
     servers: { title: 'Servidores', subtitle: 'Servidores Xtream guardados por nombre' },
-    subadmins: { title: 'Paneles sub administrador', subtitle: 'Dar acceso a este panel a otra persona' }
+    subadmins: { title: 'Paneles sub administrador', subtitle: 'Dar acceso a este panel a otra persona' },
+    whatsapp: { title: 'WhatsApp Automático', subtitle: 'Plantillas y recordatorios para vencimiento en 3 días' }
   };
   let currentView = 'home';
   function selectView(name) {
@@ -777,6 +807,10 @@
       renderOnlineUsers();
     } else if (name === 'create') {
       document.getElementById('view-create').style.display = 'block';
+    } else if (name === 'whatsapp') {
+      document.getElementById('view-whatsapp').style.display = 'block';
+      loadWhatsappConfig();
+      renderWhatsappExpiringTable();
     } else if (name === 'subadmins') {
       document.getElementById('view-subadmins').style.display = 'block';
       document.getElementById('view-subadmins-list').style.display = 'block';
@@ -1738,6 +1772,97 @@
     await loadCombos();
     renderCombosTable();
   };
+
+  const defaultWhatsappTemplate = "Hola {clientName}, te recordamos que tu suscripción a JetGo con código {code} vencerá en {daysLeft} días ({expirationDate}). ¡Renueva ahora para no perder tu servicio!";
+
+  async function loadWhatsappConfig() {
+    try {
+      const doc = await db.collection('settings').doc('whatsapp_config').get();
+      if (doc.exists) {
+        const data = doc.data();
+        document.getElementById('whatsappAutoEnabled').checked = data.enabled === true;
+        document.getElementById('whatsappTemplate').value = data.template || defaultWhatsappTemplate;
+      } else {
+        document.getElementById('whatsappTemplate').value = defaultWhatsappTemplate;
+      }
+    } catch (e) {
+      document.getElementById('whatsappTemplate').value = defaultWhatsappTemplate;
+    }
+  }
+
+  document.getElementById('saveWhatsappConfigBtn')?.addEventListener('click', async () => {
+    const enabled = document.getElementById('whatsappAutoEnabled').checked;
+    const template = document.getElementById('whatsappTemplate').value;
+    await db.collection('settings').doc('whatsapp_config').set({
+      enabled: enabled,
+      template: template,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showToast('Configuración de WhatsApp guardada');
+  });
+
+  function parseWhatsappTemplate(template, clientName, code, expirationDate, daysLeft) {
+    return template
+      .replace(/{clientName}/g, clientName || 'Cliente')
+      .replace(/{code}/g, code || '')
+      .replace(/{expirationDate}/g, expirationDate || '')
+      .replace(/{daysLeft}/g, daysLeft !== undefined ? daysLeft : '3');
+  }
+
+  window.openWhatsappForExpiringCode = (code, clientName, clientPhone, expirationDate) => {
+    if (!clientPhone) {
+      alert('Este cliente no tiene teléfono de WhatsApp registrado.');
+      return;
+    }
+    const template = document.getElementById('whatsappTemplate')?.value || defaultWhatsappTemplate;
+    const daysLeft = getDaysUntilExpiration(expirationDate) ?? 3;
+    const message = parseWhatsappTemplate(template, clientName, code, expirationDate, daysLeft);
+    const cleanPhone = clientPhone.replace(/\D/g, '');
+    const url = 'https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(message);
+    window.open(url, '_blank');
+  };
+
+  function getDaysUntilExpiration(expirationDate) {
+    if (!expirationDate) return null;
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const exp = new Date(expirationDate + 'T00:00:00');
+    const diffTime = exp - today;
+    return Math.round(diffTime / (1000 * 60 * 60 * 24));
+  }
+
+  function renderWhatsappExpiringTable() {
+    const tbody = document.getElementById('whatsappExpiringTableBody');
+    if (!tbody) return;
+    const expiring3Days = lastSnapshotDocs.filter(({ data }) => {
+      if (!data.expirationDate || data.isDemo) return false;
+      const days = getDaysUntilExpiration(data.expirationDate);
+      return days === 3;
+    });
+
+    if (expiring3Days.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">No hay clientes cuya suscripción venza exactamente en 3 días.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = '';
+    expiring3Days.forEach(({ id: code, data }) => {
+      const clientName = data.clientName || 'Sin nombre';
+      const clientPhone = data.clientPhone || '-';
+      const expDate = data.expirationDate || '-';
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="code-cell">' + code + '</td>' +
+        '<td>' + clientName + '</td>' +
+        '<td>' + clientPhone + '</td>' +
+        '<td style="color:var(--orange); font-weight:700;">' + expDate + ' (Vence en 3 días)</td>' +
+        '<td class="actions-cell">' +
+          (data.clientPhone ? '<button style="background:#25D366; color:#fff;" onclick="openWhatsappForExpiringCode(\'' + code + '\', ' + JSON.stringify(clientName).replace(/"/g, '&quot;') + ', ' + JSON.stringify(clientPhone).replace(/"/g, '&quot;') + ', \'' + expDate + '\')">Enviar WhatsApp</button>' : '<span style="color:var(--muted); font-size:12px;">Sin teléfono</span>') +
+        '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+
   function showToast(msg) {
     const toast = document.getElementById('copyToast');
     toast.textContent = msg;
