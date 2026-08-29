@@ -4,6 +4,11 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>JetGo · Panel de administración</title>
+<!-- React, ReactDOM, ReactIs, Recharts UMD -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/react-is@18/umd/react-is.production.min.js"></script>
+<script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
 <style>
   :root {
     --bg: #0b0d12;
@@ -378,6 +383,11 @@
           <div class="stat-label"><span class="live-dot"></span> En línea ahora</div>
           <div class="stat-value" id="statOnline">0</div>
         </div>
+      </div>
+      <!-- Gráfico de crecimiento de códigos en los últimos 30 días -->
+      <div class="card" id="homeChartCard" style="background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px 24px; margin-bottom:24px;">
+        <h3 style="font-size:16px; font-weight:700; margin:0 0 16px; color:var(--text);">Crecimiento de nuevos códigos (Últimos 30 días)</h3>
+        <div id="rechartsGrowthChart" style="width:100%; height:280px;"></div>
       </div>
       <!-- ---------- Vista: Usuarios en línea ---------- -->
       <div class="card view-section" id="view-online" style="display:none;">
@@ -799,9 +809,13 @@
     if (statsGrid) {
       statsGrid.style.display = (name === 'home') ? 'grid' : 'none';
     }
+    const homeChartCard = document.getElementById('homeChartCard');
+    if (homeChartCard) {
+      homeChartCard.style.display = (name === 'home') ? 'block' : 'none';
+    }
 
     if (name === 'home') {
-      // La vista 'home' solo muestra las estadísticas
+      renderGrowthChart();
     } else if (name === 'online') {
       document.getElementById('view-online').style.display = 'block';
       renderOnlineUsers();
@@ -1098,6 +1112,9 @@
     document.getElementById('badge-expiring').textContent = expiringNav;
     document.getElementById('badge-expired').textContent = expiredNav;
     document.getElementById('badge-demos').textContent = demosNav;
+    if (currentView === 'home') {
+      renderGrowthChart();
+    }
     const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
     const filtered = lastSnapshotDocs.filter(({ id: code, data }) => {
       const active = data.active !== false;
@@ -1926,6 +1943,68 @@
     closeEditClientModal();
     showToast('Cliente actualizado correctamente');
   };
+
+  function renderGrowthChart() {
+    const container = document.getElementById('rechartsGrowthChart');
+    if (!container || !window.Recharts || !window.React || !window.ReactDOM) return;
+    
+    const daysMap = {};
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      const displayKey = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+      daysMap[key] = { date: displayKey, rawDate: key, count: 0 };
+    }
+
+    lastSnapshotDocs.forEach(({ data }) => {
+      if (data.createdAt) {
+        let dateObj = null;
+        if (data.createdAt.toDate) {
+          dateObj = data.createdAt.toDate();
+        } else if (typeof data.createdAt === 'string') {
+          dateObj = new Date(data.createdAt);
+        } else if (data.createdAt.seconds) {
+          dateObj = new Date(data.createdAt.seconds * 1000);
+        }
+        if (dateObj) {
+          const key = dateObj.toISOString().slice(0, 10);
+          if (daysMap[key]) {
+            daysMap[key].count++;
+          }
+        }
+      }
+    });
+
+    const chartData = Object.values(daysMap);
+    const { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } = window.Recharts;
+    const React = window.React;
+
+    const GrowthChartComponent = () => {
+      return React.createElement(
+        ResponsiveContainer,
+        { width: '100%', height: '100%' },
+        React.createElement(
+          LineChart,
+          { data: chartData, margin: { top: 10, right: 20, left: -25, bottom: 0 } },
+          React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: '#262b36' }),
+          React.createElement(XAxis, { dataKey: 'date', stroke: '#8a90a0', fontSize: 11, tickLine: false }),
+          React.createElement(YAxis, { stroke: '#8a90a0', fontSize: 11, allowDecimals: false, tickLine: false }),
+          React.createElement(Tooltip, {
+            contentStyle: { backgroundColor: '#171a22', borderColor: '#262b36', borderRadius: '10px', color: '#fff', fontSize: '13px', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' },
+            formatter: (value) => [value, 'Nuevos códigos'],
+            labelStyle: { color: '#8a90a0', marginBottom: '4px', fontWeight: '600' }
+          }),
+          React.createElement(Line, { type: 'monotone', dataKey: 'count', stroke: '#ff7a2e', strokeWidth: 3, dot: { r: 3, fill: '#ff7a2e' }, activeDot: { r: 6, stroke: '#fff', strokeWidth: 2 } })
+        )
+      );
+    };
+
+    if (!window._growthRoot) {
+      window._growthRoot = ReactDOM.createRoot(container);
+    }
+    window._growthRoot.render(React.createElement(GrowthChartComponent));
+  }
 </script>
 
 <!-- Modal de Edición de Cliente -->
