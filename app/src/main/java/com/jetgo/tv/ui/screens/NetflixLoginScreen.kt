@@ -3,9 +3,12 @@ package com.jetgo.tv.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -216,42 +219,53 @@ fun NetflixLoginScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 300.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .heightIn(max = 320.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         registeredDevices.forEach { device ->
                             Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.5f)),
-                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(enabled = !isLoading) { onRemoveDevice(device.deviceId) },
+                                colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.6f)),
+                                border = BorderStroke(1.dp, Color(0xFFE50914).copy(alpha = 0.4f)),
+                                shape = RoundedCornerShape(8.dp)
                             ) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(12.dp),
+                                        .padding(14.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                                         Text(
                                             text = device.deviceName,
                                             color = Color.White,
-                                            fontSize = 14.sp,
+                                            fontSize = 15.sp,
                                             fontWeight = FontWeight.Bold
                                         )
+                                        Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = "ID: ${device.deviceId}",
-                                            color = Color.White.copy(alpha = 0.4f),
-                                            fontSize = 11.sp
+                                            color = Color.White.copy(alpha = 0.5f),
+                                            fontSize = 12.sp
                                         )
                                     }
                                     Button(
                                         onClick = { onRemoveDevice(device.deviceId) },
+                                        enabled = !isLoading,
                                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE50914)),
                                         shape = RoundedCornerShape(6.dp),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                        modifier = Modifier.height(38.dp),
+                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
                                     ) {
-                                        Text("Eliminar", color = Color.White, fontSize = 12.sp)
+                                        if (isLoading) {
+                                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp))
+                                        } else {
+                                            Text("Eliminar", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }
