@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -224,12 +226,20 @@ fun NetflixLoginScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         registeredDevices.forEach { device ->
+                            var isFocused by remember { mutableStateOf(false) }
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .onFocusChanged { focusState -> isFocused = focusState.isFocused }
+                                    .focusable()
                                     .clickable(enabled = !isLoading) { onRemoveDevice(device.deviceId) },
-                                colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.6f)),
-                                border = BorderStroke(1.dp, Color(0xFFE50914).copy(alpha = 0.4f)),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isFocused) Color(0xFFE50914).copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.6f)
+                                ),
+                                border = BorderStroke(
+                                    width = if (isFocused) 2.dp else 1.dp,
+                                    color = if (isFocused) Color.White else Color(0xFFE50914).copy(alpha = 0.4f)
+                                ),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Row(
@@ -249,23 +259,25 @@ fun NetflixLoginScreen(
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = "ID: ${device.deviceId}",
-                                            color = Color.White.copy(alpha = 0.5f),
+                                            color = Color.White.copy(alpha = if (isFocused) 0.9f else 0.5f),
                                             fontSize = 12.sp
                                         )
                                     }
-                                    Button(
-                                        onClick = { onRemoveDevice(device.deviceId) },
-                                        enabled = !isLoading,
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE50914)),
-                                        shape = RoundedCornerShape(6.dp),
-                                        modifier = Modifier.height(38.dp),
-                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
+                                    Box(
+                                        modifier = Modifier
+                                            .background(
+                                                color = if (isFocused) Color.White else Color(0xFFE50914),
+                                                shape = RoundedCornerShape(6.dp)
+                                            )
+                                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        if (isLoading) {
-                                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp))
-                                        } else {
-                                            Text("Eliminar", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                        }
+                                        Text(
+                                            text = "Eliminar",
+                                            color = if (isFocused) Color(0xFFE50914) else Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     }
                                 }
                             }
@@ -275,13 +287,20 @@ fun NetflixLoginScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                var isCancelFocused by remember { mutableStateOf(false) }
                 Button(
                     onClick = onDismissLimit,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { focusState -> isCancelFocused = focusState.isFocused }
+                        .focusable(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isCancelFocused) Color(0xFF444444) else Color.DarkGray
+                    ),
+                    border = if (isCancelFocused) BorderStroke(2.dp, Color.White) else null,
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("Cancelar", color = Color.White)
+                    Text("Cancelar", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
