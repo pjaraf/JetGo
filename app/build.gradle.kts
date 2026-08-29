@@ -31,7 +31,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.jetgo.tvplayer"
+        applicationId = "com.jetgo.tv"
         minSdk = 21          // cubre teléfonos, tablets, TV box y Android TV/Google TV
         targetSdk = 34
         // versionCode se incrementa automáticamente garantizando que cada compilación sea superior a la anterior
