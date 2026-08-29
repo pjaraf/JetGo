@@ -45,6 +45,12 @@ data class AccessCodeResult(
     val sources: List<ContentSource> = emptyList()
 )
 
+data class RegisteredDevice(
+    val deviceId: String,
+    val deviceName: String,
+    val lastActive: String
+)
+
 private const val MAX_DEVICES_PER_CODE = 3
 
 /**
@@ -268,6 +274,84 @@ object AccessCodeChecker {
             client.newCall(patchRequest).execute().close()
         } catch (e: Exception) {
             android.util.Log.e("JetGo_DIAG", "Update device activity exception", e)
+        }
+    }
+
+    fun fetchRegisteredDevices(projectId: String, code: String): List<RegisteredDevice> {
+        if (projectId.isBlank() || code.isBlank()) return emptyList()
+        return try {
+            val normalizedCode = code.trim().uppercase()
+            val docPath = "projects/$projectId/databases/(default)/documents/access_codes/$normalizedCode"
+            val docUrl = "https://firestore.googleapis.com/v1/$docPath"
+            val getRequest = Request.Builder().url(docUrl).build()
+            client.newCall(getRequest).execute().use { response ->
+                if (!response.isSuccessful) return emptyList()
+                val body = response.body?.string() ?: return emptyList()
+                val json = JSONObject(body)
+                val fields = json.optJSONObject("fields") ?: return emptyList()
+
+                val deviceIds = parseDeviceIds(fields)
+                val namesMap = fields.optJSONObject("deviceNames")?.optJSONObject("mapValue")?.optJSONObject("fields")
+                val activityMap = fields.optJSONObject("deviceActivity")?.optJSONObject("mapValue")?.optJSONObject("fields")
+
+                deviceIds.map { id ->
+                    val name = namesMap?.optJSONObject(id)?.optString("stringValue")?.takeIf { it.isNotBlank() } ?: "Dispositivo ${id.take(6)}"
+                    val activity = activityMap?.optJSONObject(id)?.optString("timestampValue") ?: "Desconocido"
+                    RegisteredDevice(deviceId = id, deviceName = name, lastActive = activity)
+                }
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun removeDevice(projectId: String, code: String, deviceIdToRemove: String): Boolean {
+        if (projectId.isBlank() || code.isBlank() || deviceIdToRemove.isBlank()) return false
+        return try {
+            val normalizedCode = code.trim().uppercase()
+            val docPath = "projects/$projectId/databases/(default)/documents/access_codes/$normalizedCode"
+            val docUrl = "https://firestore.googleapis.com/v1/$docPath"
+
+            val getRequest = Request.Builder().url(docUrl).build()
+            val (deviceIds, namesFields, activityFields) = client.newCall(getRequest).execute().use { response ->
+                if (!response.isSuccessful) return@use Triple(emptyList<String>(), JSONObject(), JSONObject())
+                val body = response.body?.string() ?: return@use Triple(emptyList<String>(), JSONObject(), JSONObject())
+                val json = JSONObject(body)
+                val fields = json.optJSONObject("fields") ?: return@use Triple(emptyList<String>(), JSONObject(), JSONObject())
+
+                val ids = parseDeviceIds(fields).filter { it != deviceIdToRemove }
+                val nFields = fields.optJSONObject("deviceNames")?.optJSONObject("mapValue")?.optJSONObject("fields") ?: JSONObject()
+                nFields.remove(deviceIdToRemove)
+                val aFields = fields.optJSONObject("deviceActivity")?.optJSONObject("mapValue")?.optJSONObject("fields") ?: JSONObject()
+                aFields.remove(deviceIdToRemove)
+
+                Triple(ids, nFields, aFields)
+            }
+
+            val valuesArray = JSONArray()
+            deviceIds.forEach { id -> valuesArray.put(JSONObject().put("stringValue", id)) }
+
+            val payloadFields = JSONObject().put(
+                "deviceIds", JSONObject().put(
+                    "arrayValue", JSONObject().put("values", valuesArray)
+                )
+            ).put(
+                "deviceNames", JSONObject().put(
+                    "mapValue", JSONObject().put("fields", namesFields)
+                )
+            ).put(
+                "deviceActivity", JSONObject().put(
+                    "mapValue", JSONObject().put("fields", activityFields)
+                )
+            )
+
+            val payload = JSONObject().put("fields", payloadFields)
+            val patchUrl = "$docUrl?updateMask.fieldPaths=deviceIds&updateMask.fieldPaths=deviceNames&updateMask.fieldPaths=deviceActivity"
+            val requestBody = payload.toString().toRequestBody("application/json".toMediaType())
+            val patchRequest = Request.Builder().url(patchUrl).patch(requestBody).build()
+            client.newCall(patchRequest).execute().use { it.isSuccessful }
+        } catch (e: Exception) {
+            false
         }
     }
 

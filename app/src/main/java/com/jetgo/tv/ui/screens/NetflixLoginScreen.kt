@@ -30,7 +30,11 @@ import com.jetgo.tv.data.model.ServerConfig
 fun NetflixLoginScreen(
     isLoading: Boolean,
     errorMessage: String?,
-    onLogin: (String) -> Unit
+    deviceLimitReached: Boolean = false,
+    registeredDevices: List<com.jetgo.tv.util.RegisteredDevice> = emptyList(),
+    onLogin: (String) -> Unit,
+    onRemoveDevice: (String) -> Unit = {},
+    onDismissLimit: () -> Unit = {}
 ) {
     var accessCode by remember { mutableStateOf("") }
 
@@ -177,6 +181,93 @@ fun NetflixLoginScreen(
                             modifier = Modifier.padding(top = 16.dp)
                         )
                     }
+                }
+            }
+        }
+    }
+
+    if (deviceLimitReached) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = onDismissLimit) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 480.dp)
+                    .background(Color(0xFF141419), RoundedCornerShape(16.dp))
+                    .padding(24.dp)
+            ) {
+                Text(
+                    text = "Límite de dispositivos (3/3)",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Ya tienes activos los 3 dispositivos permitidos en tu cuenta. Para conectar este nuevo equipo, selecciona y elimina uno de los dispositivos registrados:",
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
+                )
+
+                if (registeredDevices.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Color(0xFFE50914))
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 300.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        registeredDevices.forEach { device ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.5f)),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = device.deviceName,
+                                            color = Color.White,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "ID: ${device.deviceId}",
+                                            color = Color.White.copy(alpha = 0.4f),
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                    Button(
+                                        onClick = { onRemoveDevice(device.deviceId) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE50914)),
+                                        shape = RoundedCornerShape(6.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                    ) {
+                                        Text("Eliminar", color = Color.White, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = onDismissLimit,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Cancelar", color = Color.White)
                 }
             }
         }

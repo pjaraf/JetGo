@@ -168,7 +168,11 @@ private fun AppRoot(viewModel: HomeViewModel) {
                         NetflixLoginScreen(
                             isLoading = uiState.isLoading,
                             errorMessage = uiState.errorMessage,
-                            onLogin = { code -> viewModel.loginWithCode(code) }
+                            deviceLimitReached = uiState.deviceLimitReached,
+                            registeredDevices = uiState.registeredDevices,
+                            onLogin = { code -> viewModel.loginWithCode(code) },
+                            onRemoveDevice = { deviceId -> viewModel.removeDeviceAndRetry(uiState.limitReachedCode, deviceId) },
+                            onDismissLimit = { viewModel.dismissDeviceLimit() }
                         )
                     }
                     isTv -> {

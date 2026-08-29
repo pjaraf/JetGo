@@ -45,7 +45,10 @@ data class HomeUiState(
     val liveChannels: List<Channel> = emptyList(),
     val errorMessage: String? = null,
     val debugDetail: String? = null,
-    val expirationWarning: String? = null
+    val expirationWarning: String? = null,
+    val deviceLimitReached: Boolean = false,
+    val limitReachedCode: String = "",
+    val registeredDevices: List<com.jetgo.tv.util.RegisteredDevice> = emptyList()
 )
 
 data class CategoryPickerUiState(
@@ -448,7 +451,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun loginWithCode(code: String, silent: Boolean = false) {
         viewModelScope.launch {
             if (!silent) {
-                _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null, expirationWarning = null)
+                _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null, expirationWarning = null, deviceLimitReached = false)
             }
             val context = getApplication<Application>()
             val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
@@ -461,17 +464,24 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
             if (!result.valid) {
                 if (!silent) {
-                    val errorMsg = if (result.deviceLimitReached) {
-                        "Límite de dispositivos alcanzado (máximo ${result.maxDevices})"
+                    if (result.deviceLimitReached) {
+                        fetchRegisteredDevicesForLimit(code)
                     } else {
-                        "Código incorrecto o inactivo"
+                        _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "Código incorrecto o inactivo")
                     }
-                    _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = errorMsg)
                 }
                 return@launch
             }
             
             configStore.saveAccessCode(code)
+
+            _settingsInfo.value = SettingsInfo(
+                clientName = result.clientName,
+                accessCode = code,
+                deviceCount = result.deviceCount,
+                maxDevices = result.maxDevices,
+                expirationDate = result.expirationDate
+            )
 
             withContext(Dispatchers.IO) {
                 if (result.sources.isNotEmpty()) {
@@ -519,6 +529,50 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 connectXtream(ServerConfig(host, username, password))
             }
         }
+    }
+
+    fun fetchRegisteredDevicesForLimit(code: String) {
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
+            val devices = withContext(Dispatchers.IO) {
+                AccessCodeChecker.fetchRegisteredDevices(projectId, code)
+            }
+            _uiState.value = _uiState.value.copy(
+                deviceLimitReached = true,
+                limitReachedCode = code,
+                registeredDevices = devices,
+                isLoading = false,
+                errorMessage = "Ya tienes activos los 3 dispositivos permitidos. Elimina uno para continuar."
+            )
+        }
+    }
+
+    fun removeDeviceAndRetry(code: String, deviceIdToRemove: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            val context = getApplication<Application>()
+            val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
+            val success = withContext(Dispatchers.IO) {
+                AccessCodeChecker.removeDevice(projectId, code, deviceIdToRemove)
+            }
+            if (success) {
+                loginWithCode(code)
+            } else {
+                val devices = withContext(Dispatchers.IO) {
+                    AccessCodeChecker.fetchRegisteredDevices(projectId, code)
+                }
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    registeredDevices = devices,
+                    errorMessage = "No se pudo eliminar el dispositivo. Intenta de nuevo."
+                )
+            }
+        }
+    }
+
+    fun dismissDeviceLimit() {
+        _uiState.value = _uiState.value.copy(deviceLimitReached = false, errorMessage = null)
     }
 
     fun dismissExpirationWarning() {
