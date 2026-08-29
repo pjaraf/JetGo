@@ -1103,9 +1103,12 @@
     let activeNav = 0, expiringNav = 0, expiredNav = 0, demosNav = 0;
     lastSnapshotDocs.forEach(({ data }) => {
       const active = data.active !== false;
-      if (active && !data.isDemo) activeNav++;
-      if (isExpiringSoon(data.expirationDate)) expiringNav++;
-      if (isExpired(data.expirationDate)) expiredNav++;
+      const expired = isExpired(data.expirationDate);
+      const expiring = isExpiringSoon(data.expirationDate) && !expired;
+
+      if (active && !data.isDemo && !expired && !expiring) activeNav++;
+      if (active && !data.isDemo && expiring) expiringNav++;
+      if (expired) expiredNav++;
       if (data.isDemo) demosNav++;
     });
     document.getElementById('badge-active').textContent = activeNav;
@@ -1118,9 +1121,16 @@
     const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
     const filtered = lastSnapshotDocs.filter(({ id: code, data }) => {
       const active = data.active !== false;
-      if (currentView === 'active' && (!active || data.isDemo)) return false;
-      if (currentView === 'expiring' && !isExpiringSoon(data.expirationDate)) return false;
-      if (currentView === 'expired' && !isExpired(data.expirationDate)) return false;
+      const expired = isExpired(data.expirationDate);
+      const expiring = isExpiringSoon(data.expirationDate) && !expired;
+
+      if (currentView === 'active') {
+        if (!active || data.isDemo || expired || expiring) return false;
+      }
+      if (currentView === 'expiring') {
+        if (!active || data.isDemo || !expiring) return false;
+      }
+      if (currentView === 'expired' && !expired) return false;
       if (currentView === 'demos' && !data.isDemo) return false;
       if (query && !(code + ' ' + (data.clientName || '')).toLowerCase().includes(query)) return false;
       return true;
