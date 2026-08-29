@@ -369,8 +369,24 @@
           <div class="stat-value" id="statTotal">0</div>
         </div>
         <div class="stat-card accent-green">
-          <div class="stat-label">Activos</div>
+          <div class="stat-label">Activos generales</div>
           <div class="stat-value" id="statActive">0</div>
+        </div>
+        <div class="stat-card accent-green" style="cursor:pointer;" onclick="selectView('active')">
+          <div class="stat-label">Clientes activos</div>
+          <div class="stat-value" id="statActiveClients">0</div>
+        </div>
+        <div class="stat-card accent-orange" style="cursor:pointer;" onclick="selectView('expiring')">
+          <div class="stat-label">Clientes por vencer</div>
+          <div class="stat-value" id="statExpiringClients">0</div>
+        </div>
+        <div class="stat-card accent-red" style="cursor:pointer;" onclick="selectView('expired')">
+          <div class="stat-label">Clientes vencidos</div>
+          <div class="stat-value" id="statExpiredClients">0</div>
+        </div>
+        <div class="stat-card accent-blue" style="cursor:pointer;" onclick="selectView('demos')">
+          <div class="stat-label">Demos</div>
+          <div class="stat-value" id="statDemos">0</div>
         </div>
         <div class="stat-card accent-red">
           <div class="stat-label">Revocados</div>
@@ -1151,6 +1167,10 @@
     document.getElementById('badge-expired').textContent = expiredNav;
     document.getElementById('badge-demos').textContent = demosNav;
     document.getElementById('badge-notifications').textContent = notificationsNav;
+    document.getElementById('statActiveClients').textContent = activeNav;
+    document.getElementById('statExpiringClients').textContent = expiringNav;
+    document.getElementById('statExpiredClients').textContent = expiredNav;
+    document.getElementById('statDemos').textContent = demosNav;
     if (currentView === 'notifications') {
       renderNotificationsView();
     }
