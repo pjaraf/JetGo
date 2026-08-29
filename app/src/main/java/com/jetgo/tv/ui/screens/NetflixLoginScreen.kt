@@ -3,6 +3,7 @@ package com.jetgo.tv.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
@@ -185,6 +186,116 @@ fun NetflixLoginScreen(
                             fontSize = 13.sp,
                             modifier = Modifier.padding(top = 16.dp)
                         )
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    var showSubscribeDialog by remember { mutableStateOf(false) }
+                    var isSubCardFocused by remember { mutableStateOf(false) }
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { focusState -> isSubCardFocused = focusState.isFocused }
+                            .focusable()
+                            .clickable { showSubscribeDialog = true },
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isSubCardFocused) Color(0xFFE50914).copy(alpha = 0.35f) else Color.White.copy(alpha = 0.08f)
+                        ),
+                        border = BorderStroke(
+                            width = if (isSubCardFocused) 2.dp else 1.dp,
+                            color = if (isSubCardFocused) Color.White else Color(0xFFE50914).copy(alpha = 0.6f)
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "✨ ¿Aún no tienes JetGo? ¡Suscríbete aquí! 🚀",
+                                color = if (isSubCardFocused) Color.White else Color(0xFFFFB703),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    if (showSubscribeDialog) {
+                        androidx.compose.ui.window.Dialog(onDismissRequest = { showSubscribeDialog = false }) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .widthIn(max = 460.dp)
+                                    .background(Color(0xFF141419), RoundedCornerShape(16.dp))
+                                    .border(2.dp, Color(0xFFE50914), RoundedCornerShape(16.dp))
+                                    .padding(28.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "📺 Suscripción JetGo",
+                                    color = Color(0xFFE50914),
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "¡Obtén tu acceso inmediato y disfruta de todo el entretenimiento sin límites!",
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    fontSize = 14.sp,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.5f)),
+                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = "📲 Comunícate vía WhatsApp o llamada:",
+                                            color = Color.White.copy(alpha = 0.7f),
+                                            fontSize = 12.sp
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = "+56 9 5939 6963",
+                                            color = Color(0xFF4ADE80),
+                                            fontSize = 22.sp,
+                                            fontWeight = FontWeight.Black,
+                                            letterSpacing = 1.sp
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(24.dp))
+                                var isDialogBtnFocused by remember { mutableStateOf(false) }
+                                Button(
+                                    onClick = { showSubscribeDialog = false },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(44.dp)
+                                        .onFocusChanged { focusState -> isDialogBtnFocused = focusState.isFocused }
+                                        .focusable(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isDialogBtnFocused) Color.White else Color(0xFFE50914)
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = "Entendido",
+                                        color = if (isDialogBtnFocused) Color(0xFFE50914) else Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
