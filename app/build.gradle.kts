@@ -56,17 +56,7 @@ android {
     }
 
     signingConfigs {
-        create("releaseSigning") {
-            if (debugKeystore.exists()) {
-                storeFile = debugKeystore
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
-            }
-            enableV1Signing = true
-            enableV2Signing = true
-        }
-        // Firma fija garantizada en debug y release (evita conflictos de actualización)
+        // Firma fija única garantizada en debug y release (evita conflictos de actualización por firma distinta)
         getByName("debug") {
             if (debugKeystore.exists()) {
                 storeFile = debugKeystore
@@ -87,7 +77,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("releaseSigning")
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
