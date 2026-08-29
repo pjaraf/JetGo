@@ -35,6 +35,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 data class HomeUiState(
@@ -114,27 +116,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     var isAppInForeground = true
         private set
 
+    private val foregroundMutex = kotlinx.coroutines.sync.Mutex()
+
     fun setAppForegroundState(inForeground: Boolean) {
         isAppInForeground = inForeground
-        if (!inForeground) {
-            viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
+            foregroundMutex.withLock {
                 val savedCode = configStore.accessCode.first()
                 if (!savedCode.isNullOrBlank()) {
                     val context = getApplication<Application>()
                     val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
                     val deviceId = com.jetgo.tv.util.getDeviceId(context)
-                    AccessCodeChecker.sendOffline(projectId, savedCode, deviceId)
-                }
-            }
-        } else {
-            // Cuando vuelve a primer plano, envía el latido de inmediato para que se refleje rápido
-            viewModelScope.launch(Dispatchers.IO) {
-                val savedCode = configStore.accessCode.first()
-                if (!savedCode.isNullOrBlank()) {
-                    val context = getApplication<Application>()
-                    val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
-                    val deviceId = com.jetgo.tv.util.getDeviceId(context)
-                    AccessCodeChecker.sendHeartbeat(projectId, savedCode, deviceId)
+                    if (isAppInForeground) {
+                        AccessCodeChecker.sendHeartbeat(projectId, savedCode, deviceId)
+                    } else {
+                        AccessCodeChecker.sendOffline(projectId, savedCode, deviceId)
+                    }
                 }
             }
         }
