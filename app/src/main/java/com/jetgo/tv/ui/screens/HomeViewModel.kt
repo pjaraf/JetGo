@@ -421,6 +421,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         checkForUpdate()
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(3 * 60 * 1000L)
+                checkForUpdate()
+            }
+        }
     }
 
     /** Vuelve a intentar la conexión con la configuración ya guardada */

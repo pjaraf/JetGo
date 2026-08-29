@@ -10,6 +10,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +35,27 @@ fun UpdateBanner(updateInfo: UpdateInfo, onUpdateStarted: () -> Unit = {}) {
     var downloadProgress by remember { mutableStateOf<Int?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val isDownloading = downloadProgress != null && downloadProgress!! < 100
+
+    LaunchedEffect(Unit) {
+        if (UpdateInstaller.canInstallUnknownApps(context)) {
+            errorMessage = null
+            downloadProgress = 0
+            scope.launch {
+                UpdateInstaller.downloadWithProgress(
+                    context = context,
+                    apkUrl = updateInfo.apkDownloadUrl,
+                    onProgress = { percent -> downloadProgress = percent },
+                    onInstallLaunched = { onUpdateStarted() },
+                    onError = { message ->
+                        errorMessage = message
+                        downloadProgress = null
+                    }
+                )
+            }
+        } else {
+            UpdateInstaller.requestInstallPermission(context)
+        }
+    }
 
     Column(
         modifier = Modifier
