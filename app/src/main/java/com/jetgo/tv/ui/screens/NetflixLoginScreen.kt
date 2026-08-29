@@ -24,6 +24,11 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -343,6 +348,14 @@ fun NetflixLoginScreen(
                                     .fillMaxWidth()
                                     .onFocusChanged { focusState -> isFocused = focusState.isFocused }
                                     .focusable()
+                                    .onKeyEvent { event ->
+                                        if (event.type == KeyEventType.KeyDown && (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter)) {
+                                            if (!isLoading) {
+                                                onRemoveDevice(device.deviceId)
+                                                true
+                                            } else false
+                                        } else false
+                                    }
                                     .clickable(enabled = !isLoading) { onRemoveDevice(device.deviceId) },
                                 colors = CardDefaults.cardColors(
                                     containerColor = if (isFocused) Color(0xFFE50914).copy(alpha = 0.35f) else Color.Black.copy(alpha = 0.6f)
