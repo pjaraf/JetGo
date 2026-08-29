@@ -343,6 +343,7 @@
       <div class="nav-item" id="nav-expiring" onclick="selectView('expiring')"><span class="dot"></span> Clientes por vencer<span class="nav-badge" id="badge-expiring">0</span></div>
       <div class="nav-item" id="nav-expired" onclick="selectView('expired')"><span class="dot"></span> Clientes vencidos<span class="nav-badge" id="badge-expired">0</span></div>
       <div class="nav-item" id="nav-demos" onclick="selectView('demos')"><span class="dot"></span> Demos<span class="nav-badge" id="badge-demos">0</span></div>
+      <div class="nav-item" id="nav-notifications" onclick="selectView('notifications')"><span class="dot"></span> Notificaciones<span class="nav-badge" id="badge-notifications">0</span></div>
       <div class="nav-item" id="nav-servers" onclick="selectView('servers')"><span class="dot"></span> Servidores</div>
       <div class="nav-item" id="nav-subadmins" onclick="selectView('subadmins')"><span class="dot"></span> Paneles sub administrador</div>
       <div class="nav-item" id="nav-whatsapp" onclick="selectView('whatsapp')"><span class="dot"></span> WhatsApp Automático</div>
@@ -594,6 +595,34 @@
           </table>
         </div>
       </div>
+      <div class="card view-section" id="view-notifications" style="display:none;">
+        <h2>Centro de Notificaciones y Gestión Masiva</h2>
+        <p style="color:var(--muted); font-size:13px; margin-top:-10px; margin-bottom:16px;">
+          Envía avisos masivos o recordatorios de WhatsApp para todos los clientes que se encuentran en el estado 'por vencer' hoy.
+        </p>
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Título del aviso / notificación</label>
+        <input id="notifTitleInput" type="text" value="¡Tu suscripción vence hoy!" placeholder="Título..." />
+        
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Mensaje / Cuerpo del aviso</label>
+        <textarea id="notifMessageInput" rows="4" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px; resize:vertical; font-family:inherit;">Hola {clientName}, te recordamos que tu código {code} vence hoy ({expirationDate}). Contáctanos para renovar y seguir disfrutando de nuestro servicio.</textarea>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:16px;">Variables disponibles: <code>{clientName}</code>, <code>{code}</code>, <code>{expirationDate}</code></div>
+
+        <div style="display:flex; gap:10px; margin-bottom:24px;">
+          <button id="sendBulkWhatsappBtn" style="background:#25D366; color:#fff; flex:1;" onclick="sendBulkWhatsappToday()">Enviar WhatsApp Masivo a Clientes de Hoy</button>
+        </div>
+
+        <h3 style="font-size:15px; margin:0 0 12px; color:var(--text);">Clientes que vencen hoy (<span id="notifTodayCount">0</span>)</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Código</th><th>Cliente</th><th>Teléfono</th><th>Vence</th><th>Acción WhatsApp</th></tr>
+            </thead>
+            <tbody id="notificationsTableBody">
+              <tr><td colspan="5" style="color:var(--muted)">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -797,7 +826,8 @@
     demos: { title: 'Demos', subtitle: 'Cuentas marcadas como demo' },
     servers: { title: 'Servidores', subtitle: 'Servidores Xtream guardados por nombre' },
     subadmins: { title: 'Paneles sub administrador', subtitle: 'Dar acceso a este panel a otra persona' },
-    whatsapp: { title: 'WhatsApp Automático', subtitle: 'Plantillas y recordatorios para vencimiento en 3 días' }
+    whatsapp: { title: 'WhatsApp Automático', subtitle: 'Plantillas y recordatorios para vencimiento en 3 días' },
+    notifications: { title: 'Notificaciones', subtitle: 'Avisos y gestión masiva para clientes que vencen hoy' }
   };
   let currentView = 'home';
   function selectView(name) {
@@ -825,6 +855,9 @@
       document.getElementById('view-whatsapp').style.display = 'block';
       loadWhatsappConfig();
       renderWhatsappExpiringTable();
+    } else if (name === 'notifications') {
+      document.getElementById('view-notifications').style.display = 'block';
+      renderNotificationsView();
     } else if (name === 'subadmins') {
       document.getElementById('view-subadmins').style.display = 'block';
       document.getElementById('view-subadmins-list').style.display = 'block';
@@ -1100,21 +1133,27 @@
   function renderCodes() {
     const tbody = document.getElementById('codesTableBody');
     let totalCount = 0, activeCount = 0, revokedCount = 0, deviceTotal = 0, onlineTotal = 0;
-    let activeNav = 0, expiringNav = 0, expiredNav = 0, demosNav = 0;
+    let activeNav = 0, expiringNav = 0, expiredNav = 0, demosNav = 0, notificationsNav = 0;
     lastSnapshotDocs.forEach(({ data }) => {
       const active = data.active !== false;
       const expired = isExpired(data.expirationDate);
       const expiring = isExpiringSoon(data.expirationDate) && !expired;
+      const days = getDaysUntilExpiration(data.expirationDate);
 
       if (active && !data.isDemo && !expired && !expiring) activeNav++;
       if (active && !data.isDemo && expiring) expiringNav++;
       if (expired) expiredNav++;
       if (data.isDemo) demosNav++;
+      if (!data.isDemo && days === 0) notificationsNav++;
     });
     document.getElementById('badge-active').textContent = activeNav;
     document.getElementById('badge-expiring').textContent = expiringNav;
     document.getElementById('badge-expired').textContent = expiredNav;
     document.getElementById('badge-demos').textContent = demosNav;
+    document.getElementById('badge-notifications').textContent = notificationsNav;
+    if (currentView === 'notifications') {
+      renderNotificationsView();
+    }
     if (currentView === 'home') {
       renderGrowthChart();
     }
@@ -1901,6 +1940,79 @@
       tbody.appendChild(tr);
     });
   }
+
+  function renderNotificationsView() {
+    const tbody = document.getElementById('notificationsTableBody');
+    if (!tbody) return;
+    const todayList = lastSnapshotDocs.filter(({ data }) => {
+      if (!data.expirationDate || data.isDemo) return false;
+      const days = getDaysUntilExpiration(data.expirationDate);
+      return days === 0;
+    });
+
+    document.getElementById('notifTodayCount').textContent = todayList.length;
+
+    if (todayList.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">No hay clientes que vencen exactamente hoy.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = '';
+    todayList.forEach(({ id: code, data }) => {
+      const clientName = data.clientName || 'Sin nombre';
+      const clientPhone = data.clientPhone || '-';
+      const expDate = data.expirationDate || '-';
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="code-cell">' + code + '</td>' +
+        '<td>' + clientName + '</td>' +
+        '<td>' + clientPhone + '</td>' +
+        '<td style="color:var(--orange); font-weight:700;">' + expDate + ' (Vence Hoy)</td>' +
+        '<td class="actions-cell">' +
+          (data.clientPhone ? '<button style="background:#25D366; color:#fff;" onclick="openWhatsappForNotifCode(\'' + code + '\', ' + JSON.stringify(clientName).replace(/"/g, '&quot;') + ', ' + JSON.stringify(clientPhone).replace(/"/g, '&quot;') + ', \'' + expDate + '\')">Enviar WhatsApp</button>' : '<span style="color:var(--muted); font-size:12px;">Sin teléfono</span>') +
+        '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+  window.renderNotificationsView = renderNotificationsView;
+
+  window.openWhatsappForNotifCode = (code, clientName, clientPhone, expirationDate) => {
+    if (!clientPhone) {
+      alert('Este cliente no tiene teléfono de WhatsApp registrado.');
+      return;
+    }
+    const template = document.getElementById('notifMessageInput')?.value || 'Hola {clientName}, tu servicio vence hoy.';
+    const message = template
+      .replace(/{clientName}/g, clientName || 'Cliente')
+      .replace(/{code}/g, code || '')
+      .replace(/{expirationDate}/g, expirationDate || '');
+    const cleanPhone = clientPhone.replace(/\D/g, '');
+    const url = 'https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(message);
+    window.open(url, '_blank');
+  };
+
+  window.sendBulkWhatsappToday = () => {
+    const todayList = lastSnapshotDocs.filter(({ data }) => {
+      if (!data.expirationDate || data.isDemo) return false;
+      const days = getDaysUntilExpiration(data.expirationDate);
+      return days === 0 && data.clientPhone;
+    });
+
+    if (todayList.length === 0) {
+      alert('No hay clientes con teléfono que vencan hoy.');
+      return;
+    }
+
+    if (!confirm('Se abrirá WhatsApp para ' + todayList.length + ' clientes que vencen hoy. ¿Deseas continuar?')) {
+      return;
+    }
+
+    todayList.forEach(({ id: code, data }, index) => {
+      setTimeout(() => {
+        openWhatsappForNotifCode(code, data.clientName, data.clientPhone, data.expirationDate);
+      }, index * 600);
+    });
+  };
 
   function showToast(msg) {
     const toast = document.getElementById('copyToast');
