@@ -42,7 +42,10 @@ data class AccessCodeResult(
     val hiddenTypes: List<String> = emptyList(),
     /** Una o dos fuentes de contenido combinadas para este código (nuevo formato). Si viene
      *  vacío, se usa el formato viejo (host/username/password/m3uUrl sueltos, una sola fuente). */
-    val sources: List<ContentSource> = emptyList()
+    val sources: List<ContentSource> = emptyList(),
+    val allowTv: Boolean = true,
+    val allowMovies: Boolean = true,
+    val allowSeries: Boolean = true
 )
 
 data class RegisteredDevice(
@@ -117,7 +120,10 @@ object AccessCodeChecker {
                     maxDevices = MAX_DEVICES_PER_CODE,
                     hiddenCategories = parseStringArray(fields, "hiddenCategories"),
                     hiddenTypes = parseStringArray(fields, "hiddenTypes"),
-                    sources = parseSources(fields)
+                    sources = parseSources(fields),
+                    allowTv = fields.optJSONObject("allowTv")?.optBoolean("booleanValue", true) ?: true,
+                    allowMovies = fields.optJSONObject("allowMovies")?.optBoolean("booleanValue", true) ?: true,
+                    allowSeries = fields.optJSONObject("allowSeries")?.optBoolean("booleanValue", true) ?: true
                 )
             }
         } catch (e: Exception) {

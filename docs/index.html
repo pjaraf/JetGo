@@ -451,6 +451,20 @@
           <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Fecha de vencimiento (opcional)</label>
           <input id="expirationDate" type="date" />
         </div>
+        <div style="margin: 12px 0;">
+          <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Servicios permitidos para el cliente</label>
+          <div style="display:flex; gap:16px; flex-wrap:wrap;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text); cursor:pointer;">
+              <input type="checkbox" id="allowTv" style="width:auto; margin:0;" checked /> TV / En vivo
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text); cursor:pointer;">
+              <input type="checkbox" id="allowMovies" style="width:auto; margin:0;" checked /> Películas
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text); cursor:pointer;">
+              <input type="checkbox" id="allowSeries" style="width:auto; margin:0;" checked /> Series
+            </label>
+          </div>
+        </div>
         <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin: 4px 0 8px; cursor:pointer;">
           <input type="checkbox" id="isDemo" style="width:auto; margin:0;" onchange="onDemoCheckChange()" />
           Marcar como cuenta demo
@@ -1023,6 +1037,9 @@
       deviceNames: {},
       expirationDate: expirationDate,
       isDemo: isDemo,
+      allowTv: document.getElementById('allowTv').checked,
+      allowMovies: document.getElementById('allowMovies').checked,
+      allowSeries: document.getElementById('allowSeries').checked,
       ownerId: auth.currentUser.uid,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
@@ -2128,6 +2145,9 @@
     document.getElementById('editClientName').value = data.clientName || '';
     document.getElementById('editClientPhone').value = data.clientPhone || '';
     document.getElementById('editExpirationDate').value = data.expirationDate || '';
+    document.getElementById('editAllowTv').checked = data.allowTv !== false;
+    document.getElementById('editAllowMovies').checked = data.allowMovies !== false;
+    document.getElementById('editAllowSeries').checked = data.allowSeries !== false;
 
     populateEditServerSelects();
 
@@ -2265,6 +2285,9 @@
       password: sources[0].password || null,
       m3uUrl: sources[0].m3uUrl || null,
       sources: sources,
+      allowTv: document.getElementById('editAllowTv').checked,
+      allowMovies: document.getElementById('editAllowMovies').checked,
+      allowSeries: document.getElementById('editAllowSeries').checked,
       lastModified: Date.now()
     };
 
@@ -2374,6 +2397,21 @@
       <div id="editXtreamCredFields2" style="display:none;">
         <input id="editUsername2" type="text" placeholder="Usuario" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
         <input id="editXtreamPassword2" type="text" placeholder="Contraseña" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+      </div>
+    </div>
+
+    <div style="margin: 12px 0;">
+      <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Servicios permitidos para el cliente</label>
+      <div style="display:flex; gap:16px; flex-wrap:wrap;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text); cursor:pointer;">
+          <input type="checkbox" id="editAllowTv" style="width:auto; margin:0;" checked /> TV / En vivo
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text); cursor:pointer;">
+          <input type="checkbox" id="editAllowMovies" style="width:auto; margin:0;" checked /> Películas
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text); cursor:pointer;">
+          <input type="checkbox" id="editAllowSeries" style="width:auto; margin:0;" checked /> Series
+        </label>
       </div>
     </div>
 
