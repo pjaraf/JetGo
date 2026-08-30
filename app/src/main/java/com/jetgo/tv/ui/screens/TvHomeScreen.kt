@@ -76,14 +76,6 @@ fun TvHomeScreen(
         try { vivoFocusRequester.requestFocus() } catch (e: Exception) {}
     }
 
-    var currentTime by remember { mutableStateOf(formatNow()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            currentTime = formatNow()
-            delay(30_000)
-        }
-    }
-
     val featuredItem = newestItems.firstOrNull()
     val release2026Items = newestItems.drop(1).ifEmpty { newestItems }
 
@@ -168,21 +160,7 @@ fun TvHomeScreen(
                     .weight(1f)
                     .fillMaxHeight()
             ) {
-                // Cabecera superior con hora
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = currentTime,
-                        color = Color.White.copy(alpha = 0.85f),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+
 
                 // ---- MINI REPRODUCTOR EN VIVO (DONDE ESTABA EL HERO) + CARÁTULA 2026 AUTOMÁTICA ----
                 Row(
@@ -228,12 +206,7 @@ fun TvHomeScreen(
                             .fillMaxHeight(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "Estrenos 2026",
-                            color = Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -290,14 +263,7 @@ fun TvHomeScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // ---- CAROUSELS DE CONTENIDO ABAJO (Mi Lista / Recientes) ----
-                Text(
-                    text = "Mi Lista y Contenido Destacado",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
+
 
                 LazyRow(
                     modifier = Modifier
