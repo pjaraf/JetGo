@@ -2041,6 +2041,75 @@
     setTimeout(() => { toast.style.display = 'none'; }, 2000);
   }
 
+  function populateEditServerSelects() {
+    const visibleServers = currentUserRole === 'subadmin'
+      ? serversList.filter(s => s.id === currentAssignedServerId)
+      : serversList;
+    const visibleCombos = currentUserRole === 'subadmin'
+      ? combosList.filter(c => ('combo::' + c.id) === currentAssignedServerId)
+      : combosList;
+    const optionsHtml = '<option value="">Selecciona uno...</option>' +
+      visibleServers.map(s => '<option value="' + s.host.replace(/"/g, '&quot;') + '">' + s.name.replace(/</g, '&lt;') + (s.type === 'm3u' ? ' (Lista M3U)' : ' (Xtream)') + '</option>').join('');
+    const comboOptionsHtml = visibleCombos.length === 0 ? '' :
+      '<optgroup label="Combos">' +
+        visibleCombos.map(c => '<option value="combo::' + c.id + '">' + c.name.replace(/</g, '&lt;') + ' (Combo)</option>').join('') +
+      '</optgroup>';
+    const select = document.getElementById('editServerSelect');
+    if (select) {
+      const currentValue = select.value;
+      select.innerHTML = optionsHtml + comboOptionsHtml;
+      select.value = currentValue;
+    }
+    const select2 = document.getElementById('editServerSelect2');
+    if (select2) {
+      const currentValue2 = select2.value;
+      select2.innerHTML = optionsHtml;
+      select2.value = currentValue2;
+    }
+  }
+
+  function onEditServerSelectChange() {
+    const select = document.getElementById('editServerSelect');
+    if (!select) return;
+    const value = currentUserRole === 'subadmin' ? (currentAssignedServerId || '') : select.value;
+    if (value.startsWith('combo::')) {
+      const comboId = value.substring('combo::'.length);
+      const combo = combosList.find(c => c.id === comboId);
+      const member1 = combo ? serversList.find(s => s.id === combo.memberIds[0]) : null;
+      const member2 = combo ? serversList.find(s => s.id === combo.memberIds[1]) : null;
+      document.getElementById('editXtreamCredFields').style.display = (member1 && member1.type !== 'm3u') ? 'block' : 'none';
+      document.getElementById('editUseSecondSourceRow').style.display = 'none';
+      document.getElementById('editSecondSourceBox').style.display = 'block';
+      document.getElementById('editServerSelect2Row').style.display = 'none';
+      document.getElementById('editXtreamCredFields2').style.display = (member2 && member2.type !== 'm3u') ? 'block' : 'none';
+      return;
+    }
+    document.getElementById('editUseSecondSourceRow').style.display = currentUserRole === 'subadmin' ? 'none' : 'block';
+    document.getElementById('editServerSelect2Row').style.display = 'block';
+    onEditUseSecondSourceChange();
+    const selected = serversList.find(s => s.host === value);
+    const isXtream = selected ? selected.type !== 'm3u' : false;
+    document.getElementById('editXtreamCredFields').style.display = isXtream ? 'block' : 'none';
+  }
+  window.onEditServerSelectChange = onEditServerSelectChange;
+
+  function onEditUseSecondSourceChange() {
+    const box = document.getElementById('editSecondSourceBox');
+    if (box) {
+      box.style.display = document.getElementById('editUseSecondSource').checked ? 'block' : 'none';
+    }
+  }
+  window.onEditUseSecondSourceChange = onEditUseSecondSourceChange;
+
+  function onEditServerSelect2Change() {
+    const select2 = document.getElementById('editServerSelect2');
+    if (!select2) return;
+    const selected = serversList.find(s => s.host === select2.value);
+    const isXtream = selected ? selected.type !== 'm3u' : false;
+    document.getElementById('editXtreamCredFields2').style.display = isXtream ? 'block' : 'none';
+  }
+  window.onEditServerSelect2Change = onEditServerSelect2Change;
+
   window.openEditClientModal = async (code) => {
     const doc = await db.collection('access_codes').doc(code).get();
     if (!doc.exists) return;
@@ -2049,17 +2118,52 @@
     document.getElementById('editClientName').value = data.clientName || '';
     document.getElementById('editClientPhone').value = data.clientPhone || '';
     document.getElementById('editExpirationDate').value = data.expirationDate || '';
-    if (data.mode === 'm3u') {
-      document.getElementById('editXtreamSection').style.display = 'none';
-      document.getElementById('editM3uSection').style.display = 'block';
-      document.getElementById('editM3uUrl').value = data.m3uUrl || '';
-    } else {
-      document.getElementById('editXtreamSection').style.display = 'block';
-      document.getElementById('editM3uSection').style.display = 'none';
-      document.getElementById('editHost').value = data.host || '';
-      document.getElementById('editUsername').value = data.username || '';
-      document.getElementById('editPassword').value = data.password || '';
+
+    populateEditServerSelects();
+
+    const sources = Array.isArray(data.sources) && data.sources.length > 0 ? data.sources : [{
+      type: data.mode || 'xtream',
+      serverId: null,
+      host: data.host,
+      username: data.username,
+      password: data.password,
+      m3uUrl: data.m3uUrl
+    }];
+
+    if (sources.length === 2) {
+      const matchingCombo = combosList.find(c => c.memberIds.includes(sources[0].serverId) && c.memberIds.includes(sources[1].serverId));
+      if (matchingCombo) {
+        document.getElementById('editServerSelect').value = 'combo::' + matchingCombo.id;
+        document.getElementById('editUsername').value = sources[0].username || '';
+        document.getElementById('editXtreamPassword').value = sources[0].password || '';
+        document.getElementById('editUsername2').value = sources[1].username || '';
+        document.getElementById('editXtreamPassword2').value = sources[1].password || '';
+      } else {
+        const s1 = serversList.find(s => s.id === sources[0].serverId || s.host === sources[0].host || s.host === sources[0].m3uUrl);
+        const s2 = serversList.find(s => s.id === sources[1].serverId || s.host === sources[1].host || s.host === sources[1].m3uUrl);
+        if (s1) document.getElementById('editServerSelect').value = s1.host;
+        document.getElementById('editUsername').value = sources[0].username || '';
+        document.getElementById('editXtreamPassword').value = sources[0].password || '';
+
+        document.getElementById('editUseSecondSource').checked = true;
+        if (s2) document.getElementById('editServerSelect2').value = s2.host;
+        document.getElementById('editUsername2').value = sources[1].username || '';
+        document.getElementById('editXtreamPassword2').value = sources[1].password || '';
+      }
+    } else if (sources.length === 1) {
+      const s1 = serversList.find(s => s.id === sources[0].serverId || s.host === sources[0].host || s.host === sources[0].m3uUrl);
+      if (s1) {
+        document.getElementById('editServerSelect').value = s1.host;
+      }
+      document.getElementById('editUsername').value = sources[0].username || '';
+      document.getElementById('editXtreamPassword').value = sources[0].password || '';
+      document.getElementById('editUseSecondSource').checked = false;
     }
+
+    onEditServerSelectChange();
+    onEditUseSecondSourceChange();
+    onEditServerSelect2Change();
+
     document.getElementById('editClientModal').style.display = 'flex';
   };
 
@@ -2073,21 +2177,85 @@
     const clientPhone = document.getElementById('editClientPhone').value.trim();
     const expirationDate = document.getElementById('editExpirationDate').value;
     
+    const selectedValue = currentUserRole === 'subadmin'
+      ? (currentAssignedServerId || '')
+      : document.getElementById('editServerSelect').value;
+    if (!selectedValue) {
+      alert('Selecciona un servidor, lista o combo de la lista.');
+      return;
+    }
+
+    const sources = [];
+    function buildEditSource(server, usernameFieldId, passwordFieldId) {
+      if (server.type === 'm3u') {
+        return { type: 'm3u', serverId: server.id, m3uUrl: server.host };
+      }
+      const username = document.getElementById(usernameFieldId).value.trim();
+      const password = document.getElementById(passwordFieldId).value.trim();
+      if (!username || !password) return null;
+      return { type: 'xtream', serverId: server.id, host: server.host, username: username, password: password };
+    }
+
+    if (selectedValue.startsWith('combo::')) {
+      const comboId = selectedValue.substring('combo::'.length);
+      const combo = combosList.find(c => c.id === comboId);
+      const member1 = combo ? serversList.find(s => s.id === combo.memberIds[0]) : null;
+      const member2 = combo ? serversList.find(s => s.id === combo.memberIds[1]) : null;
+      if (!member1 || !member2) {
+        alert('No se pudo cargar este combo.');
+        return;
+      }
+      const source1 = buildEditSource(member1, 'editUsername', 'editXtreamPassword');
+      if (member1.type !== 'm3u' && !source1) {
+        alert('Completa usuario y contraseña del primer servidor del combo.');
+        return;
+      }
+      const source2 = buildEditSource(member2, 'editUsername2', 'editXtreamPassword2');
+      if (member2.type !== 'm3u' && !source2) {
+        alert('Completa usuario y contraseña del segundo servidor del combo.');
+        return;
+      }
+      sources.push(source1, source2);
+    } else {
+      const selectedServer = serversList.find(s => s.host === selectedValue);
+      if (!selectedServer) {
+        alert('Selecciona un servidor o lista de la lista.');
+        return;
+      }
+      const source1 = buildEditSource(selectedServer, 'editUsername', 'editXtreamPassword');
+      if (selectedServer.type !== 'm3u' && !source1) {
+        alert('Completa usuario y contraseña.');
+        return;
+      }
+      sources.push(source1);
+      const useSecond = document.getElementById('editUseSecondSource').checked;
+      if (useSecond) {
+        const selectedHost2 = document.getElementById('editServerSelect2').value;
+        const selectedServer2 = serversList.find(s => s.host === selectedHost2);
+        if (!selectedServer2) {
+          alert('Selecciona el segundo servidor o lista.');
+          return;
+        }
+        const source2 = buildEditSource(selectedServer2, 'editUsername2', 'editXtreamPassword2');
+        if (selectedServer2.type !== 'm3u' && !source2) {
+          alert('Completa usuario y contraseña del servidor adicional.');
+          return;
+        }
+        sources.push(source2);
+      }
+    }
+
     const updates = {
       clientName: clientName,
       clientPhone: clientPhone,
-      expirationDate: expirationDate
+      expirationDate: expirationDate || null,
+      mode: sources[0].type,
+      host: sources[0].host || null,
+      username: sources[0].username || null,
+      password: sources[0].password || null,
+      m3uUrl: sources[0].m3uUrl || null,
+      sources: sources
     };
-
-    const doc = await db.collection('access_codes').doc(code).get();
-    const data = doc.data() || {};
-    if (data.mode === 'm3u') {
-      updates.m3uUrl = document.getElementById('editM3uUrl').value.trim();
-    } else {
-      updates.host = document.getElementById('editHost').value.trim();
-      updates.username = document.getElementById('editUsername').value.trim();
-      updates.password = document.getElementById('editPassword').value.trim();
-    }
 
     await db.collection('access_codes').doc(code).update(updates);
     closeEditClientModal();
@@ -2169,20 +2337,36 @@
     <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Fecha de vencimiento</label>
     <input id="editExpirationDate" type="date" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" />
     
-    <div id="editXtreamSection">
-      <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Host del Servidor</label>
-      <input id="editHost" type="text" placeholder="http://servidor.com:8080" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" />
-      <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Usuario</label>
-      <input id="editUsername" type="text" placeholder="Usuario" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" />
-      <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Contraseña</label>
-      <input id="editPassword" type="text" placeholder="Contraseña" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:16px;" />
+    <div id="editServerSelectRow">
+      <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor / lista / combo</label>
+      <select id="editServerSelect" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" onchange="onEditServerSelectChange()">
+        <option value="">Selecciona uno...</option>
+      </select>
     </div>
-    <div id="editM3uSection" style="display:none;">
-      <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">URL M3U</label>
-      <input id="editM3uUrl" type="text" placeholder="http://..." style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:16px;" />
+    <div id="editXtreamCredFields" style="display:none;">
+      <input id="editUsername" type="text" placeholder="Usuario" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+      <input id="editXtreamPassword" type="text" placeholder="Contraseña" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+    </div>
+    <div id="editUseSecondSourceRow">
+      <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin: 4px 0 8px; cursor:pointer;">
+        <input type="checkbox" id="editUseSecondSource" style="width:auto; margin:0;" onchange="onEditUseSecondSourceChange()" />
+        Juntar con un segundo servidor o lista
+      </label>
+    </div>
+    <div id="editSecondSourceBox" style="display:none;">
+      <div id="editServerSelect2Row">
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:4px;">Servidor / lista adicional</label>
+        <select id="editServerSelect2" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" onchange="onEditServerSelect2Change()">
+          <option value="">Selecciona uno...</option>
+        </select>
+      </div>
+      <div id="editXtreamCredFields2" style="display:none;">
+        <input id="editUsername2" type="text" placeholder="Usuario" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+        <input id="editXtreamPassword2" type="text" placeholder="Contraseña" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:14px; margin-bottom:12px;" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+      </div>
     </div>
 
-    <div style="display:flex; gap:10px;">
+    <div style="display:flex; gap:10px; margin-top:10px;">
       <button class="secondary" style="flex:1;" onclick="closeEditClientModal()">Cancelar</button>
       <button class="full" style="flex:1; margin-top:0;" onclick="saveEditClient()">Guardar cambios</button>
     </div>
