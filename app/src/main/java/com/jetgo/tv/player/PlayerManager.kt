@@ -258,11 +258,13 @@ class PlayerManager(context: Context) {
         _stats.value = _stats.value.copy(channelName = name, isLive = isLive)
 
         try {
-            // Se detiene por completo antes de cargar lo nuevo — si solo se pausa, puede
-            // quedar algo del canal anterior a medio camino, y cambiar rápido entre canales
-            // (sobre todo volviendo al mismo de hace un momento) se queda con la imagen en negro.
             player.stop()
+            player.media = null
             state.currentMedia?.release()
+            state.currentMedia = null
+        } catch (e: Exception) { /* ignorar */ }
+
+        try {
             val media = Media(libVLC, android.net.Uri.parse(url))
             media.addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
             media.addOption(":network-caching=3000")
