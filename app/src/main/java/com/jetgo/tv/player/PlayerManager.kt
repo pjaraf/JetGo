@@ -257,12 +257,7 @@ class PlayerManager(context: Context) {
 
         _stats.value = _stats.value.copy(channelName = name, isLive = isLive)
 
-        try {
-            player.stop()
-            player.media = null
-            state.currentMedia?.release()
-            state.currentMedia = null
-        } catch (e: Exception) { /* ignorar */ }
+        val oldMedia = state.currentMedia
 
         try {
             val media = Media(libVLC, android.net.Uri.parse(url))
@@ -271,6 +266,7 @@ class PlayerManager(context: Context) {
             player.media = media
             state.currentMedia = media
             player.play()
+            try { oldMedia?.release() } catch (e: Exception) {}
         } catch (e: Exception) {
             _playbackError.value = "No se pudo reproducir \"$name\"."
         }
