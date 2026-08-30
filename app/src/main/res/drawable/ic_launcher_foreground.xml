@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/apk/res/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Outer rounded card with vibrant gradient -->
+    <path
+        android:pathData="M22,22h64c11.046,0 20,8.954 20,20v64c0,11.046 -8.954,20 -20,20h-64c-11.046,0 -20,-8.954 -20,-20v-64c0,-11.046 8.954,-20 20,-20z"
+        android:fillColor="#FF7A00">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="10"
+                android:startY="10"
+                android:endX="98"
+                android:endY="98"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FF7A00" />
+                <item android:offset="0.5" android:color="#E50914" />
+                <item android:offset="1.0" android:color="#9C27B0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    
+    <!-- White Play Triangle symbol -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,34l32,20l-32,20z" />
+</vector>
