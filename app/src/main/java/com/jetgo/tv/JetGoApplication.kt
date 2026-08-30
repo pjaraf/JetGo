@@ -15,10 +15,9 @@ class JetGoApplication : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
-        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            android.util.Log.e("JetGo_Crash", "Excepción no capturada en ${thread.name}: ${throwable.message}", throwable)
-            defaultHandler?.uncaughtException(thread, throwable)
+            android.util.Log.e("JetGo_Crash", "Excepción atrapada para evitar cierre de la APK en ${thread.name}: ${throwable.message}", throwable)
+            // Evitamos llamar al handler por defecto para que la aplicación NUNCA se cierre sola.
         }
     }
 
