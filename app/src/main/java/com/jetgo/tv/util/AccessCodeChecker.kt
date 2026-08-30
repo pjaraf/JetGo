@@ -236,6 +236,50 @@ object AccessCodeChecker {
         updateDeviceActivity(projectId, code, deviceId, nowIsoUtc())
     }
 
+    fun sendHeartbeatAndGetModified(projectId: String, code: String, deviceId: String): Long {
+        if (projectId.isBlank() || code.isBlank() || deviceId.isBlank()) return 0L
+        return try {
+            val normalizedCode = code.trim().uppercase()
+            val docPath = "projects/$projectId/databases/(default)/documents/access_codes/$normalizedCode"
+            val docUrl = "https://firestore.googleapis.com/v1/$docPath"
+
+            val getRequest = Request.Builder().url(docUrl).build()
+            var lastModified = 0L
+            val activityFields = client.newCall(getRequest).execute().use { response ->
+                if (!response.isSuccessful) return@use JSONObject()
+                val body = response.body?.string() ?: return@use JSONObject()
+                val json = JSONObject(body)
+                val fields = json.optJSONObject("fields") ?: return@use JSONObject()
+
+                lastModified = fields.optJSONObject("lastModified")?.optString("integerValue")?.toLongOrNull()
+                    ?: fields.optJSONObject("lastModified")?.optString("stringValue")?.toLongOrNull() ?: 0L
+
+                fields.optJSONObject("deviceActivity")?.optJSONObject("mapValue")?.optJSONObject("fields") ?: JSONObject()
+            }
+
+            activityFields.put(deviceId, JSONObject().put("timestampValue", nowIsoUtc()))
+
+            val payload = JSONObject().put(
+                "fields", JSONObject().put(
+                    "deviceActivity", JSONObject().put(
+                        "mapValue", JSONObject().put(
+                            "fields", activityFields
+                        )
+                    )
+                )
+            )
+
+            val patchUrl = "$docUrl?updateMask.fieldPaths=deviceActivity"
+            val requestBody = payload.toString().toRequestBody("application/json".toMediaType())
+            val patchRequest = Request.Builder().url(patchUrl).patch(requestBody).build()
+            client.newCall(patchRequest).execute().close()
+
+            lastModified
+        } catch (e: Exception) {
+            0L
+        }
+    }
+
     fun sendOffline(projectId: String, code: String, deviceId: String) {
         updateDeviceActivity(projectId, code, deviceId, "1970-01-01T00:00:00Z")
     }

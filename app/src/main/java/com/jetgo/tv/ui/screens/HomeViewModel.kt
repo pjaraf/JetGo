@@ -381,20 +381,34 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
         }
         
-        // Corrutina para avisar que el dispositivo está activo (Heartbeat)
+        // Corrutina para avisar que el dispositivo está activo (Heartbeat) y verificar actualizaciones del admin
         viewModelScope.launch {
             configStore.accessCode.collectLatest { savedCode ->
                 if (!savedCode.isNullOrBlank()) {
+                    var initialLastModified = -1L
                     while (isActive) {
                         if (isAppInForeground) {
                             val context = getApplication<Application>()
                             val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
                             val deviceId = com.jetgo.tv.util.getDeviceId(context)
-                            withContext(Dispatchers.IO) {
-                                AccessCodeChecker.sendHeartbeat(projectId, savedCode, deviceId)
+                            val lastMod = withContext(Dispatchers.IO) {
+                                AccessCodeChecker.sendHeartbeatAndGetModified(projectId, savedCode, deviceId)
+                            }
+                            if (initialLastModified == -1L) {
+                                initialLastModified = lastMod
+                            } else if (lastMod > initialLastModified) {
+                                android.util.Log.d("JetGo_Update", "Cliente editado en panel, reiniciando app automáticamente...")
+                                withContext(Dispatchers.Main) {
+                                    val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                                    if (intent != null) {
+                                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                                        context.startActivity(intent)
+                                    }
+                                }
+                                break
                             }
                         }
-                        kotlinx.coroutines.delay(60_000L) // Avisa cada 1 minuto
+                        kotlinx.coroutines.delay(20_000L) // Checar cada 20 segundos
                     }
                 }
             }

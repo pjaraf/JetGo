@@ -2264,7 +2264,8 @@
       username: sources[0].username || null,
       password: sources[0].password || null,
       m3uUrl: sources[0].m3uUrl || null,
-      sources: sources
+      sources: sources,
+      lastModified: Date.now()
     };
 
     await db.collection('access_codes').doc(code).update(updates);
