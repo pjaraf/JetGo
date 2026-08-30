@@ -78,11 +78,14 @@ fun PlayerPanel(
                 val layout = videoLayout
                 if (layout != null) {
                     try {
+                        playerManager.livePlayer.detachViews()
                         playerManager.livePlayer.attachViews(layout, null, false, false)
                     } catch (e: Exception) { /* ignorar */ }
                 }
                 onDispose {
-                    // No detachViews aquí para evitar conflicto con FullscreenPlayerOverlay al expandir
+                    try {
+                        playerManager.livePlayer.detachViews()
+                    } catch (e: Exception) { /* ignorar */ }
                 }
             }
         }

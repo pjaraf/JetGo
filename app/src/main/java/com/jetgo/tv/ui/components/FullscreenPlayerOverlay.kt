@@ -209,6 +209,16 @@ fun FullscreenPlayerOverlay(
         val activePlayer = if (isVod) playerManager.vodPlayer else playerManager.livePlayer
         var attachedPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
 
+        androidx.compose.runtime.DisposableEffect(Unit) {
+            onDispose {
+                try {
+                    attachedPlayer?.detachViews()
+                    playerManager.livePlayer.detachViews()
+                    playerManager.vodPlayer.detachViews()
+                } catch (e: Exception) { /* ignorar */ }
+            }
+        }
+
         AndroidView(
             factory = { context ->
                 VLCVideoLayout(context)

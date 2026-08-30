@@ -87,6 +87,7 @@ class PlayerManager(context: Context) {
         var lastUrl: String? = null
         var lastName: String = ""
         var currentUrl: String? = null
+        var currentMedia: Media? = null
         var bufferingTimeoutRunnable: Runnable? = null
         /** true mientras VLC avisa que está cargando (buffering < 100%) */
         var isBuffering = false
@@ -219,13 +220,15 @@ class PlayerManager(context: Context) {
     private fun reloadWithSoftwareDecoder(player: MediaPlayer, url: String): Boolean {
         return try {
             player.stop()
+            val state = if (player == livePlayer) liveState else vodState
+            state.currentMedia?.release()
             val media = Media(libVLC, android.net.Uri.parse(url))
             media.addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
             media.addOption(":network-caching=3000")
             // Fuerza a NO usar el decodificador de hardware del chip para este contenido.
             media.setHWDecoderEnabled(false, true)
             player.media = media
-            media.release()
+            state.currentMedia = media
             player.play()
             true
         } catch (e: Exception) {
@@ -259,11 +262,12 @@ class PlayerManager(context: Context) {
             // quedar algo del canal anterior a medio camino, y cambiar rápido entre canales
             // (sobre todo volviendo al mismo de hace un momento) se queda con la imagen en negro.
             player.stop()
+            state.currentMedia?.release()
             val media = Media(libVLC, android.net.Uri.parse(url))
             media.addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
             media.addOption(":network-caching=3000")
             player.media = media
-            media.release()
+            state.currentMedia = media
             player.play()
         } catch (e: Exception) {
             _playbackError.value = "No se pudo reproducir \"$name\"."
@@ -273,6 +277,8 @@ class PlayerManager(context: Context) {
     fun release() {
         try { livePlayer.stop() } catch (e: Exception) { /* ignorar */ }
         try { vodPlayer.stop() } catch (e: Exception) { /* ignorar */ }
+        liveState.currentMedia?.release()
+        vodState.currentMedia?.release()
         livePlayer.release()
         vodPlayer.release()
         libVLC.release()
