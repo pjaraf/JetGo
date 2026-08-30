@@ -282,6 +282,8 @@
     font-family: ui-monospace, monospace;
     word-break: break-all;
     display: none;
+    width: 100%;
+    flex-basis: 100%;
   }
   #error { color: var(--red); font-size: 13px; margin-top: 10px; }
   /* ---------- Tabla ---------- */
@@ -1394,24 +1396,32 @@
   window.upgradeToPlan = async (code, months) => {
     const labels = { 1: '1 mes', 3: '3 meses', 6: '6 meses', 12: '1 año' };
     if (!confirm('¿Extender o activar el plan de ' + labels[months] + ' para el código ' + code + '?')) return;
-    const docRef = db.collection('access_codes').doc(code);
-    const snap = await docRef.get();
-    const data = snap.data() || {};
-    let baseDate = new Date();
-    if (!data.isDemo && data.expirationDate) {
-      const exp = new Date(data.expirationDate + 'T00:00:00');
-      if (exp > baseDate) baseDate = exp;
+    try {
+      const docRef = db.collection('access_codes').doc(code);
+      const snap = await docRef.get();
+      const data = snap.data() || {};
+      let baseDate = new Date();
+      if (!data.isDemo && data.expirationDate) {
+        const exp = new Date(data.expirationDate + 'T00:00:00');
+        if (!isNaN(exp) && exp > baseDate) baseDate = exp;
+      }
+      baseDate.setMonth(baseDate.getMonth() + months);
+      const expirationDate = baseDate.toISOString().slice(0, 10);
+      const updates = {
+        isDemo: false,
+        expirationDate: expirationDate,
+        active: true,
+        forceCloseSignal: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      if (data.demoExpiresAt !== undefined) {
+        updates.demoExpiresAt = firebase.firestore.FieldValue.delete();
+      }
+      await docRef.update(updates);
+      showToast('Plan de ' + labels[months] + ' aplicado');
+    } catch (e) {
+      console.error(e);
+      alert('Error al actualizar el plan: ' + e.message);
     }
-    baseDate.setMonth(baseDate.getMonth() + months);
-    const expirationDate = baseDate.toISOString().slice(0, 10);
-    await docRef.update({
-      isDemo: false,
-      demoExpiresAt: firebase.firestore.FieldValue.delete(),
-      expirationDate: expirationDate,
-      active: true,
-      forceCloseSignal: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    showToast('Plan de ' + labels[months] + ' aplicado');
   };
   window.deleteCode = async (code) => {
     if (!confirm('Eliminar el codigo ' + code + '? Esta accion no se puede deshacer.')) return;

@@ -521,11 +521,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-            val expWarning = if (isExpiringWithin24Hours(result.expirationDate)) {
-                "⚠️ Aviso importante: Su suscripción vence en menos de 24 horas. Comuníquese con su proveedor para renovar."
-            } else {
-                null
-            }
+            val expWarning = getExpirationWarningMessage(result.expirationDate)
 
             if (expWarning != null) {
                 _uiState.value = _uiState.value.copy(expirationWarning = expWarning)
@@ -593,17 +589,38 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(expirationWarning = null)
     }
 
-    private fun isExpiringWithin24Hours(expirationDateStr: String?): Boolean {
-        if (expirationDateStr.isNullOrBlank()) return false
+    private fun getExpirationWarningMessage(expirationDateStr: String?): String? {
+        if (expirationDateStr.isNullOrBlank()) return null
         return try {
             val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
-            val date = sdf.parse(expirationDateStr) ?: return false
-            val expiryTime = date.time + 24 * 60 * 60 * 1000 - 1
-            val diffMs = expiryTime - System.currentTimeMillis()
-            val diffHours = diffMs / (1000.0 * 60.0 * 60.0)
-            diffHours in 0.0..24.0
+            val date = sdf.parse(expirationDateStr) ?: return null
+            val calToday = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            val calExp = java.util.Calendar.getInstance().apply {
+                time = date
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            val diffMs = calExp.timeInMillis - calToday.timeInMillis
+            val diffDays = (diffMs / (1000 * 60 * 60 * 24)).toInt()
+
+            if (diffDays in 0..7) {
+                when (diffDays) {
+                    0 -> "⚠️ Aviso importante: Su suscripción vence hoy. Comuníquese con su proveedor para renovar."
+                    1 -> "⚠️ Aviso importante: Le queda 1 día a su suscripción. Comuníquese con su proveedor para renovar."
+                    else -> "⚠️ Aviso importante: Le quedan $diffDays días a su suscripción. Comuníquese con su proveedor para renovar."
+                }
+            } else {
+                null
+            }
         } catch (e: Exception) {
-            false
+            null
         }
     }
 
