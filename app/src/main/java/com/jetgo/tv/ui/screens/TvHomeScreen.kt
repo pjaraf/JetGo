@@ -119,11 +119,7 @@ fun TvHomeScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Logo superior pequeño
-                Image(
-                    painter = painterResource(id = com.jetgo.tv.R.drawable.logo_splash),
-                    contentDescription = "JetGo",
-                    modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp))
-                )
+                com.jetgo.tv.ui.components.JetGoLogo(size = 34.dp)
 
                 Spacer(modifier = Modifier.height(10.dp))
 

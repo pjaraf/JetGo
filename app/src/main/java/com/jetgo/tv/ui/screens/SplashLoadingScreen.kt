@@ -62,23 +62,11 @@ fun SplashLoadingScreen() {
     ) {
         SpaceBackground(modifier = Modifier.fillMaxSize())
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Image(
-                painter = painterResource(id = R.drawable.logo_splash),
-                contentDescription = "JetGo",
-                modifier = Modifier
-                    .size(110.dp)
-                    .scale(scale)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Color.White.copy(alpha = glowAlpha * 0.12f))
-            )
-            Text(
-                text = "JetGo",
-                color = Color.White,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 20.dp)
-            )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.scale(scale)
+        ) {
+            com.jetgo.tv.ui.components.JetGoLogo(size = 96.dp, showText = true)
         }
     }
 }

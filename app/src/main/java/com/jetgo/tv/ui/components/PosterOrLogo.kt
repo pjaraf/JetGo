@@ -44,11 +44,7 @@ fun PosterOrLogo(
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Image(
-                    painter = painterResource(id = R.drawable.logo_splash),
-                    contentDescription = null,
-                    modifier = Modifier.size(44.dp)
-                )
+                JetGoLogo(size = 40.dp)
                 Text(
                     text = name,
                     color = Color.White.copy(alpha = 0.85f),
