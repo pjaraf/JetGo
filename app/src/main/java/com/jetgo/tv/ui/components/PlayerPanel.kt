@@ -66,28 +66,22 @@ fun PlayerPanel(
 
             AndroidView(
                 factory = { context ->
-                    VLCVideoLayout(context).also { videoLayout = it }
+                    VLCVideoLayout(context).also { layout ->
+                        videoLayout = layout
+                        try {
+                            playerManager.livePlayer.detachViews()
+                            playerManager.livePlayer.attachViews(layout, null, false, false)
+                        } catch (e: Exception) { /* ignorar */ }
+                    }
                 },
-                modifier = Modifier.fillMaxSize()
-            )
-
-            // Se vincula/desvincula el reproductor de Vivo a esta vista chica cada vez que
-            // entra o sale de composición (por ejemplo, al ir y volver de pantalla completa)
-            // — sin esto a veces se queda solo el audio con la imagen congelada.
-            DisposableEffect(videoLayout) {
-                val layout = videoLayout
-                if (layout != null) {
+                update = { layout ->
                     try {
                         playerManager.livePlayer.detachViews()
                         playerManager.livePlayer.attachViews(layout, null, false, false)
                     } catch (e: Exception) { /* ignorar */ }
-                }
-                onDispose {
-                    try {
-                        playerManager.livePlayer.detachViews()
-                    } catch (e: Exception) { /* ignorar */ }
-                }
-            }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
         }
     }
 }
