@@ -181,6 +181,7 @@ fun TvHomeScreen(
                         PlayerPanel(
                             playerManager = playerManager,
                             modifier = Modifier.fillMaxSize(),
+                            showVideo = !isFullscreen,
                             onTap = onLiveClick
                         )
                         Box(

@@ -25,33 +25,28 @@ class PlayerManager(context: Context) {
     /** Executor en segundo plano para liberar recursos de streams anteriores sin demorar el hilo UI */
     private val releaseExecutor = Executors.newSingleThreadExecutor()
 
-    /** Motor de VLC — optimizado para zapping ultra rápido e instantáneo en TV Boxes, Android TV y teléfonos */
+    /** Motor de VLC — configurado de forma ultra rápida y 100% estable para Android TV, Google TV y TV Boxes */
     private val libVLC: LibVLC by lazy {
         try {
             LibVLC(
-                context,
+                context.applicationContext,
                 arrayListOf(
-                    "--network-caching=150",
-                    "--live-caching=150",
+                    "--network-caching=600",
+                    "--live-caching=600",
                     "--file-caching=1000",
                     "--ipv4",
-                    "--avcodec-fast",
-                    "--avcodec-threads=0",
-                    "--avcodec-skiploopfilter=4",
                     "--hls-live-edge=1",
-                    "--clock-jitter=0",
-                    "--clock-synchro=0",
                     "--no-stats",
                     "--no-video-title-show",
                     "--no-sub-autodetect-file",
-                    "--no-audio-time-stretch",
                     "--rtsp-tcp",
-                    "--no-drop-late-frames"
+                    "--drop-late-frames",
+                    "--skip-frames"
                 )
             )
         } catch (e: Throwable) {
             android.util.Log.e("JetGo_Player", "Error al iniciar LibVLC con opciones personalizadas", e)
-            LibVLC(context)
+            LibVLC(context.applicationContext)
         }
     }
 
@@ -237,29 +232,21 @@ class PlayerManager(context: Context) {
                         val oldMedia = state.currentMedia
                         state.currentMedia = null
                         if (oldMedia != null) {
-                            releaseExecutor.execute {
-                                try { if (!oldMedia.isReleased) oldMedia.release() } catch (t: Throwable) {}
-                            }
+                            try { if (!oldMedia.isReleased) oldMedia.release() } catch (t: Throwable) {}
                         }
-                        val cachingMs = if (state.isLive) "150" else "1500"
+                        val cachingMs = if (state.isLive) "600" else "1500"
                         val media = Media(libVLC, android.net.Uri.parse(url))
                         media.addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
                         media.addOption(":network-caching=$cachingMs")
                         media.addOption(":live-caching=$cachingMs")
                         media.addOption(":http-reconnect=true")
                         media.addOption(":http-continuous=1")
-                        media.addOption(":clock-jitter=0")
-                        media.addOption(":clock-synchro=0")
                         media.addOption(":hls-live-edge=1")
-                        media.addOption(":avcodec-fast")
-                        media.addOption(":avcodec-skiploopfilter=4")
-                        media.addOption(":no-audio-time-stretch")
                         media.addOption(":no-sub-autodetect-file")
-                        media.setHWDecoderEnabled(true, true)
+                        // Hardware decoder con fallback seguro automático a software para evitar que la app se cierre en TV Box
+                        media.setHWDecoderEnabled(true, false)
                         if (state.generationId != generation) {
-                            releaseExecutor.execute {
-                                try { if (!media.isReleased) media.release() } catch (t: Throwable) {}
-                            }
+                            try { if (!media.isReleased) media.release() } catch (t: Throwable) {}
                             return@Runnable
                         }
                         player.media = media
@@ -296,28 +283,20 @@ class PlayerManager(context: Context) {
             val oldMedia = state.currentMedia
             state.currentMedia = null
             if (oldMedia != null) {
-                releaseExecutor.execute {
-                    try { if (!oldMedia.isReleased) oldMedia.release() } catch (t: Throwable) {}
-                }
+                try { if (!oldMedia.isReleased) oldMedia.release() } catch (t: Throwable) {}
             }
-            val cachingMs = if (state.isLive) "150" else "1500"
+            val cachingMs = if (state.isLive) "600" else "1500"
             val media = Media(libVLC, android.net.Uri.parse(url))
             media.addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
             media.addOption(":network-caching=$cachingMs")
             media.addOption(":live-caching=$cachingMs")
             media.addOption(":http-reconnect=true")
             media.addOption(":http-continuous=1")
-            media.addOption(":clock-jitter=0")
-            media.addOption(":clock-synchro=0")
             media.addOption(":hls-live-edge=1")
-            media.addOption(":avcodec-fast")
-            media.addOption(":no-audio-time-stretch")
             media.addOption(":no-sub-autodetect-file")
-            media.setHWDecoderEnabled(false, true)
+            media.setHWDecoderEnabled(false, false)
             if (state.generationId != generation) {
-                releaseExecutor.execute {
-                    try { if (!media.isReleased) media.release() } catch (t: Throwable) {}
-                }
+                try { if (!media.isReleased) media.release() } catch (t: Throwable) {}
                 return false
             }
             player.media = media
@@ -374,42 +353,34 @@ class PlayerManager(context: Context) {
             // Ignorar
         }
 
-        // 4. Liberar el media anterior en background executor para no frenar el hilo principal ni 1ms
+        // 4. Liberar el media anterior de forma segura
         if (oldMedia != null) {
-            releaseExecutor.execute {
-                try {
-                    if (!oldMedia.isReleased) {
-                        oldMedia.release()
-                    }
-                } catch (e: Throwable) {
-                    // Ignorar
+            try {
+                if (!oldMedia.isReleased) {
+                    oldMedia.release()
                 }
+            } catch (e: Throwable) {
+                // Ignorar
             }
         }
 
-        // 5. Cargar nuevo stream con búfer ultrabajo (150ms) y aceleración por hardware para arranque instantáneo
+        // 5. Cargar nuevo stream con búfer ágil (600ms) y aceleración por hardware estable para Android TV
         try {
-            val cachingMs = if (isLive) "150" else "1500"
+            val cachingMs = if (isLive) "600" else "1500"
             val media = Media(libVLC, android.net.Uri.parse(url))
             media.addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
             media.addOption(":network-caching=$cachingMs")
             media.addOption(":live-caching=$cachingMs")
             media.addOption(":http-reconnect=true")
             media.addOption(":http-continuous=1")
-            media.addOption(":clock-jitter=0")
-            media.addOption(":clock-synchro=0")
             media.addOption(":hls-live-edge=1")
-            media.addOption(":avcodec-fast")
-            media.addOption(":avcodec-skiploopfilter=4")
-            media.addOption(":no-audio-time-stretch")
             media.addOption(":no-sub-autodetect-file")
-            media.setHWDecoderEnabled(true, true)
+            // Aceleración por hardware segura con respaldo automático a decodificación por software
+            media.setHWDecoderEnabled(true, false)
 
             // Si durante la creación del Media el usuario cambió rápidamente a otro canal, descartar
             if (state.generationId != generation) {
-                releaseExecutor.execute {
-                    try { if (!media.isReleased) media.release() } catch (t: Throwable) {}
-                }
+                try { if (!media.isReleased) media.release() } catch (t: Throwable) {}
                 return
             }
 
