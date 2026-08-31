@@ -68,20 +68,24 @@ fun PlayerPanel(
                 factory = { context ->
                     VLCVideoLayout(context).also { layout ->
                         videoLayout = layout
-                        try {
-                            playerManager.livePlayer.detachViews()
-                            playerManager.livePlayer.attachViews(layout, null, false, false)
-                        } catch (e: Exception) { /* ignorar */ }
                     }
-                },
-                update = { layout ->
-                    try {
-                        playerManager.livePlayer.detachViews()
-                        playerManager.livePlayer.attachViews(layout, null, false, false)
-                    } catch (e: Exception) { /* ignorar */ }
                 },
                 modifier = Modifier.fillMaxSize()
             )
+
+            DisposableEffect(videoLayout) {
+                val layout = videoLayout
+                if (layout != null) {
+                    try {
+                        playerManager.livePlayer.attachViews(layout, null, false, false)
+                    } catch (e: Throwable) { /* ignorar */ }
+                }
+                onDispose {
+                    try {
+                        playerManager.livePlayer.detachViews()
+                    } catch (e: Throwable) { /* ignorar */ }
+                }
+            }
         }
     }
 }

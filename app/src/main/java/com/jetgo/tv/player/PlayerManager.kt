@@ -17,42 +17,34 @@ data class TrackOption(
 
 /**
  * Maneja DOS reproductores VLC completamente separados — uno para Vivo y otro para Película/
- * Serie — para que cualquier ajuste que se necesite en uno (ej. forzar decodificador por
- * software en algún TV Box puntual) se pueda aplicar sin que le toque nada al otro. Cada uno
- * tiene su propia lógica de reconexión/reintento, así ninguno depende del estado del otro.
- *
- * Reemplaza por completo a Media3/ExoPlayer — no queda ninguna referencia a él en la app.
+ * Serie — optimizados para zapping instantáneo sin congelamiento ni cierres inesperados.
  */
 class PlayerManager(context: Context) {
 
-    /** Motor de VLC — optimizado para TV Boxes y hardware limitado */
+    /** Motor de VLC — optimizado para TV Boxes, Android TV y teléfonos */
     private val libVLC: LibVLC by lazy {
         try {
             LibVLC(
                 context,
                 arrayListOf(
-                    "--network-caching=3000",
+                    "--network-caching=2000",
                     "--rtsp-tcp",
                     "--no-drop-late-frames"
                 )
             )
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             android.util.Log.e("JetGo_Player", "Error al iniciar LibVLC con opciones personalizadas", e)
             LibVLC(context)
         }
     }
 
     // =====================================================================================
-    // REPRODUCTOR DE VIVO — configuración simple, sin ningún ajuste especial de decodificador.
-    // No se debe tocar esta parte para probar cosas nuevas: para eso está el reproductor de
-    // Película/Serie de más abajo, que es completamente independiente.
+    // REPRODUCTOR DE VIVO — optimizado para cambio rápido de canales (zapping)
     // =====================================================================================
     val livePlayer: MediaPlayer by lazy { MediaPlayer(libVLC) }
 
     // =====================================================================================
-    // REPRODUCTOR DE PELÍCULA/SERIE — separado por completo del de Vivo. Acá es donde se
-    // puede forzar decodificación por software si el hardware de un TV Box puntual falla,
-    // sin ningún riesgo de que afecte a Vivo (es otro objeto MediaPlayer distinto).
+    // REPRODUCTOR DE PELÍCULA/SERIE — independiente del reproductor de vivo
     // =====================================================================================
     val vodPlayer: MediaPlayer by lazy { MediaPlayer(libVLC) }
 
@@ -62,23 +54,22 @@ class PlayerManager(context: Context) {
     private val _isPlaying = mutableStateOf(true)
     val isPlaying: State<Boolean> get() = _isPlaying
 
-    /** Calidad real del video que se está reproduciendo AHORA MISMO (según su resolución real) */
+    /** Calidad real del video que se está reproduciendo AHORA MISMO */
     private val _videoQuality = mutableStateOf<String?>(null)
     val videoQuality: State<String?> get() = _videoQuality
 
-    /** Se dispara cuando el contenido actual termina de reproducirse por completo (fin de capítulo/película) */
+    /** Se dispara cuando el contenido actual termina de reproducirse por completo */
     var onPlaybackEnded: (() -> Unit)? = null
 
-    /** Mensaje de error si la reproducción falló (canal caído, URL rota, etc.) — antes esto
-     *  se perdía en silencio y solo se veía una pantalla negra sin ninguna explicación. */
+    /** Mensaje de error si la reproducción falló */
     private val _playbackError = mutableStateOf<String?>(null)
     val playbackError: State<String?> get() = _playbackError
 
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
-    /** Agrupa todo el estado de reconexión/reintento que necesita CADA reproductor por
-     *  separado — así el de Vivo y el de Película/Serie nunca se pisan entre sí. */
+    /** Agrupa todo el estado de reconexión/reintento y generación de cada reproductor */
     private inner class PlayerState(val player: MediaPlayer, val isLive: Boolean) {
+        var generationId: Long = 0L
         var retryCount = 0
         var bufferingReconnectCount = 0
         var lastUrl: String? = null
@@ -86,24 +77,32 @@ class PlayerManager(context: Context) {
         var currentUrl: String? = null
         var currentMedia: Media? = null
         var bufferingTimeoutRunnable: Runnable? = null
-        /** true mientras VLC avisa que está cargando (buffering < 100%) */
+        var errorRetryRunnable: Runnable? = null
         var isBuffering = false
-        /** true una vez que ya se reintentó ESTE contenido forzando decodificación por
-         *  software — para no entrar en un bucle si vuelve a fallar igual. */
         var yaForzoSoftware = false
-
         var lastPosition: Long = -1L
         var lastProgressTime: Long = System.currentTimeMillis()
-        var freezeCheckRunnable: Runnable? = null
 
         fun cancelBufferingTimeout() {
             bufferingTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
             bufferingTimeoutRunnable = null
         }
 
+        fun cancelErrorRetry() {
+            errorRetryRunnable?.let { mainHandler.removeCallbacks(it) }
+            errorRetryRunnable = null
+        }
+
+        fun cancelAllCallbacks() {
+            cancelBufferingTimeout()
+            cancelErrorRetry()
+        }
+
         fun startBufferingTimeout() {
             cancelBufferingTimeout()
+            val gen = generationId
             val runnable = Runnable {
+                if (generationId != gen) return@Runnable
                 if (isBuffering && !isLive) {
                     if (bufferingReconnectCount < 3) {
                         bufferingReconnectCount++
@@ -112,7 +111,7 @@ class PlayerManager(context: Context) {
                             try {
                                 player.stop()
                                 player.play()
-                            } catch (e: Exception) {}
+                            } catch (e: Throwable) {}
                         }
                         startBufferingTimeout()
                     }
@@ -133,25 +132,32 @@ class PlayerManager(context: Context) {
 
     private fun setupPlayer(player: MediaPlayer, state: PlayerState) {
         player.setEventListener { event ->
+            val eventGen = state.generationId
             when (event.type) {
                 MediaPlayer.Event.Playing -> {
+                    if (state.generationId != eventGen) return@setEventListener
                     state.isBuffering = false
                     _isPlaying.value = true
                     _playbackError.value = null
-                    state.retryCount = 0; state.bufferingReconnectCount = 0
+                    state.retryCount = 0
+                    state.bufferingReconnectCount = 0
                     state.cancelBufferingTimeout()
                 }
                 MediaPlayer.Event.Paused -> {
+                    if (state.generationId != eventGen) return@setEventListener
                     _isPlaying.value = false
                 }
                 MediaPlayer.Event.Stopped -> {
+                    if (state.generationId != eventGen) return@setEventListener
                     _isPlaying.value = false
                     state.cancelBufferingTimeout()
                 }
                 MediaPlayer.Event.EndReached -> {
+                    if (state.generationId != eventGen) return@setEventListener
                     onPlaybackEnded?.invoke()
                 }
                 MediaPlayer.Event.Buffering -> {
+                    if (state.generationId != eventGen) return@setEventListener
                     val pct = event.buffering
                     if (pct < 100f) {
                         if (!state.isBuffering) {
@@ -164,12 +170,14 @@ class PlayerManager(context: Context) {
                     }
                 }
                 MediaPlayer.Event.EncounteredError -> {
-                    handlePlaybackError(player, state)
+                    if (state.generationId != eventGen) return@setEventListener
+                    handlePlaybackError(player, state, eventGen)
                 }
                 MediaPlayer.Event.Vout -> {
+                    if (state.generationId != eventGen) return@setEventListener
                     updateVideoQuality(player)
                 }
-                else -> { /* otros eventos (posición, tiempo, etc.) no necesitan acción acá */ }
+                else -> {}
             }
         }
     }
@@ -185,68 +193,88 @@ class PlayerManager(context: Context) {
                 height >= 700 -> "HD"
                 else -> "SD"
             }
-        } catch (e: Exception) { /* ignorar */ }
+        } catch (e: Throwable) { /* ignorar */ }
     }
 
-    private fun handlePlaybackError(player: MediaPlayer, state: PlayerState) {
+    private fun handlePlaybackError(player: MediaPlayer, state: PlayerState, generation: Long) {
+        if (state.generationId != generation || state.currentUrl == null) return
+
         if (!state.yaForzoSoftware) {
             state.yaForzoSoftware = true
             val url = state.lastUrl
-            if (url != null && reloadWithSoftwareDecoder(player, url)) {
+            if (url != null && reloadWithSoftwareDecoder(player, url, generation)) {
                 return
             }
         }
 
         if (state.isLive) {
-            // Para TV en vivo, nunca mostrar error al usuario. Recargar de inmediato y silenciosamente.
+            // Para TV en vivo, reintentar silenciosamente sin mostrar error que interrumpa la experiencia
             val url = state.lastUrl
             if (url != null) {
-                mainHandler.postDelayed({
+                state.cancelErrorRetry()
+                val runnable = Runnable {
+                    if (state.generationId != generation) return@Runnable
                     try {
                         player.stop()
-                        state.currentMedia?.release()
+                        player.media = null
+                        state.currentMedia?.let {
+                            try { it.release() } catch (t: Throwable) {}
+                        }
                         val media = Media(libVLC, android.net.Uri.parse(url))
                         media.addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-                        media.addOption(":network-caching=3000")
+                        media.addOption(":network-caching=2000")
+                        media.addOption(":live-caching=2000")
+                        if (state.generationId != generation) {
+                            try { media.release() } catch (t: Throwable) {}
+                            return@Runnable
+                        }
                         player.media = media
                         state.currentMedia = media
                         player.play()
-                    } catch (e: Exception) {}
-                }, 1_500)
+                    } catch (e: Throwable) {}
+                }
+                state.errorRetryRunnable = runnable
+                mainHandler.postDelayed(runnable, 1_500)
             }
             return
         }
 
         val url = state.lastUrl
         if (url != null && state.retryCount < 2) {
-            // Reintenta un par de veces solo (cortes momentáneos de red/servidor),
-            // antes de mostrarle un error al usuario.
             state.retryCount++
             try {
                 player.play()
-            } catch (e: Exception) { /* ignorar, se maneja abajo si vuelve a fallar */ }
+            } catch (e: Throwable) { /* ignorar */ }
         } else {
-            _playbackError.value = "No se pudo reproducir \"${state.lastName}\"."
+            if (state.generationId == generation) {
+                _playbackError.value = "No se pudo reproducir \"${state.lastName}\"."
+            }
         }
     }
 
-    /** Vuelve a cargar el mismo contenido, esta vez forzando que VLC use un decodificador
-     *  por software en vez del de hardware del chip — devuelve true si se pudo armar. */
-    private fun reloadWithSoftwareDecoder(player: MediaPlayer, url: String): Boolean {
+    /** Vuelve a cargar el mismo contenido forzando decodificador por software */
+    private fun reloadWithSoftwareDecoder(player: MediaPlayer, url: String, generation: Long): Boolean {
+        val state = if (player == livePlayer) liveState else vodState
+        if (state.generationId != generation) return false
         return try {
             player.stop()
-            val state = if (player == livePlayer) liveState else vodState
-            state.currentMedia?.release()
+            player.media = null
+            state.currentMedia?.let {
+                try { it.release() } catch (t: Throwable) {}
+            }
             val media = Media(libVLC, android.net.Uri.parse(url))
             media.addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-            media.addOption(":network-caching=3000")
-            // Fuerza a NO usar el decodificador de hardware del chip para este contenido.
+            media.addOption(":network-caching=2000")
             media.setHWDecoderEnabled(false, true)
+            if (state.generationId != generation) {
+                try { media.release() } catch (t: Throwable) {}
+                return false
+            }
             player.media = media
             state.currentMedia = media
             player.play()
             true
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             false
         }
     }
@@ -261,11 +289,15 @@ class PlayerManager(context: Context) {
             return
         }
 
-        state.cancelBufferingTimeout()
+        // 1. Generación nueva para invalidar cualquier evento, callback o reintento de canales anteriores
+        val generation = ++state.generationId
+        state.cancelAllCallbacks()
+
         state.currentUrl = url
         state.lastUrl = url
         state.lastName = name
-        state.retryCount = 0; state.bufferingReconnectCount = 0
+        state.retryCount = 0
+        state.bufferingReconnectCount = 0
         state.yaForzoSoftware = false
         state.isBuffering = false
         _playbackError.value = null
@@ -278,80 +310,106 @@ class PlayerManager(context: Context) {
         val oldMedia = state.currentMedia
         state.currentMedia = null
 
-        // 1. Detener el reproductor anterior de forma segura antes de cambiar de canal (zapping)
+        // 2. Matar el stream anterior de inmediato
         try {
             player.stop()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             // Ignorar errores al detener
         }
 
-        // 2. Liberar recursos de media anterior sin bloquear
+        // 3. Desvincular el media anterior antes de liberarlo para evitar bloqueos en el motor C de VLC
         try {
-            oldMedia?.release()
-        } catch (e: Exception) {
+            player.media = null
+        } catch (e: Throwable) {
             // Ignorar
         }
 
-        // 3. Cargar nuevo stream con manejo robusto de excepciones
+        // 4. Liberar el media anterior
+        if (oldMedia != null) {
+            try {
+                if (!oldMedia.isReleased) {
+                    oldMedia.release()
+                }
+            } catch (e: Throwable) {
+                // Ignorar
+            }
+        }
+
+        // 5. Cargar nuevo stream con protección total contra excepciones
         try {
             val media = Media(libVLC, android.net.Uri.parse(url))
             media.addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-            media.addOption(":network-caching=3000")
-            media.addOption(":live-caching=3000")
+            media.addOption(":network-caching=2000")
+            media.addOption(":live-caching=2000")
+            media.addOption(":no-sub-autodetect-file")
+
+            // Si durante la creación del Media el usuario cambió rápidamente a otro canal, descartar
+            if (state.generationId != generation) {
+                try { media.release() } catch (t: Throwable) {}
+                return
+            }
+
             player.media = media
             state.currentMedia = media
             player.play()
-        } catch (e: Exception) {
-            _playbackError.value = "No se pudo reproducir \"$name\"."
+        } catch (e: Throwable) {
+            if (state.generationId == generation) {
+                _playbackError.value = "No se pudo reproducir \"$name\"."
+            }
         }
     }
 
     fun release() {
-        try { livePlayer.stop() } catch (e: Exception) { /* ignorar */ }
-        try { vodPlayer.stop() } catch (e: Exception) { /* ignorar */ }
-        liveState.currentMedia?.release()
-        vodState.currentMedia?.release()
-        livePlayer.release()
-        vodPlayer.release()
-        libVLC.release()
+        try { livePlayer.stop() } catch (e: Throwable) { /* ignorar */ }
+        try { vodPlayer.stop() } catch (e: Throwable) { /* ignorar */ }
+        try { livePlayer.media = null } catch (e: Throwable) { /* ignorar */ }
+        try { vodPlayer.media = null } catch (e: Throwable) { /* ignorar */ }
+        try { liveState.currentMedia?.release() } catch (e: Throwable) { /* ignorar */ }
+        try { vodState.currentMedia?.release() } catch (e: Throwable) { /* ignorar */ }
+        try { livePlayer.release() } catch (e: Throwable) { /* ignorar */ }
+        try { vodPlayer.release() } catch (e: Throwable) { /* ignorar */ }
+        try { libVLC.release() } catch (e: Throwable) { /* ignorar */ }
     }
 
     /** Pausa ambos reproductores — se usa cuando la app pasa a segundo plano */
     fun pauseAll() {
-        try { if (livePlayer.isPlaying) livePlayer.pause() } catch (e: Exception) { /* ignorar */ }
-        try { if (vodPlayer.isPlaying) vodPlayer.pause() } catch (e: Exception) { /* ignorar */ }
+        try { if (livePlayer.isPlaying) livePlayer.pause() } catch (e: Throwable) { /* ignorar */ }
+        try { if (vodPlayer.isPlaying) vodPlayer.pause() } catch (e: Throwable) { /* ignorar */ }
     }
 
     /** Reanuda ambos reproductores (el que no tenía nada cargado simplemente no hace nada) */
     fun playAll() {
-        try { livePlayer.play() } catch (e: Exception) { /* ignorar */ }
-        try { vodPlayer.play() } catch (e: Exception) { /* ignorar */ }
+        try { livePlayer.play() } catch (e: Throwable) { /* ignorar */ }
+        try { vodPlayer.play() } catch (e: Throwable) { /* ignorar */ }
     }
 
     /** Detiene ambos por completo — usado al cerrar sesión o desconectar */
     fun stopAll() {
-        try { livePlayer.stop() } catch (e: Exception) { /* ignorar */ }
-        try { vodPlayer.stop() } catch (e: Exception) { /* ignorar */ }
+        try { livePlayer.stop() } catch (e: Throwable) { /* ignorar */ }
+        try { vodPlayer.stop() } catch (e: Throwable) { /* ignorar */ }
+        try { livePlayer.media = null } catch (e: Throwable) { /* ignorar */ }
+        try { vodPlayer.media = null } catch (e: Throwable) { /* ignorar */ }
+        try { liveState.cancelAllCallbacks() } catch (e: Throwable) { /* ignorar */ }
+        try { vodState.cancelAllCallbacks() } catch (e: Throwable) { /* ignorar */ }
     }
 
-    // ---- Todo lo de acá para abajo es SOLO para Película/Serie (el reproductor de Vivo no
-    // usa nada de esto: no tiene controles de avance/retroceso ni pistas seleccionables) ----
+    // ---- Controles para Película/Serie ----
 
     /** Posición actual de reproducción, en milisegundos */
-    fun currentPositionMs(): Long = try { vodPlayer.time } catch (e: Exception) { 0L }
+    fun currentPositionMs(): Long = try { vodPlayer.time } catch (e: Throwable) { 0L }
 
     /** Duración total del contenido actual, en milisegundos (0 si aún no se sabe) */
-    fun durationMs(): Long = try { vodPlayer.length.coerceAtLeast(0) } catch (e: Exception) { 0L }
+    fun durationMs(): Long = try { vodPlayer.length.coerceAtLeast(0) } catch (e: Throwable) { 0L }
 
-    /** Salta a una posición específica (usado para "Seguir viendo" y la barra de progreso) */
+    /** Salta a una posición específica */
     fun seekTo(positionMs: Long) {
-        try { vodPlayer.time = positionMs } catch (e: Exception) { /* ignorar */ }
+        try { vodPlayer.time = positionMs } catch (e: Throwable) { /* ignorar */ }
     }
 
     fun togglePlayPause() {
         try {
             if (vodPlayer.isPlaying) vodPlayer.pause() else vodPlayer.play()
-        } catch (e: Exception) { /* ignorar */ }
+        } catch (e: Throwable) { /* ignorar */ }
     }
 
     fun seekForward(ms: Long = 10_000) {
@@ -369,7 +427,7 @@ class PlayerManager(context: Context) {
             vodPlayer.audioTracks?.map { track ->
                 TrackOption(track.id, track.name ?: "Pista de audio", track.id == current)
             } ?: emptyList()
-        } catch (e: Exception) { emptyList() }
+        } catch (e: Throwable) { emptyList() }
     }
 
     /** Pistas de subtítulos disponibles en el contenido actual */
@@ -379,19 +437,19 @@ class PlayerManager(context: Context) {
             vodPlayer.spuTracks?.map { track ->
                 TrackOption(track.id, track.name ?: "Subtítulo", track.id == current)
             } ?: emptyList()
-        } catch (e: Exception) { emptyList() }
+        } catch (e: Throwable) { emptyList() }
     }
 
     fun selectTrack(option: TrackOption) {
-        try { vodPlayer.setAudioTrack(option.trackId) } catch (e: Exception) { /* ignorar */ }
+        try { vodPlayer.setAudioTrack(option.trackId) } catch (e: Throwable) { /* ignorar */ }
     }
 
     /** Apaga los subtítulos por completo */
     fun disableSubtitles() {
-        try { vodPlayer.setSpuTrack(-1) } catch (e: Exception) { /* ignorar */ }
+        try { vodPlayer.setSpuTrack(-1) } catch (e: Throwable) { /* ignorar */ }
     }
 
     fun selectSubtitleTrack(option: TrackOption) {
-        try { vodPlayer.setSpuTrack(option.trackId) } catch (e: Exception) { /* ignorar */ }
+        try { vodPlayer.setSpuTrack(option.trackId) } catch (e: Throwable) { /* ignorar */ }
     }
 }

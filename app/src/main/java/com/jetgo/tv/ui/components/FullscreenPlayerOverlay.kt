@@ -17,6 +17,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -209,7 +210,14 @@ fun FullscreenPlayerOverlay(
         val activePlayer = if (isVod) playerManager.vodPlayer else playerManager.livePlayer
         var attachedPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
 
-
+        DisposableEffect(activePlayer) {
+            onDispose {
+                try {
+                    attachedPlayer?.detachViews()
+                    attachedPlayer = null
+                } catch (e: Throwable) { /* ignorar */ }
+            }
+        }
 
         AndroidView(
             factory = { context ->
@@ -217,11 +225,11 @@ fun FullscreenPlayerOverlay(
             },
             update = { layout ->
                 if (attachedPlayer !== activePlayer) {
-                    try { attachedPlayer?.detachViews() } catch (e: Exception) { /* ignorar */ }
+                    try { attachedPlayer?.detachViews() } catch (e: Throwable) { /* ignorar */ }
                     try {
                         activePlayer.attachViews(layout, null, true, false)
                         attachedPlayer = activePlayer
-                    } catch (e: Exception) { /* ignorar */ }
+                    } catch (e: Throwable) { /* ignorar */ }
                 }
                 try {
                     if (fillScreen) {
@@ -231,7 +239,7 @@ fun FullscreenPlayerOverlay(
                         activePlayer.aspectRatio = null
                         activePlayer.scale = 0f
                     }
-                } catch (e: Exception) { /* ignorar */ }
+                } catch (e: Throwable) { /* ignorar */ }
             },
             modifier = Modifier.fillMaxSize()
         )
