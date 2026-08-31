@@ -32,11 +32,8 @@ class PlayerManager(context: Context) {
                 context,
                 arrayListOf(
                     "--network-caching=3000",
-                    "--clock-jitter=0",
-                    "--clock-synchro=0",
-                    "--drop-late-frames",
-                    "--skip-frames",
-                    "--rtsp-tcp"
+                    "--rtsp-tcp",
+                    "--no-drop-late-frames"
                 )
             )
         } catch (e: Exception) {
@@ -104,86 +101,25 @@ class PlayerManager(context: Context) {
             bufferingTimeoutRunnable = null
         }
 
-        fun cancelFreezeWatchdog() {
-            freezeCheckRunnable?.let { mainHandler.removeCallbacks(it) }
-            freezeCheckRunnable = null
-        }
-
-        fun startFreezeWatchdog() {
-            if (!isLive) return
-            cancelFreezeWatchdog()
-            val runnable = object : Runnable {
-                override fun run() {
-                    try {
-                        if (player.isPlaying) {
-                            val currentPos = try { player.time } catch (e: Exception) { 0L }
-                            val now = System.currentTimeMillis()
-                            if (currentPos != lastPosition) {
-                                lastPosition = currentPos
-                                lastProgressTime = now
-                            } else {
-                                // Si la posición no avanza en 10 segundos estando reproduciendo en vivo, el canal se congeló/pegó.
-                                if (now - lastProgressTime > 10_000) {
-                                    android.util.Log.d("JetGo_Player", "Canal en vivo congelado detectado, recargando silenciosamente...")
-                                    lastProgressTime = now
-                                    lastUrl?.let { url ->
-                                        try {
-                                            player.stop()
-                                            currentMedia?.release()
-                                            val media = Media(libVLC, android.net.Uri.parse(url))
-                                            media.addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-                                            media.addOption(":network-caching=3000")
-                                            player.media = media
-                                            currentMedia = media
-                                            player.play()
-                                        } catch (e: Exception) {}
-                                    }
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {}
-                    mainHandler.postDelayed(this, 5_000)
-                }
-            }
-            freezeCheckRunnable = runnable
-            mainHandler.postDelayed(runnable, 5_000)
-        }
-
         fun startBufferingTimeout() {
             cancelBufferingTimeout()
             val runnable = Runnable {
-                if (isBuffering) {
-                    if (isLive) {
-                        // Para en vivo, reintentar indefinidamente de forma silenciosa
-                        val url = lastUrl
-                        if (url != null) {
-                            try {
-                                player.stop()
-                                currentMedia?.release()
-                                val media = Media(libVLC, android.net.Uri.parse(url))
-                                media.addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-                                media.addOption(":network-caching=3000")
-                                player.media = media
-                                currentMedia = media
-                                player.play()
-                            } catch (e: Exception) {}
-                        }
-                        startBufferingTimeout()
-                    } else if (bufferingReconnectCount < 4) {
+                if (isBuffering && !isLive) {
+                    if (bufferingReconnectCount < 3) {
                         bufferingReconnectCount++
                         val url = lastUrl
                         if (url != null) {
                             try {
                                 player.stop()
                                 player.play()
-                            } catch (e: Exception) { /* se reintenta de nuevo si vuelve a quedar pegado */ }
+                            } catch (e: Exception) {}
                         }
-                        startBufferingTimeout() // sigue vigilando por si necesita reconectar de nuevo
+                        startBufferingTimeout()
                     }
                 }
             }
             bufferingTimeoutRunnable = runnable
-            mainHandler.postDelayed(runnable, 6_000)
+            mainHandler.postDelayed(runnable, 8_000)
         }
     }
 
@@ -333,10 +269,8 @@ class PlayerManager(context: Context) {
         _playbackError.value = null
         _videoQuality.value = null
         state.cancelBufferingTimeout()
-        state.cancelFreezeWatchdog()
         state.lastPosition = -1L
         state.lastProgressTime = System.currentTimeMillis()
-        state.startFreezeWatchdog()
 
         _stats.value = _stats.value.copy(channelName = name, isLive = isLive)
 
