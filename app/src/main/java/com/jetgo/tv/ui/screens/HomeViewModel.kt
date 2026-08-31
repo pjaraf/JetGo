@@ -574,13 +574,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun removeDeviceAndRetry(code: String, deviceIdToRemove: String) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             val context = getApplication<Application>()
             val projectId = context.getString(com.jetgo.tv.R.string.firebase_project_id)
             val success = withContext(Dispatchers.IO) {
                 AccessCodeChecker.removeDevice(projectId, code, deviceIdToRemove)
             }
             if (success) {
+                _uiState.value = _uiState.value.copy(
+                    deviceLimitReached = false,
+                    registeredDevices = emptyList(),
+                    errorMessage = null
+                )
                 loginWithCode(code)
             } else {
                 val devices = withContext(Dispatchers.IO) {

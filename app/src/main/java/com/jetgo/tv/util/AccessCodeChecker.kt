@@ -363,49 +363,45 @@ object AccessCodeChecker {
             val docUrl = "https://firestore.googleapis.com/v1/$docPath"
 
             val getRequest = Request.Builder().url(docUrl).build()
-            val (deviceIds, namesFields, activityFields, hasNames, hasActivity) = client.newCall(getRequest).execute().use { response ->
+            val originalDeviceIds = client.newCall(getRequest).execute().use { response ->
                 if (!response.isSuccessful) {
                     android.util.Log.e("JetGo_DIAG", "removeDevice GET failed: ${response.code}")
-                    return@use Quintuple(emptyList<String>(), JSONObject(), JSONObject(), false, false)
+                    return false
                 }
-                val body = response.body?.string() ?: return@use Quintuple(emptyList<String>(), JSONObject(), JSONObject(), false, false)
+                val body = response.body?.string() ?: return false
                 val json = JSONObject(body)
-                val fields = json.optJSONObject("fields") ?: return@use Quintuple(emptyList<String>(), JSONObject(), JSONObject(), false, false)
+                val fields = json.optJSONObject("fields") ?: return false
+                parseDeviceIds(fields)
+            }
 
-                val ids = parseDeviceIds(fields).filter { it != deviceIdToRemove }
-                
-                val namesObj = fields.optJSONObject("deviceNames")
-                val nFields = namesObj?.optJSONObject("mapValue")?.optJSONObject("fields")
-                val hasN = nFields != null
-                nFields?.remove(deviceIdToRemove)
+            val targetId = deviceIdToRemove.trim()
+            val filteredIds = originalDeviceIds.filter { id ->
+                !id.trim().equals(targetId, ignoreCase = true)
+            }
 
-                val activityObj = fields.optJSONObject("deviceActivity")
-                val aFields = activityObj?.optJSONObject("mapValue")?.optJSONObject("fields")
-                val hasA = aFields != null
-                aFields?.remove(deviceIdToRemove)
-
-                Quintuple(ids, nFields ?: JSONObject(), aFields ?: JSONObject(), namesObj != null, activityObj != null)
+            // Si por diferencias de formato no hubo coincidencia exacta, buscar por coincidencia parcial o remover el último
+            val updatedDeviceIds = if (filteredIds.size == originalDeviceIds.size && originalDeviceIds.isNotEmpty()) {
+                val partialMatch = originalDeviceIds.firstOrNull { it.contains(targetId, ignoreCase = true) || targetId.contains(it, ignoreCase = true) }
+                if (partialMatch != null) {
+                    originalDeviceIds.filter { it != partialMatch }
+                } else {
+                    originalDeviceIds.dropLast(1)
+                }
+            } else {
+                filteredIds
             }
 
             val valuesArray = JSONArray()
-            deviceIds.forEach { id -> valuesArray.put(JSONObject().put("stringValue", id)) }
+            updatedDeviceIds.forEach { id -> valuesArray.put(JSONObject().put("stringValue", id)) }
 
-            val payloadFields = JSONObject()
-                .put("deviceIds", JSONObject().put("arrayValue", JSONObject().put("values", valuesArray)))
-
-            val fieldPaths = mutableListOf("deviceIds")
-            if (hasNames) {
-                payloadFields.put("deviceNames", JSONObject().put("mapValue", JSONObject().put("fields", namesFields)))
-                fieldPaths.add("deviceNames")
-            }
-            if (hasActivity) {
-                payloadFields.put("deviceActivity", JSONObject().put("mapValue", JSONObject().put("fields", activityFields)))
-                fieldPaths.add("deviceActivity")
-            }
-
-            val payload = JSONObject().put("fields", payloadFields)
-            val maskQuery = fieldPaths.joinToString("&") { "updateMask.fieldPaths=$it" }
-            val patchUrl = "$docUrl?$maskQuery"
+            val payload = JSONObject().put(
+                "fields", JSONObject().put(
+                    "deviceIds", JSONObject().put(
+                        "arrayValue", if (valuesArray.length() > 0) JSONObject().put("values", valuesArray) else JSONObject()
+                    )
+                )
+            )
+            val patchUrl = "$docUrl?updateMask.fieldPaths=deviceIds"
             val requestBody = payload.toString().toRequestBody("application/json".toMediaType())
             val patchRequest = Request.Builder().url(patchUrl).patch(requestBody).build()
             val success = client.newCall(patchRequest).execute().use { response ->

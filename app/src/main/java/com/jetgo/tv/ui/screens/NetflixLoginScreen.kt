@@ -308,7 +308,7 @@ fun NetflixLoginScreen(
     }
 
     if (deviceLimitReached) {
-        androidx.compose.ui.window.Dialog(onDismissRequest = onDismissLimit) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { if (!isLoading) onDismissLimit() }) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -329,7 +329,26 @@ fun NetflixLoginScreen(
                     modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
                 )
 
-                if (registeredDevices.isEmpty()) {
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            CircularProgressIndicator(color = Color(0xFFE50914), modifier = Modifier.size(36.dp))
+                            Text(
+                                text = "Eliminando dispositivo y conectando...",
+                                color = Color.White.copy(alpha = 0.8f),
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                } else if (registeredDevices.isEmpty()) {
                     Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = Color(0xFFE50914))
                     }
@@ -387,14 +406,15 @@ fun NetflixLoginScreen(
                                             fontSize = 12.sp
                                         )
                                     }
-                                    Box(
-                                        modifier = Modifier
-                                            .background(
-                                                color = if (isFocused) Color.White else Color(0xFFE50914),
-                                                shape = RoundedCornerShape(6.dp)
-                                            )
-                                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                                        contentAlignment = Alignment.Center
+                                    Button(
+                                        onClick = { if (!isLoading) onRemoveDevice(device.deviceId) },
+                                        enabled = !isLoading,
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (isFocused) Color.White else Color(0xFFE50914),
+                                            disabledContainerColor = Color(0xFFE50914).copy(alpha = 0.5f)
+                                        ),
+                                        shape = RoundedCornerShape(6.dp),
+                                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                                     ) {
                                         Text(
                                             text = "Eliminar",
@@ -409,11 +429,21 @@ fun NetflixLoginScreen(
                     }
                 }
 
+                if (!errorMessage.isNullOrBlank() && !isLoading) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = errorMessage,
+                        color = Color(0xFFFF5252),
+                        fontSize = 13.sp
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 var isCancelFocused by remember { mutableStateOf(false) }
                 Button(
                     onClick = onDismissLimit,
+                    enabled = !isLoading,
                     modifier = Modifier
                         .fillMaxWidth()
                         .onFocusChanged { focusState -> isCancelFocused = focusState.isFocused }
