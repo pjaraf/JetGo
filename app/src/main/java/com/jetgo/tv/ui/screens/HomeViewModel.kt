@@ -515,7 +515,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     sourceHiddenConfigs = result.sources.map { source ->
                         if (!source.serverId.isNullOrBlank()) {
                             val liveCfg = AccessCodeChecker.fetchServerLiveConfig(projectId, source.serverId)
-                            liveCfg.hiddenCategories.map { it.trim().lowercase() }.toSet() to liveCfg.hiddenTypes.toSet()
+                            liveCfg.hiddenCategories.map { normalizeCat(it) }.toSet() to liveCfg.hiddenTypes.toSet()
                         } else {
                             emptySet<String>() to emptySet<String>()
                         }
@@ -530,7 +530,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         allHiddenCats.reduce { acc, set -> acc.intersect(set) }
                     } else emptySet()
                 } else {
-                    hiddenCategoryNames = result.hiddenCategories.map { it.trim().lowercase() }.toSet()
+                    hiddenCategoryNames = result.hiddenCategories.map { normalizeCat(it) }.toSet()
                     _hiddenTypes.value = result.hiddenTypes.toSet()
                 }
             }
@@ -659,7 +659,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     } catch (e: Exception) { null }
                 }
                 _settingsInfo.value = _settingsInfo.value.copy(expirationDate = expirationText)
-                val channels = repository.getLiveChannels(config, categoryId = null)
+                val categoryNameById = try {
+                    repository.getLiveCategories(config).associate { it.id to it.name }
+                } catch (e: Exception) { emptyMap() }
+                val rawChannels = repository.getLiveChannels(config, categoryId = null)
+                val channels = rawChannels.filterNot { channel ->
+                    val catName = categoryNameById[channel.categoryId] ?: channel.categoryId
+                    hiddenCategoryNames.contains(normalizeCat(catName))
+                }
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     isConfigured = true,
@@ -671,7 +678,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 // primer canal de la lista.
                 if (!silent || !isCurrentlyShowingLive) {
                     val lastId = try { configStore.getLastChannelId() } catch (e: Exception) { null }
-                    val startingChannel = channels.firstOrNull { it.streamId == lastId } ?: channels.firstOrNull()
+                    val chileChannel = channels.firstOrNull { channel ->
+                        val catName = categoryNameById[channel.categoryId] ?: channel.categoryId
+                        normalizeCat(catName).contains("chile")
+                    }
+                    val startingChannel = channels.firstOrNull { it.streamId == lastId } ?: chileChannel ?: channels.firstOrNull()
                     startingChannel?.let { playChannel(it) }
                 }
                 ensureHomeCatalogLoaded()
@@ -714,7 +725,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 if (!silent || !isCurrentlyShowingLive) {
                     val lastId = try { configStore.getLastChannelId() } catch (e: Exception) { null }
-                    val startingChannel = result.channels.firstOrNull { it.streamId == lastId } ?: result.channels.firstOrNull()
+                    val chileChannel = result.channels.firstOrNull { channel ->
+                        normalizeCat(channel.categoryId).contains("chile") || normalizeCat(channel.name).contains("chile")
+                    }
+                    val startingChannel = result.channels.firstOrNull { it.streamId == lastId } ?: chileChannel ?: result.channels.firstOrNull()
                     startingChannel?.let { playChannel(it) }
                 }
                 checkForAutoResume()
@@ -766,7 +780,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     if (source.type == "m3u" && !source.m3uUrl.isNullOrBlank()) {
                         val result = repository.loadFromM3u(source.m3uUrl)
                         allLiveChannels += result.channels
-                            .filterNot { sourceHiddenCats.contains(it.categoryId.trim().lowercase()) }
+                            .filterNot { sourceHiddenCats.contains(normalizeCat(it.categoryId)) }
                             .map { it.copy(streamId = "src${index}_${it.streamId}", categoryId = "$index::${it.categoryId}") }
                         anySourceWorked = true
                     } else if (!source.host.isNullOrBlank() && !source.username.isNullOrBlank() && !source.password.isNullOrBlank()) {
@@ -776,7 +790,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         } catch (e: Exception) { emptyMap() }
                         val channels = repository.getLiveChannels(config, categoryId = null)
                         allLiveChannels += channels
-                            .filterNot { sourceHiddenCats.contains((categoryNameById[it.categoryId] ?: it.categoryId).trim().lowercase()) }
+                            .filterNot { sourceHiddenCats.contains(normalizeCat(categoryNameById[it.categoryId] ?: it.categoryId)) }
                             .map {
                                 val readableCategory = categoryNameById[it.categoryId] ?: it.categoryId
                                 it.copy(streamId = "src${index}_${it.streamId}", categoryId = "$index::$readableCategory")
@@ -805,7 +819,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
             if (!silent || !isCurrentlyShowingLive) {
                 val lastId = try { configStore.getLastChannelId() } catch (e: Exception) { null }
-                val startingChannel = allLiveChannels.firstOrNull { it.streamId == lastId } ?: allLiveChannels.firstOrNull()
+                val chileChannel = allLiveChannels.firstOrNull { normalizeCat(it.categoryId).contains("chile") }
+                val startingChannel = allLiveChannels.firstOrNull { it.streamId == lastId } ?: chileChannel ?: allLiveChannels.firstOrNull()
                 startingChannel?.let { playChannel(it) }
             }
             if (firstXtream != null) ensureHomeCatalogLoaded()
@@ -1638,5 +1653,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     override fun onCleared() {
         super.onCleared()
         playerManager.release()
+    }
+
+    private fun normalizeCat(s: String): String {
+        return s.replace("\uFE0F", "")
+            .replace("\uFE0E", "")
+            .trim()
+            .lowercase()
     }
 }

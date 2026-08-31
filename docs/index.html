@@ -1675,6 +1675,11 @@
       tbody.appendChild(tr);
     });
   }
+  function normalizeCatName(s) {
+    if (!s) return '';
+    return s.replace(/\uFE0F/g, '').replace(/\uFE0E/g, '').trim().toLowerCase();
+  }
+
   window.loadServerCategories = async (serverId) => {
     const server = serversList.find(s => s.id === serverId);
     if (!server) return;
@@ -1745,10 +1750,10 @@
       let html = '<div style="font-size:11px; color:var(--muted); margin-bottom:6px;">Haz clic en una categoría para ocultarla o mostrarla:</div>';
       html += '<div style="display:flex; flex-wrap:wrap; gap:5px; max-height:180px; overflow-y:auto; padding:6px; background:var(--bg); border-radius:8px; border:1px solid var(--border);">';
       
-      const hiddenSet = new Set((server.hiddenCategories || []).map(c => c.trim().toLowerCase()));
+      const hiddenSet = new Set((server.hiddenCategories || []).map(c => normalizeCatName(c)));
 
       rawCats.sort((a, b) => a.name.localeCompare(b.name)).forEach(cat => {
-        const isHidden = hiddenSet.has(cat.name.toLowerCase());
+        const isHidden = hiddenSet.has(normalizeCatName(cat.name));
         html += '<button type="button" onclick="toggleCategoryHidden(\'' + serverId + '\', \'' + cat.name.replace(/'/g, "\\'") + '\')" style="background:' + (isHidden ? 'var(--red-dim)' : 'var(--surface2)') + '; color:' + (isHidden ? 'var(--red)' : 'var(--text)') + '; border:1px solid ' + (isHidden ? 'var(--red)' : 'var(--border)') + '; padding:5px 8px; border-radius:6px; font-size:11px; cursor:pointer; font-weight:' + (isHidden ? '700' : '500') + ';">' + (isHidden ? '🔒 ' : '') + cat.name.replace(/</g, '&lt;') + '</button>';
       });
       html += '</div>';
@@ -1761,7 +1766,7 @@
     const server = serversList.find(s => s.id === serverId);
     if (!server) return;
     let currentHidden = [...(server.hiddenCategories || [])];
-    const idx = currentHidden.findIndex(c => c.trim().toLowerCase() === categoryName.trim().toLowerCase());
+    const idx = currentHidden.findIndex(c => normalizeCatName(c) === normalizeCatName(categoryName));
     if (idx >= 0) {
       currentHidden.splice(idx, 1);
     } else {
