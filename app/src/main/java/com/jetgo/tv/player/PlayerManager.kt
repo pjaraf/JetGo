@@ -253,6 +253,14 @@ class PlayerManager(context: Context) {
     }
 
     private fun handlePlaybackError(player: MediaPlayer, state: PlayerState) {
+        if (!state.yaForzoSoftware) {
+            state.yaForzoSoftware = true
+            val url = state.lastUrl
+            if (url != null && reloadWithSoftwareDecoder(player, url)) {
+                return
+            }
+        }
+
         if (state.isLive) {
             // Para TV en vivo, nunca mostrar error al usuario. Recargar de inmediato y silenciosamente.
             val url = state.lastUrl
@@ -271,19 +279,6 @@ class PlayerManager(context: Context) {
                 }, 1_500)
             }
             return
-        }
-
-        // Si en PELÍCULA/SERIE la reproducción falla y todavía no se probó forzando
-        // decodificación por software para este contenido puntual, se reintenta UNA vez así
-        // — algunos TV Box (chips MediaTek entre otros) fallan con el decodificador de
-        // hardware en ciertos videos, pero funcionan bien por software. Nunca se hace esto
-        // de forma preventiva ni en Vivo, solo como reintento reactivo tras una falla real.
-        if (!state.isLive && !state.yaForzoSoftware) {
-            state.yaForzoSoftware = true
-            val url = state.lastUrl
-            if (url != null && reloadWithSoftwareDecoder(player, url)) {
-                return
-            }
         }
 
         val url = state.lastUrl
