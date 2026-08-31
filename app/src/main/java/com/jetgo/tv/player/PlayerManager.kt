@@ -260,6 +260,8 @@ class PlayerManager(context: Context) {
             // Ya está reproduciendo justo esta URL: no la recarga de nuevo
             return
         }
+
+        state.cancelBufferingTimeout()
         state.currentUrl = url
         state.lastUrl = url
         state.lastName = name
@@ -268,22 +270,37 @@ class PlayerManager(context: Context) {
         state.isBuffering = false
         _playbackError.value = null
         _videoQuality.value = null
-        state.cancelBufferingTimeout()
         state.lastPosition = -1L
         state.lastProgressTime = System.currentTimeMillis()
 
         _stats.value = _stats.value.copy(channelName = name, isLive = isLive)
 
         val oldMedia = state.currentMedia
+        state.currentMedia = null
 
+        // 1. Detener el reproductor anterior de forma segura antes de cambiar de canal (zapping)
+        try {
+            player.stop()
+        } catch (e: Exception) {
+            // Ignorar errores al detener
+        }
+
+        // 2. Liberar recursos de media anterior sin bloquear
+        try {
+            oldMedia?.release()
+        } catch (e: Exception) {
+            // Ignorar
+        }
+
+        // 3. Cargar nuevo stream con manejo robusto de excepciones
         try {
             val media = Media(libVLC, android.net.Uri.parse(url))
             media.addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
             media.addOption(":network-caching=3000")
+            media.addOption(":live-caching=3000")
             player.media = media
             state.currentMedia = media
             player.play()
-            try { oldMedia?.release() } catch (e: Exception) {}
         } catch (e: Exception) {
             _playbackError.value = "No se pudo reproducir \"$name\"."
         }
