@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 import com.jetgo.tv.data.model.PlaybackStats
+import java.util.concurrent.Executors
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
@@ -21,13 +22,23 @@ data class TrackOption(
  */
 class PlayerManager(context: Context) {
 
-    /** Motor de VLC — optimizado para TV Boxes, Android TV y teléfonos */
+    /** Executor en segundo plano para liberar recursos de streams anteriores sin demorar el hilo UI */
+    private val releaseExecutor = Executors.newSingleThreadExecutor()
+
+    /** Motor de VLC — optimizado para zapping ultra rápido en TV Boxes, Android TV y teléfonos */
     private val libVLC: LibVLC by lazy {
         try {
             LibVLC(
                 context,
                 arrayListOf(
-                    "--network-caching=2000",
+                    "--network-caching=300",
+                    "--live-caching=300",
+                    "--file-caching=1000",
+                    "--ipv4",
+                    "--avcodec-fast",
+                    "--avcodec-threads=0",
+                    "--no-stats",
+                    "--no-video-title-show",
                     "--rtsp-tcp",
                     "--no-drop-late-frames"
                 )
@@ -217,15 +228,26 @@ class PlayerManager(context: Context) {
                     try {
                         player.stop()
                         player.media = null
-                        state.currentMedia?.let {
-                            try { it.release() } catch (t: Throwable) {}
+                        val oldMedia = state.currentMedia
+                        state.currentMedia = null
+                        if (oldMedia != null) {
+                            releaseExecutor.execute {
+                                try { if (!oldMedia.isReleased) oldMedia.release() } catch (t: Throwable) {}
+                            }
                         }
+                        val cachingMs = if (state.isLive) "300" else "1500"
                         val media = Media(libVLC, android.net.Uri.parse(url))
                         media.addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-                        media.addOption(":network-caching=2000")
-                        media.addOption(":live-caching=2000")
+                        media.addOption(":network-caching=$cachingMs")
+                        media.addOption(":live-caching=$cachingMs")
+                        media.addOption(":http-reconnect=true")
+                        media.addOption(":http-continuous=1")
+                        media.addOption(":clock-jitter=0")
+                        media.addOption(":no-sub-autodetect-file")
                         if (state.generationId != generation) {
-                            try { media.release() } catch (t: Throwable) {}
+                            releaseExecutor.execute {
+                                try { if (!media.isReleased) media.release() } catch (t: Throwable) {}
+                            }
                             return@Runnable
                         }
                         player.media = media
@@ -259,15 +281,27 @@ class PlayerManager(context: Context) {
         return try {
             player.stop()
             player.media = null
-            state.currentMedia?.let {
-                try { it.release() } catch (t: Throwable) {}
+            val oldMedia = state.currentMedia
+            state.currentMedia = null
+            if (oldMedia != null) {
+                releaseExecutor.execute {
+                    try { if (!oldMedia.isReleased) oldMedia.release() } catch (t: Throwable) {}
+                }
             }
+            val cachingMs = if (state.isLive) "300" else "1500"
             val media = Media(libVLC, android.net.Uri.parse(url))
             media.addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-            media.addOption(":network-caching=2000")
+            media.addOption(":network-caching=$cachingMs")
+            media.addOption(":live-caching=$cachingMs")
+            media.addOption(":http-reconnect=true")
+            media.addOption(":http-continuous=1")
+            media.addOption(":clock-jitter=0")
+            media.addOption(":no-sub-autodetect-file")
             media.setHWDecoderEnabled(false, true)
             if (state.generationId != generation) {
-                try { media.release() } catch (t: Throwable) {}
+                releaseExecutor.execute {
+                    try { if (!media.isReleased) media.release() } catch (t: Throwable) {}
+                }
                 return false
             }
             player.media = media
@@ -324,28 +358,36 @@ class PlayerManager(context: Context) {
             // Ignorar
         }
 
-        // 4. Liberar el media anterior
+        // 4. Liberar el media anterior en background executor para no frenar el hilo principal ni 1ms
         if (oldMedia != null) {
-            try {
-                if (!oldMedia.isReleased) {
-                    oldMedia.release()
+            releaseExecutor.execute {
+                try {
+                    if (!oldMedia.isReleased) {
+                        oldMedia.release()
+                    }
+                } catch (e: Throwable) {
+                    // Ignorar
                 }
-            } catch (e: Throwable) {
-                // Ignorar
             }
         }
 
-        // 5. Cargar nuevo stream con protección total contra excepciones
+        // 5. Cargar nuevo stream con búfer ultrabajo (300ms) para arranque instantáneo
         try {
+            val cachingMs = if (isLive) "300" else "1500"
             val media = Media(libVLC, android.net.Uri.parse(url))
             media.addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-            media.addOption(":network-caching=2000")
-            media.addOption(":live-caching=2000")
+            media.addOption(":network-caching=$cachingMs")
+            media.addOption(":live-caching=$cachingMs")
+            media.addOption(":http-reconnect=true")
+            media.addOption(":http-continuous=1")
+            media.addOption(":clock-jitter=0")
             media.addOption(":no-sub-autodetect-file")
 
             // Si durante la creación del Media el usuario cambió rápidamente a otro canal, descartar
             if (state.generationId != generation) {
-                try { media.release() } catch (t: Throwable) {}
+                releaseExecutor.execute {
+                    try { if (!media.isReleased) media.release() } catch (t: Throwable) {}
+                }
                 return
             }
 
@@ -369,6 +411,7 @@ class PlayerManager(context: Context) {
         try { livePlayer.release() } catch (e: Throwable) { /* ignorar */ }
         try { vodPlayer.release() } catch (e: Throwable) { /* ignorar */ }
         try { libVLC.release() } catch (e: Throwable) { /* ignorar */ }
+        try { releaseExecutor.shutdown() } catch (e: Throwable) { /* ignorar */ }
     }
 
     /** Pausa ambos reproductores — se usa cuando la app pasa a segundo plano */
