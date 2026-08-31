@@ -85,6 +85,9 @@ class MainActivity : ComponentActivity() {
         // No queremos que la pantalla (TV o teléfono) se apague sola mientras se usa la app.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        // Iniciar servicio en primer plano para evitar que Android mate el proceso por ahorro de energía
+        com.jetgo.tv.util.JetGoForegroundService.start(this)
+
         setContent {
             JetGoTheme {
                 AppRoot(viewModel)
