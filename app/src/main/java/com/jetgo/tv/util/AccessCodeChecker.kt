@@ -394,44 +394,74 @@ object AccessCodeChecker {
 
             val removedIds = originalDeviceIds.filter { !updatedDeviceIds.contains(it) }
 
+            // 1. Update deviceIds (Critical)
             val valuesArray = JSONArray()
             updatedDeviceIds.forEach { id -> valuesArray.put(JSONObject().put("stringValue", id)) }
 
-            val payloadFields = JSONObject()
-                .put("deviceIds", JSONObject().put("arrayValue", JSONObject().put("values", valuesArray)))
-
-            val namesObj = fields.optJSONObject("deviceNames")?.optJSONObject("mapValue")?.optJSONObject("fields")
-            if (namesObj != null) {
-                removedIds.forEach { remId -> namesObj.remove(remId) }
-                namesObj.remove(targetId)
-                payloadFields.put("deviceNames", JSONObject().put("mapValue", JSONObject().put("fields", namesObj)))
-            }
-
-            val activityObj = fields.optJSONObject("deviceActivity")?.optJSONObject("mapValue")?.optJSONObject("fields")
-            if (activityObj != null) {
-                removedIds.forEach { remId -> activityObj.remove(remId) }
-                activityObj.remove(targetId)
-                payloadFields.put("deviceActivity", JSONObject().put("mapValue", JSONObject().put("fields", activityObj)))
-            }
-
-            val payload = JSONObject().put("fields", payloadFields)
-            val fieldPaths = mutableListOf("deviceIds")
-            if (namesObj != null) fieldPaths.add("deviceNames")
-            if (activityObj != null) fieldPaths.add("deviceActivity")
-
-            val maskQuery = fieldPaths.joinToString("&") { "updateMask.fieldPaths=$it" }
-            val patchUrl = "$docUrl?$maskQuery"
-            val requestBody = payload.toString().toRequestBody("application/json".toMediaType())
-            val patchRequest = Request.Builder().url(patchUrl).patch(requestBody).build()
-            val success = client.newCall(patchRequest).execute().use { response ->
+            val idsPayload = JSONObject().put(
+                "fields", JSONObject().put(
+                    "deviceIds", JSONObject().put(
+                        "arrayValue", JSONObject().put("values", valuesArray)
+                    )
+                )
+            )
+            val idsPatchUrl = "$docUrl?updateMask.fieldPaths=deviceIds"
+            val idsRequest = Request.Builder().url(idsPatchUrl).patch(idsPayload.toString().toRequestBody("application/json".toMediaType())).build()
+            val idsSuccess = client.newCall(idsRequest).execute().use { response ->
                 if (!response.isSuccessful) {
-                    android.util.Log.e("JetGo_DIAG", "removeDevice PATCH failed: ${response.code} ${response.body?.string()}")
+                    android.util.Log.e("JetGo_DIAG", "removeDevice deviceIds PATCH failed: ${response.code} ${response.body?.string()}")
                 }
                 response.isSuccessful
             }
 
-            android.util.Log.d("JetGo_DIAG", "removeDevice success: $success")
-            success
+            if (!idsSuccess) {
+                return false
+            }
+
+            // 2. Clean up deviceNames if present
+            val namesObj = fields.optJSONObject("deviceNames")?.optJSONObject("mapValue")?.optJSONObject("fields")
+            if (namesObj != null) {
+                try {
+                    removedIds.forEach { remId -> namesObj.remove(remId) }
+                    namesObj.remove(targetId)
+                    val namesPayload = JSONObject().put(
+                        "fields", JSONObject().put(
+                            "deviceNames", JSONObject().put(
+                                "mapValue", JSONObject().put("fields", namesObj)
+                            )
+                        )
+                    )
+                    val namesPatchUrl = "$docUrl?updateMask.fieldPaths=deviceNames"
+                    val namesRequest = Request.Builder().url(namesPatchUrl).patch(namesPayload.toString().toRequestBody("application/json".toMediaType())).build()
+                    client.newCall(namesRequest).execute().close()
+                } catch (e: Exception) {
+                    android.util.Log.e("JetGo_DIAG", "removeDevice names cleanup exception", e)
+                }
+            }
+
+            // 3. Clean up deviceActivity if present
+            val activityObj = fields.optJSONObject("deviceActivity")?.optJSONObject("mapValue")?.optJSONObject("fields")
+            if (activityObj != null) {
+                try {
+                    removedIds.forEach { remId -> activityObj.remove(remId) }
+                    activityObj.remove(targetId)
+                    val activityPayload = JSONObject().put(
+                        "fields", JSONObject().put(
+                            "deviceActivity", JSONObject().put(
+                                "mapValue", JSONObject().put("fields", activityObj)
+                            )
+                        )
+                    )
+                    val activityPatchUrl = "$docUrl?updateMask.fieldPaths=deviceActivity"
+                    val activityRequest = Request.Builder().url(activityPatchUrl).patch(activityPayload.toString().toRequestBody("application/json".toMediaType())).build()
+                    client.newCall(activityRequest).execute().close()
+                } catch (e: Exception) {
+                    android.util.Log.e("JetGo_DIAG", "removeDevice activity cleanup exception", e)
+                }
+            }
+
+            android.util.Log.d("JetGo_DIAG", "removeDevice success: true")
+            true
         } catch (e: Exception) {
             android.util.Log.e("JetGo_DIAG", "removeDevice exception", e)
             false
